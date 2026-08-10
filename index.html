@@ -1,0 +1,2706 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hemocentro João Pessoa | Prontuário Eletrônico</title>
+<style>
+  :root{
+    --red:#C81E2C;
+    --red-dark:#9E1520;
+    --navy:#132A4C;
+    --navy-2:#1E3A5F;
+    --blue:#1D63C9;
+    --bg:#F2F4F7;
+    --card:#FFFFFF;
+    --line:#E4E8EE;
+    --text:#1B2430;
+    --muted:#67748B;
+    --green-bg:#E4F7EA;
+    --green-text:#1C8A45;
+    --amber-bg:#FDF1D8;
+    --amber-text:#B4780A;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Roboto,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:#C81E2C33;}
+
+  /* ---------- LOGIN ---------- */
+  #login-screen{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:
+      radial-gradient(circle at 15% 20%, #ffffff14 0%, transparent 45%),
+      linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 55%, #24345a 100%);
+    position:relative;
+    overflow:hidden;
+  }
+  #login-screen::before{
+    content:"";
+    position:absolute;
+    width:900px;height:900px;
+    border-radius:50%;
+    background:radial-gradient(circle, #C81E2C22 0%, transparent 70%);
+    top:-300px; right:-260px;
+  }
+  #login-screen::after{
+    content:"";
+    position:absolute;
+    width:600px;height:600px;
+    border-radius:50%;
+    background:radial-gradient(circle, #ffffff10 0%, transparent 70%);
+    bottom:-220px; left:-200px;
+  }
+  .login-card{
+    position:relative;
+    z-index:2;
+    width:380px;
+    background:var(--card);
+    border-radius:20px;
+    padding:40px 36px 34px;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,.45);
+    text-align:center;
+  }
+  .login-logo{
+    width:64px;height:64px;
+    margin:0 auto 14px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .login-brand{
+    font-size:19px;
+    font-weight:800;
+    color:var(--navy);
+    line-height:1.15;
+    letter-spacing:.2px;
+  }
+  .login-brand span{color:var(--red);}
+  .login-tag{
+    font-size:12.5px;
+    color:var(--muted);
+    margin-top:4px;
+    margin-bottom:26px;
+  }
+  .login-title{
+    font-size:15px;
+    font-weight:700;
+    color:var(--text);
+    margin-bottom:20px;
+    text-align:left;
+  }
+  .field{
+    text-align:left;
+    margin-bottom:16px;
+  }
+  .field label{
+    display:block;
+    font-size:12px;
+    font-weight:700;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:.5px;
+    margin-bottom:6px;
+  }
+  .field input{
+    width:100%;
+    padding:12px 14px;
+    border:1.5px solid var(--line);
+    border-radius:10px;
+    font-size:14.5px;
+    background:#FAFBFC;
+    transition:.15s;
+    outline:none;
+  }
+  .field input:focus{
+    border-color:var(--red);
+    background:#fff;
+    box-shadow:0 0 0 3px #C81E2C1A;
+  }
+  .login-btn{
+    width:100%;
+    padding:13px;
+    background:var(--red);
+    color:#fff;
+    border:none;
+    border-radius:10px;
+    font-size:15px;
+    font-weight:700;
+    cursor:pointer;
+    margin-top:6px;
+    transition:.15s;
+    letter-spacing:.2px;
+  }
+  .login-btn:hover{background:var(--red-dark);}
+  .login-error{
+    color:var(--red-dark);
+    font-size:13px;
+    font-weight:600;
+    margin-top:12px;
+    display:none;
+    text-align:left;
+  }
+  .login-hint{
+    margin-top:22px;
+    font-size:11.5px;
+    color:#9AA5B5;
+    border-top:1px solid var(--line);
+    padding-top:14px;
+  }
+
+  /* ---------- APP SHELL ---------- */
+  #app{display:none;min-height:100vh;}
+  .topbar{
+    height:64px;
+    background:#fff;
+    border-bottom:1px solid var(--line);
+    display:flex;
+    align-items:center;
+    padding:0 24px;
+    gap:20px;
+    position:sticky;top:0;z-index:50;
+  }
+  .brand{
+    display:flex;align-items:center;gap:10px;
+    min-width:230px;
+  }
+  .brand-mark{width:34px;height:34px;flex-shrink:0;}
+  .brand-text{line-height:1.1;}
+  .brand-text b{
+    display:block;font-size:14px;color:var(--navy);font-weight:800;letter-spacing:.2px;
+  }
+  .brand-text span{font-size:10px;color:var(--red);font-weight:700;letter-spacing:.4px;}
+  .topbar-divider{width:1px;height:28px;background:var(--line);}
+  .topbar-title{font-size:14px;font-weight:700;color:var(--muted);letter-spacing:.3px;}
+  .topbar-right{margin-left:auto;display:flex;align-items:center;gap:18px;}
+  .icon-btn{
+    width:36px;height:36px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background:#F5F6F8;color:var(--muted);cursor:pointer;
+    position:relative;font-size:16px;border:none;
+  }
+  .icon-btn .badge{
+    position:absolute;top:-3px;right:-3px;
+    background:var(--red);color:#fff;font-size:10px;font-weight:700;
+    width:16px;height:16px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .user-chip{display:flex;align-items:center;gap:10px;cursor:pointer;}
+  .user-avatar{
+    width:36px;height:36px;border-radius:50%;
+    background:linear-gradient(135deg,var(--navy),var(--blue));
+    color:#fff;display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:13px;
+  }
+  .user-meta{line-height:1.15;}
+  .user-meta b{font-size:13px;color:var(--text);display:block;}
+  .user-meta span{font-size:11.5px;color:var(--muted);}
+  .logout-link{font-size:12px;color:var(--red);font-weight:700;cursor:pointer;margin-left:6px;}
+
+  .layout{display:flex;align-items:flex-start;}
+  .sidebar{
+    width:250px;flex-shrink:0;
+    background:#fff;border-right:1px solid var(--line);
+    min-height:calc(100vh - 64px);
+    padding:18px 12px;
+    position:sticky;top:64px;
+    display:flex;flex-direction:column;
+  }
+  .nav-item{
+    display:flex;align-items:center;gap:11px;
+    padding:10px 12px;border-radius:9px;
+    font-size:13.5px;font-weight:600;color:#4A5568;
+    cursor:pointer;margin-bottom:2px;
+    transition:.12s;
+  }
+  .nav-item .ic{width:18px;text-align:center;font-size:15px;flex-shrink:0;}
+  .nav-item:hover{background:#F5F6F8;}
+  .nav-item.active{background:#FCEAEC;color:var(--red-dark);}
+  .nav-item.active .ic{color:var(--red);}
+  .nav-spacer{flex:1;}
+  .sidebar-footer{
+    padding:14px 10px 4px;border-top:1px solid var(--line);margin-top:10px;
+  }
+  .sidebar-footer .nav-item{color:var(--red-dark);}
+  .sidebar-version{font-size:10.5px;color:#B7C0CD;padding:10px 12px 0;}
+
+  .main{flex:1;padding:24px 28px 60px;min-width:0;}
+
+  /* Patient header card */
+  .patient-card{
+    background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px 26px;display:flex;gap:22px;align-items:center;
+    box-shadow:0 1px 2px rgba(16,24,40,.04);
+  }
+  .patient-avatar{
+    width:64px;height:64px;border-radius:50%;
+    background:#EDF1F6;display:flex;align-items:center;justify-content:center;
+    color:#9AA5B5;font-size:28px;flex-shrink:0;
+  }
+  .patient-info{flex:1;}
+  .patient-name{font-size:19px;font-weight:800;color:var(--navy);margin:0 0 10px;}
+  .patient-grid{
+    display:grid;grid-template-columns:repeat(5,1fr);gap:16px;
+  }
+  .pi{font-size:12px;}
+  .pi label{display:flex;align-items:center;gap:6px;color:var(--muted);font-weight:600;margin-bottom:3px;}
+  .pi b{font-size:13.5px;color:var(--text);font-weight:700;}
+  .pi.red b{color:var(--red);}
+  .edit-btn{
+    background:var(--red);color:#fff;border:none;padding:10px 16px;
+    border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;
+    display:flex;align-items:center;gap:7px;
+  }
+  .edit-btn:hover{background:var(--red-dark);}
+
+  /* Info strip */
+  .info-strip{
+    margin-top:16px;background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 26px;
+  }
+  .info-strip-title{font-size:11.5px;font-weight:800;color:var(--muted);letter-spacing:.6px;margin-bottom:14px;}
+  .info-strip-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;}
+  .info-chip{display:flex;align-items:flex-start;gap:10px;}
+  .info-chip .ic{
+    width:34px;height:34px;border-radius:9px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;font-size:15px;
+  }
+  .info-chip label{display:block;font-size:11px;color:var(--muted);font-weight:600;margin-bottom:2px;}
+  .info-chip b{font-size:14px;color:var(--text);font-weight:700;}
+
+  /* Tabs */
+  .tabs{
+    margin-top:18px;background:#fff;border:1px solid var(--line);border-radius:var(--radius) var(--radius) 0 0;
+    display:flex;padding:0 10px;border-bottom:none;
+  }
+  .tab{
+    padding:15px 18px;font-size:13px;font-weight:700;color:var(--muted);
+    cursor:pointer;border-bottom:3px solid transparent;
+  }
+  .tab.active{color:var(--red-dark);border-bottom-color:var(--red);}
+
+  .tab-body{
+    background:transparent;
+    display:flex;gap:18px;margin-top:0;
+    border:1px solid var(--line);border-top:none;border-radius:0 0 var(--radius) var(--radius);
+    background:#fff;padding:20px;
+  }
+
+  /* Docs left col */
+  .docs-col{width:230px;flex-shrink:0;}
+  .docs-title{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.6px;margin:4px 0 10px;}
+  .doc-nav{
+    display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;
+    font-size:13px;font-weight:600;color:#4A5568;cursor:pointer;margin-bottom:3px;
+  }
+  .doc-nav .ic{width:16px;text-align:center;color:var(--muted);}
+  .doc-nav:hover{background:#F5F6F8;}
+  .doc-nav.active{background:#FCEAEC;color:var(--red-dark);}
+  .doc-nav.active .ic{color:var(--red);}
+
+  .updates-box{margin-top:22px;padding-top:16px;border-top:1px solid var(--line);}
+  .updates-title{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.6px;margin-bottom:14px;}
+  .update-item{display:flex;gap:10px;margin-bottom:16px;}
+  .update-item .dot{
+    width:26px;height:26px;border-radius:50%;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;font-size:12px;margin-top:1px;
+  }
+  .update-item .tx label{display:block;font-size:11.5px;font-weight:700;color:var(--text);}
+  .update-item .tx span{font-size:11.5px;color:var(--muted);}
+
+  /* Right content: panels */
+  .panels{flex:1;min-width:0;display:flex;flex-direction:column;gap:18px;}
+  .panel{border:1px solid var(--line);border-radius:12px;overflow:hidden;}
+  .panel-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 18px;border-bottom:1px solid var(--line);
+  }
+  .panel-head h3{margin:0;font-size:14.5px;font-weight:800;color:var(--navy);}
+  .btn-new{
+    background:var(--blue);color:#fff;border:none;padding:8px 14px;
+    border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;
+    display:flex;align-items:center;gap:6px;
+  }
+  .btn-new:hover{filter:brightness(1.08);}
+  .btn-new.red{background:var(--red);}
+
+  table{width:100%;border-collapse:collapse;}
+  thead th{
+    text-align:left;font-size:10.5px;color:var(--muted);text-transform:uppercase;
+    letter-spacing:.5px;font-weight:800;padding:10px 18px;background:#FAFBFC;
+    border-bottom:1px solid var(--line);
+  }
+  tbody td{
+    padding:13px 18px;font-size:13px;color:var(--text);border-bottom:1px solid #F0F2F5;
+  }
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:#FAFBFD;}
+  .status{
+    display:inline-block;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;
+  }
+  .status.pendente{background:var(--amber-bg);color:var(--amber-text);}
+  .status.concluido{background:var(--green-bg);color:var(--green-text);}
+  .status.autorizada{background:var(--green-bg);color:var(--green-text);}
+  .status.urgente{background:#FCE4E4;color:var(--red-dark);}
+  .row-actions{display:flex;gap:6px;}
+  .row-actions button{
+    width:30px;height:30px;border-radius:7px;border:none;background:#F5F6F8;
+    color:var(--muted);cursor:pointer;font-size:13px;
+  }
+  .row-actions button:hover{background:#EAECEF;color:var(--text);}
+  .panel-foot{
+    padding:12px 18px;text-align:right;font-size:12.5px;font-weight:700;color:var(--blue);cursor:pointer;
+  }
+  .empty-row td{text-align:center;color:var(--muted);padding:26px;font-style:italic;}
+
+  .placeholder{
+    background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+    padding:70px 30px;text-align:center;margin-top:18px;
+  }
+  .placeholder .ic{font-size:38px;margin-bottom:14px;}
+  .placeholder h3{margin:0 0 8px;color:var(--navy);font-size:17px;}
+  .placeholder p{margin:0;color:var(--muted);font-size:13.5px;}
+
+  /* Footer */
+  .app-footer{
+    text-align:center;padding:22px;color:var(--muted);font-size:12px;
+    border-top:1px solid var(--line);margin-top:30px;background:#fff;
+  }
+  .app-footer b{color:var(--navy);}
+
+  /* Modal */
+  .modal-overlay{
+    display:none;position:fixed;inset:0;background:rgba(19,42,76,.55);
+    z-index:200;align-items:center;justify-content:center;padding:20px;
+  }
+  .modal-overlay.show{display:flex;}
+  .modal{
+    background:#fff;border-radius:16px;width:100%;max-width:620px;
+    max-height:88vh;overflow:auto;box-shadow:0 30px 70px -20px rgba(0,0,0,.4);
+  }
+  .modal-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:18px 22px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff;z-index:2;
+  }
+  .modal-head h3{margin:0;font-size:16px;color:var(--navy);font-weight:800;}
+  .modal-head .close{cursor:pointer;color:var(--muted);font-size:20px;background:none;border:none;line-height:1;}
+  .modal-body{padding:22px;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .form-grid .full{grid-column:1/-1;}
+  .form-field label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px;}
+  .form-field input, .form-field select, .form-field textarea{
+    width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px;
+    font-size:13.5px;font-family:inherit;outline:none;background:#FAFBFC;
+  }
+  .form-field input:focus, .form-field select:focus, .form-field textarea:focus{
+    border-color:var(--blue);background:#fff;box-shadow:0 0 0 3px #1D63C91A;
+  }
+  .form-field textarea{resize:vertical;min-height:70px;}
+  .form-field{margin-bottom:0;}
+  .check-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;}
+  .lab-checklist{display:grid;grid-template-columns:1fr 1fr;gap:0 22px;max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#FAFBFC;}
+  .lab-cat-title{font-size:11px;font-weight:800;color:var(--navy);text-transform:uppercase;letter-spacing:.3px;margin:10px 0 4px;}
+  .lab-cat-title:first-child{margin-top:0;}
+  .lab-check-item{display:flex;align-items:center;gap:7px;font-size:12.5px;padding:2px 0;color:var(--text);}
+  .lab-check-item input{width:14px;height:14px;flex-shrink:0;}
+  .check-opt{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);}
+  .modal-foot{
+    display:flex;justify-content:flex-end;gap:10px;padding:16px 22px;border-top:1px solid var(--line);
+    position:sticky;bottom:0;background:#fff;
+  }
+  .btn-secondary{
+    background:#F5F6F8;color:var(--text);border:none;padding:10px 18px;border-radius:9px;
+    font-size:13px;font-weight:700;cursor:pointer;
+  }
+  .btn-primary{
+    background:var(--red);color:#fff;border:none;padding:10px 20px;border-radius:9px;
+    font-size:13px;font-weight:700;cursor:pointer;
+  }
+  .btn-primary:hover{background:var(--red-dark);}
+  .form-section-title{
+    font-size:12px;font-weight:800;color:var(--navy);margin:18px 0 10px;
+    text-transform:uppercase;letter-spacing:.4px;
+  }
+  .toast{
+    position:fixed;bottom:26px;left:50%;transform:translateX(-50%);
+    background:var(--navy);color:#fff;padding:13px 22px;border-radius:10px;
+    font-size:13.5px;font-weight:600;box-shadow:0 15px 40px rgba(0,0,0,.3);
+    z-index:400;display:flex;align-items:center;gap:10px;opacity:0;pointer-events:none;transition:.25s;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  @media (max-width:1100px){
+    .patient-grid{grid-template-columns:repeat(3,1fr);}
+    .info-strip-grid{grid-template-columns:repeat(3,1fr);}
+    .sidebar{display:none;}
+    .tab-body{flex-direction:column;}
+    .docs-col{width:100%;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <svg viewBox="0 0 48 48" width="52" height="52"><path fill="#C81E2C" d="M24 4C24 4 10 20.5 10 30.5C10 38 16.3 44 24 44C31.7 44 38 38 38 30.5C38 20.5 24 4 24 4Z"/></svg>
+    </div>
+    <div class="login-brand">HEMOCENTRO<br><span>JOÃO PESSOA</span></div>
+    <div class="login-tag">Cuidar de você. Doar vida.</div>
+
+    <div class="login-title">Acesso ao Prontuário Eletrônico</div>
+    <form id="login-form" autocomplete="off">
+      <div class="field">
+        <label for="login-user">Usuário</label>
+        <input type="text" id="login-user" placeholder="Digite seu usuário" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="login-pass">Senha</label>
+        <input type="password" id="login-pass" placeholder="Digite sua senha" autocomplete="off">
+      </div>
+      <button type="submit" class="login-btn">Entrar</button>
+      <div class="login-error" id="login-error">Usuário ou senha incorretos. Tente novamente.</div>
+    </form>
+    <div class="login-hint">Acesso restrito a profissionais autorizados do Hemocentro João Pessoa.</div>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app">
+  <div class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 48 48" width="30" height="30"><path fill="#C81E2C" d="M24 4C24 4 10 20.5 10 30.5C10 38 16.3 44 24 44C31.7 44 38 38 38 30.5C38 20.5 24 4 24 4Z"/></svg>
+      <div class="brand-text"><b>HEMOCENTRO</b><span>JOÃO PESSOA</span></div>
+    </div>
+    <div class="topbar-divider"></div>
+    <div class="topbar-title">PRONTUÁRIO ELETRÔNICO</div>
+    <div class="topbar-right">
+      <button class="icon-btn">🔔<span class="badge">3</span></button>
+      <button class="icon-btn">?</button>
+      <div class="user-chip">
+        <div class="user-avatar">RC</div>
+        <div class="user-meta"><b>Dr. Rodrigo Cahuana</b><span>Hematologista</span></div>
+      </div>
+      <span class="logout-link" onclick="logout()">Sair</span>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="sidebar" id="sidebar">
+      <div class="nav-item active" data-page="resumo"><span class="ic">🏠</span> Resumo do Paciente</div>
+      <div class="nav-item" data-page="dados"><span class="ic">🧑</span> Dados do Paciente</div>
+      <div class="nav-item" data-page="atendimentos"><span class="ic">🗓️</span> Atendimentos</div>
+      <div class="nav-item" data-page="receitas"><span class="ic">📋</span> Receitas Médicas</div>
+      <div class="nav-item" data-page="laboratorios"><span class="ic">🧪</span> Solicitações de Laboratórios</div>
+      <div class="nav-item" data-page="hemocomponentes"><span class="ic">🩸</span> Solicitações de Hemocomponentes</div>
+      <div class="nav-item" data-page="documentos"><span class="ic">📄</span> Documentos</div>
+      <div class="nav-item" data-page="evolucoes"><span class="ic">📝</span> Evoluções</div>
+      <div class="nav-item" data-page="transfusoes"><span class="ic">💉</span> Transfusões</div>
+      <div class="nav-item" data-page="historico"><span class="ic">📖</span> Histórico Clínico</div>
+      <div class="nav-item" data-page="exames"><span class="ic">🔬</span> Exames Realizados</div>
+      <div class="nav-item" data-page="alergias"><span class="ic">⚠️</span> Alergias e Reações</div>
+      <div class="nav-item" data-page="relatorios"><span class="ic">📊</span> Relatórios</div>
+      <div class="nav-item" data-page="anexos"><span class="ic">📎</span> Anexos</div>
+      <div class="nav-item" data-page="config"><span class="ic">⚙️</span> Configurações</div>
+      <div class="nav-item" data-page="usuarios" style="display:none;"><span class="ic">🔑</span> Usuários</div>
+      <div class="nav-spacer"></div>
+      <div class="sidebar-footer">
+        <div class="brand" style="margin-bottom:8px;">
+          <svg width="24" height="24" viewBox="0 0 48 48"><path fill="#C81E2C" d="M24 4C24 4 10 20.5 10 30.5C10 38 16.3 44 24 44C31.7 44 38 38 38 30.5C38 20.5 24 4 24 4Z"/></svg>
+          <div class="brand-text"><b style="font-size:12px;">HEMOCENTRO</b><span style="font-size:9px;">JOÃO PESSOA</span></div>
+        </div>
+        <div class="sidebar-version">Versão 1.0.0</div>
+      </div>
+    </div>
+
+    <div class="main" id="main-content">
+      <!-- content injected by JS -->
+    </div>
+  </div>
+
+  <div class="app-footer">
+    <b>Hemocentro João Pessoa</b> — Av. Cruz das Armas, 159 - Cruz das Armas - João Pessoa/PB - CEP: 58085-000<br>
+    Telefone: (83) 3213-7XXX &nbsp;|&nbsp; CNPJ: 09.123.456/0001-XX
+  </div>
+</div>
+
+<!-- ============ MODALS ============ -->
+
+<!-- Nova Receita -->
+<div class="modal-overlay" id="modal-receita">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modal-receita-title">Nova Receita Médica</h3><button class="close" onclick="closeModal('modal-receita')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field full">
+          <label>Paciente</label>
+          <input type="text" id="rx-paciente-display" value="Maria da Conceição Silva" disabled>
+        </div>
+        <div class="form-field">
+          <label>Tipo de receituário</label>
+          <select id="rx-tipo">
+            <option value="Receituário médico">Receituário médico (F.CP.107.04)</option>
+            <option value="Receituário de controle especial">Receituário de controle especial (F.CP.107.05)</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Data</label>
+          <input type="date" id="rx-data">
+        </div>
+        <div class="form-field">
+          <label>Medicamento</label>
+          <input type="text" id="rx-medicamento" placeholder="Ex.: Hidroxiureia 500 mg">
+        </div>
+        <div class="form-field">
+          <label>Posologia / Uso</label>
+          <input type="text" id="rx-uso" placeholder="Ex.: 1 comprimido ao dia">
+        </div>
+        <div class="form-field full">
+          <label>Prescrição completa</label>
+          <textarea id="rx-prescricao" placeholder="Descreva a prescrição na íntegra..."></textarea>
+        </div>
+        <div class="form-field full">
+          <label>Médico assinante</label>
+          <input type="text" id="rx-medico" placeholder="Nome do médico solicitante">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-secondary" onclick="closeModal('modal-receita')">Cancelar</button>
+      <button class="btn-primary" id="modal-receita-btn" onclick="salvarReceita()">Salvar Receita</button>
+    </div>
+  </div>
+</div>
+
+<!-- Nova Solicitação de Laboratório -->
+<div class="modal-overlay" id="modal-lab">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modal-lab-title">Nova Solicitação de Exames (F.CP.107.02)</h3><button class="close" onclick="closeModal('modal-lab')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field full">
+          <label>Paciente</label>
+          <input type="text" id="lab-paciente-display" value="Maria da Conceição Silva" disabled>
+        </div>
+        <div class="form-field">
+          <label>Data da coleta</label>
+          <input type="date" id="lab-data">
+        </div>
+        <div class="form-field">
+          <label>Previsão de entrega</label>
+          <input type="date" id="lab-previsao">
+        </div>
+      </div>
+
+      <div class="form-section-title">Exames solicitados (marque quantos precisar)</div>
+      <div class="form-field">
+        <div id="lab-exame-checklist" class="lab-checklist"></div>
+      </div>
+      <div class="form-field full" style="margin-top:14px;">
+        <label>Médico solicitante</label>
+        <input type="text" id="lab-medico" placeholder="Nome do médico solicitante">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-secondary" onclick="closeModal('modal-lab')">Cancelar</button>
+      <button class="btn-primary" id="modal-lab-btn" onclick="salvarLab()">Salvar Solicitação</button>
+    </div>
+  </div>
+</div>
+
+<!-- Nova Solicitação de Hemocomponentes -->
+<div class="modal-overlay" id="modal-hemo">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modal-hemo-title">Solicitação de Hemocomponentes (F.CP.107.03)</h3><button class="close" onclick="closeModal('modal-hemo')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field full">
+          <label>Paciente</label>
+          <input type="text" id="hemo-paciente-display" value="Maria da Conceição Silva" disabled>
+        </div>
+        <div class="form-field">
+          <label>Hemocomponente</label>
+          <select id="hemo-tipo">
+            <option>Concentrado de Hemácias</option>
+            <option>Concentrado de Hemácias Filtradas</option>
+            <option>Concentrado de Hemácias Lavadas</option>
+            <option>Plasma Fresco Congelado</option>
+            <option>Concentrado de Plaquetas</option>
+            <option>Crioprecipitado</option>
+            <option>Plaquetaférese</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Quantidade (mL ou unidades)</label>
+          <input type="text" id="hemo-qtd" placeholder="Ex.: 2 bolsas">
+        </div>
+        <div class="form-field">
+          <label>Tipo de atendimento</label>
+          <select id="hemo-urgencia">
+            <option>Transfusão Programada</option>
+            <option>Não Urgente (24 horas)</option>
+            <option>Urgente (3 horas)</option>
+            <option>Extrema Urgência</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Data</label>
+          <input type="date" id="hemo-data">
+        </div>
+        <div class="form-field full">
+          <label>Diagnóstico e indicação clínica</label>
+          <textarea id="hemo-diagnostico" placeholder="Ex.: Anemia Falciforme (HbSS)"></textarea>
+        </div>
+
+        <div class="form-section-title" style="grid-column:1/-1;">Dados clínicos (laboratório)</div>
+        <div class="form-field">
+          <label>Hemoglobina (g/dL)</label>
+          <input type="text" id="hemo-hemoglobina" placeholder="Ex.: 8.5">
+        </div>
+        <div class="form-field">
+          <label>Hematócrito (%)</label>
+          <input type="text" id="hemo-hematocrito" placeholder="Ex.: 26">
+        </div>
+        <div class="form-field">
+          <label>Plaquetas (/mm³)</label>
+          <input type="text" id="hemo-plaquetas" placeholder="Ex.: 150.000">
+        </div>
+        <div class="form-field">
+          <label>Peso (Kg)</label>
+          <input type="text" id="hemo-peso" placeholder="Ex.: 62">
+        </div>
+        <div class="form-field full">
+          <label>Distúrbio de coagulação?</label>
+          <input type="text" id="hemo-coagulacao" placeholder="Descreva se houver, ou deixe em branco">
+        </div>
+        <div class="form-field full">
+          <label>Cirurgia proposta?</label>
+          <input type="text" id="hemo-cirurgia" placeholder="Descreva se houver, ou deixe em branco">
+        </div>
+
+        <div class="form-field full">
+          <label>Médico solicitante</label>
+          <input type="text" id="hemo-medico" placeholder="Nome do médico solicitante">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-secondary" onclick="closeModal('modal-hemo')">Cancelar</button>
+      <button class="btn-primary" id="modal-hemo-btn" onclick="salvarHemo()">Salvar Solicitação</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Novo Paciente -->
+<div class="modal-overlay" id="modal-paciente">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modal-paciente-title">Novo Paciente</h3><button class="close" onclick="closeModal('modal-paciente')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field full">
+          <label>Nome completo</label>
+          <input type="text" id="pac-nome" placeholder="Nome do paciente">
+        </div>
+        <div class="form-field">
+          <label>Nº do prontuário</label>
+          <input type="text" id="pac-prontuario" placeholder="Ex.: 00012346">
+        </div>
+        <div class="form-field">
+          <label>Data de nascimento</label>
+          <input type="date" id="pac-nascimento">
+        </div>
+        <div class="form-field">
+          <label>Sexo</label>
+          <select id="pac-sexo"><option>Feminino</option><option>Masculino</option></select>
+        </div>
+        <div class="form-field">
+          <label>Telefone</label>
+          <input type="text" id="pac-telefone" placeholder="(83) 90000-0000">
+        </div>
+        <div class="form-field">
+          <label>CPF</label>
+          <input type="text" id="pac-cpf" placeholder="000.000.000-00">
+        </div>
+        <div class="form-field">
+          <label>Cartão do SUS</label>
+          <input type="text" id="pac-sus" placeholder="0000 0000 0000 0000">
+        </div>
+        <div class="form-field full">
+          <label>Endereço (rua e número)</label>
+          <input type="text" id="pac-logradouro" placeholder="Rua das Flores, 123">
+        </div>
+        <div class="form-field">
+          <label>Bairro</label>
+          <input type="text" id="pac-bairro" placeholder="Bairro dos Estados">
+        </div>
+        <div class="form-field">
+          <label>Cidade</label>
+          <input type="text" id="pac-cidade" placeholder="João Pessoa">
+        </div>
+        <div class="form-field">
+          <label>UF</label>
+          <input type="text" id="pac-uf" placeholder="PB" maxlength="2">
+        </div>
+        <div class="form-field">
+          <label>CEP</label>
+          <input type="text" id="pac-cep" placeholder="58000-000">
+        </div>
+        <div class="form-field">
+          <label>Tipo sanguíneo</label>
+          <select id="pac-tipo-sanguineo">
+            <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+            <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Raça/Cor</label>
+          <select id="pac-raca-cor">
+            <option value="">— (não informado)</option>
+            <option value="Branca">Branca</option>
+            <option value="Preta">Preta</option>
+            <option value="Parda">Parda</option>
+            <option value="Amarela">Amarela</option>
+            <option value="Indígena">Indígena</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Convênio</label>
+          <input type="text" id="pac-convenio" placeholder="Ex.: SUS">
+        </div>
+        <div class="form-field full">
+          <label>Alergias</label>
+          <input type="text" id="pac-alergias" placeholder="Ex.: Dipirona">
+        </div>
+        <div class="form-field full">
+          <label>Diagnóstico principal</label>
+          <input type="text" id="pac-diagnostico" placeholder="Ex.: Anemia Falciforme (HbSS)">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-secondary" onclick="closeModal('modal-paciente')">Cancelar</button>
+      <button class="btn-primary" id="modal-paciente-btn" onclick="salvarPaciente()">Salvar Paciente</button>
+    </div>
+  </div>
+</div>
+
+<!-- Novo Usuário (médico ou recepção) -->
+<div class="modal-overlay" id="modal-usuario">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modal-usuario-title">Novo Usuário</h3><button class="close" onclick="closeModal('modal-usuario')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field full">
+          <label>Nome completo</label>
+          <input type="text" id="usr-nome" placeholder="Ex.: Dra. Ana Paula Souza">
+        </div>
+        <div class="form-field">
+          <label>Perfil</label>
+          <select id="usr-tipo">
+            <option value="medico">Médico(a)</option>
+            <option value="recepcao">Recepção</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>CRM (se médico)</label>
+          <input type="text" id="usr-crm" placeholder="Ex.: CRM-PB 12345">
+        </div>
+        <div class="form-field">
+          <label>Login</label>
+          <input type="text" id="usr-login" placeholder="ex.: ana.souza">
+        </div>
+        <div class="form-field">
+          <label>Senha</label>
+          <input type="text" id="usr-senha" placeholder="Defina uma senha">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-secondary" onclick="closeModal('modal-usuario')">Cancelar</button>
+      <button class="btn-primary" id="modal-usuario-btn" onclick="salvarUsuario()">Salvar Usuário</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+/* ================= SUPABASE ================= */
+// 1. Crie um projeto em https://supabase.com
+// 2. Rode o arquivo supabase-schema.sql no SQL Editor do projeto
+// 3. Cole aqui a URL e a chave "anon public" (Project Settings > API)
+const SUPABASE_URL = "https://ohuaoncwgioawgptyqgz.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9odWFvbmN3Z2lvYXdncHR5cWd6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5NzQ1MjAsImV4cCI6MjEwMTU1MDUyMH0.ckf7P-qPqGyoLZgW2MUrhQBBC_Ei9MW2t1nohi1SXDM";
+
+let supabaseClient = null;
+let supabaseConfigured = false;
+try{
+  if(SUPABASE_URL.startsWith('http') && SUPABASE_ANON_KEY.length > 20){
+    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    supabaseConfigured = true;
+  }
+}catch(e){ console.warn('Supabase não configurado:', e); }
+
+function isoToBR(iso){
+  if(!iso) return '—';
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+function brToISO(br){
+  if(!br) return null;
+  const [d,m,y] = br.split('/');
+  return `${y}-${m}-${d}`;
+}
+</script>
+<script>
+/* ================= DADOS (estado em memória — sem localStorage) ================= */
+const paciente = {
+  nome:"MARIA DA CONCEIÇÃO SILVA",
+  prontuario:"00012345",
+  nascimento:"15/06/1985",
+  idade:"38 anos",
+  sexo:"Feminino",
+  telefone:"(83) 98765-4321",
+  cpf:"123.456.789-09",
+  sus:"8980 1234 5678 9012",
+  logradouro:"Rua das Flores, 123",
+  bairro:"Bairro dos Estados",
+  cidade:"João Pessoa",
+  uf:"PB",
+  cep:"58030-000",
+  endereco:"Rua das Flores, 123 — Bairro dos Estados — João Pessoa - PB — CEP: 58030-000",
+  tipoSanguineo:"A+",
+  racaCor:"Parda",
+  alergias:"Dipirona",
+  diagnostico:"Anemia Falciforme (HbSS)",
+  ultimaConsulta:"02/05/2025",
+  convenio:"SUS"
+};
+
+function montarEndereco(p){
+  const cidadeUf = [p.cidade, p.uf].filter(Boolean).join(' - ');
+  return [p.logradouro, p.bairro, cidadeUf, p.cep ? ('CEP: ' + p.cep) : null].filter(Boolean).join(' — ') || '—';
+}
+
+let receitas = [
+  {data:"02/05/2025", medicamento:"Ácido Fólico 5 mg", uso:"1 comprimido ao dia", medico:"Dr. Rodrigo Cahuana", tipo:"Receituário médico",
+   prescricao:"Ácido Fólico 5 mg — tomar 1 comprimido ao dia, via oral, uso contínuo."},
+  {data:"02/05/2025", medicamento:"Hidroxiureia 500 mg", uso:"2 cápsulas ao dia", medico:"Dr. Rodrigo Cahuana", tipo:"Receituário de controle especial",
+   prescricao:"Hidroxiureia 500 mg — tomar 2 cápsulas ao dia, via oral, uso contínuo. Retorno em 30 dias para hemograma de controle."},
+  {data:"12/03/2025", medicamento:"Deferasirox 360 mg", uso:"1 comprimido ao dia", medico:"Dr. Rodrigo Cahuana", tipo:"Receituário de controle especial",
+   prescricao:"Deferasirox 360 mg — tomar 1 comprimido ao dia, via oral, em jejum. Uso contínuo conforme protocolo de quelação de ferro."},
+];
+
+let labs = [
+  {data:"02/05/2025", exame:"Hemograma Completo", situacao:"Pendente", medico:"Dr. Rodrigo C."},
+  {data:"02/05/2025", exame:"Ferritina", situacao:"Pendente", medico:"Dr. Rodrigo C."},
+  {data:"12/03/2025", exame:"Função Hepática (TGO, TGP)", situacao:"Concluído", medico:"Dr. Rodrigo C."},
+];
+
+let hemos = [
+  {data:"02/05/2025", tipo:"Concentrado de Hemácias", qtd:"2 bolsas", situacao:"Autorizada", medico:"Dr. Rodrigo C.", urgencia:"Transfusão Programada", diagnostico:"Anemia Falciforme (HbSS)"},
+];
+
+let pacientesList = []; // preenchida a partir do Supabase (ou fica vazia se não configurado)
+let currentPacienteId = null;
+
+/* ================= LOGIN ================= */
+const VALID_USER = "hemocentro";
+const VALID_PASS = "1234";
+let currentUser = null; // {id, nome, tipo, crm, login}
+
+document.getElementById('login-form').addEventListener('submit', async function(e){
+  e.preventDefault();
+  const user = document.getElementById('login-user').value.trim().toLowerCase();
+  const pass = document.getElementById('login-pass').value.trim();
+  const errorEl = document.getElementById('login-error');
+  const btn = document.querySelector('.login-btn');
+  btn.textContent = 'Entrando...';
+  btn.disabled = true;
+
+  let loggedIn = null;
+
+  if(supabaseConfigured){
+    try{
+      const { data, error } = await supabaseClient.from('usuarios').select('*').ilike('login', user).eq('ativo', true).limit(1);
+      if(!error && data && data.length && data[0].senha === pass){
+        loggedIn = data[0];
+      }
+    }catch(err){ console.error(err); }
+  }
+
+  // fallback: credencial fixa de demonstração (funciona mesmo sem Supabase configurado)
+  if(!loggedIn && user === VALID_USER && pass === VALID_PASS){
+    loggedIn = { nome:'Administrador', tipo:'gestor', login:'hemocentro' };
+  }
+
+  btn.textContent = 'Entrar';
+  btn.disabled = false;
+
+  if(loggedIn){
+    currentUser = loggedIn;
+    errorEl.style.display = 'none';
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    aplicarPermissoesUsuario();
+    renderPage('resumo');
+    initFromSupabase();
+  } else {
+    errorEl.style.display = 'block';
+  }
+});
+
+function aplicarPermissoesUsuario(){
+  const isRecepcao = currentUser && currentUser.tipo === 'recepcao';
+  const isGestor = currentUser && currentUser.tipo === 'gestor';
+
+  // Cabeçalho: mostra nome/perfil de quem está logado
+  const userMetaB = document.querySelector('.user-meta b');
+  const userMetaSpan = document.querySelector('.user-meta span');
+  const userAvatar = document.querySelector('.user-avatar');
+  const rotulos = {gestor:'Gestor', medico:'Médico(a)', recepcao:'Recepção'};
+  if(userMetaB) userMetaB.textContent = currentUser.nome;
+  if(userMetaSpan) userMetaSpan.textContent = rotulos[currentUser.tipo] || currentUser.tipo;
+  if(userAvatar) userAvatar.textContent = currentUser.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+
+  // Item "Usuários" no menu: só o gestor vê
+  const usuariosNav = document.querySelector('.nav-item[data-page="usuarios"]');
+  if(usuariosNav) usuariosNav.style.display = isGestor ? 'flex' : 'none';
+}
+
+function logout(){
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+  document.getElementById('login-error').style.display = 'none';
+  currentUser = null;
+}
+
+function podeCriarDocumentos(){
+  return !currentUser || currentUser.tipo !== 'recepcao';
+}
+
+/* ================= NAVIGATION ================= */
+document.querySelectorAll('.nav-item[data-page]').forEach(item=>{
+  item.addEventListener('click', ()=>{
+    document.querySelectorAll('.nav-item[data-page]').forEach(i=>i.classList.remove('active'));
+    item.classList.add('active');
+    renderPage(item.dataset.page);
+  });
+});
+
+function statusClass(s){
+  const map = {"Pendente":"pendente","Concluído":"concluido","Autorizada":"autorizada","Urgente":"urgente"};
+  return map[s] || "pendente";
+}
+
+function renderPage(page){
+  const main = document.getElementById('main-content');
+  if(page === 'resumo'){
+    main.innerHTML = resumoTemplate();
+    bindResumoEvents();
+  } else if(page === 'dados'){
+    main.innerHTML = pacientesTemplate();
+  } else if(page === 'usuarios'){
+    if(!currentUser || currentUser.tipo !== 'gestor'){
+      main.innerHTML = placeholderTemplate('acesso_negado');
+    } else {
+      main.innerHTML = usuariosTemplate();
+      carregarUsuarios().then(()=>{ if(document.querySelector('.nav-item.active')?.dataset.page === 'usuarios') main.innerHTML = usuariosTemplate(); });
+    }
+  } else if(page === 'receitas'){
+    main.innerHTML = fullListTemplate('Receitas Médicas','📋', receitasRows(), ['Data','Medicamento','Uso','Médico','Ações'], "abrirNovaReceita()", '+ Nova Receita');
+  } else if(page === 'laboratorios'){
+    main.innerHTML = fullListTemplate('Solicitações de Laboratórios','🧪', labsRows(), ['Data','Exame Solicitado','Situação','Médico','Ações'], "abrirNovaSolicitacaoLab()", '+ Nova Solicitação');
+  } else if(page === 'hemocomponentes'){
+    main.innerHTML = fullListTemplate('Solicitações de Hemocomponentes','🩸', hemosRows(), ['Data','Hemocomponente','Quantidade','Situação','Médico','Ações'], "abrirNovaSolicitacaoHemo()", '+ Nova Solicitação');
+  } else if(page === 'documentos'){
+    main.innerHTML = documentosTemplate();
+  } else {
+    main.innerHTML = placeholderTemplate(page);
+  }
+}
+
+/* ================= TEMPLATES ================= */
+function resumoTemplate(){
+  return `
+  <div class="patient-card">
+    <div class="patient-avatar">🧑‍🦱</div>
+    <div class="patient-info">
+      <div class="patient-name">${paciente.nome}</div>
+      <div class="patient-grid">
+        <div class="pi red"><label>🔴 Nº do Prontuário</label><b>${paciente.prontuario}</b></div>
+        <div class="pi"><label>📅 Data de Nascimento</label><b>${paciente.nascimento}</b></div>
+        <div class="pi"><label>👤 Idade</label><b>${paciente.idade}</b></div>
+        <div class="pi"><label>♀ Sexo</label><b>${paciente.sexo}</b></div>
+        <div class="pi"><label>📞 Telefone</label><b>${paciente.telefone}</b></div>
+      </div>
+      <div class="patient-grid" style="margin-top:14px;">
+        <div class="pi"><label>🪪 CPF</label><b>${paciente.cpf}</b></div>
+        <div class="pi"><label>➕ SUS</label><b>${paciente.sus}</b></div>
+        <div class="pi" style="grid-column:span 3;"><label>📍 Endereço</label><b>${paciente.endereco}</b></div>
+      </div>
+    </div>
+    <button class="edit-btn" onclick="editarPacienteAtivo()">✏️ Editar Dados</button>
+  </div>
+
+  <div class="info-strip">
+    <div class="info-strip-title">DADOS IMPORTANTES</div>
+    <div class="info-strip-grid">
+      <div class="info-chip"><div class="ic" style="background:#FCEAEC;color:#C81E2C;">🩸</div><div><label>Tipo Sanguíneo</label><b style="color:#C81E2C;">${paciente.tipoSanguineo}</b></div></div>
+      <div class="info-chip"><div class="ic" style="background:#FDF1D8;color:#B4780A;">⚠️</div><div><label>Alergias</label><b>${paciente.alergias}</b></div></div>
+      <div class="info-chip"><div class="ic" style="background:#E7EEF9;color:#1D63C9;">📋</div><div><label>Diagnóstico Principal</label><b>${paciente.diagnostico}</b></div></div>
+      <div class="info-chip"><div class="ic" style="background:#E7EEF9;color:#1D63C9;">📅</div><div><label>Última Consulta</label><b>${paciente.ultimaConsulta}</b></div></div>
+      <div class="info-chip"><div class="ic" style="background:#E4F7EA;color:#1C8A45;">🏥</div><div><label>Convênio</label><b>${paciente.convenio}</b></div></div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="docs">Documentos Médicos</div>
+    <div class="tab" data-tab="historico">Histórico Clínico</div>
+    <div class="tab" data-tab="exames">Exames e Resultados</div>
+    <div class="tab" data-tab="evolucoes">Evoluções</div>
+  </div>
+
+  <div class="tab-body">
+    <div class="docs-col">
+      <div class="docs-title">DOCUMENTOS</div>
+      <div class="doc-nav active"><span class="ic">📋</span> Receitas Médicas</div>
+      <div class="doc-nav"><span class="ic">🧪</span> Solicitações de Laboratórios</div>
+      <div class="doc-nav"><span class="ic">🩸</span> Solicitações de Hemocomponentes</div>
+      <div class="doc-nav"><span class="ic">📃</span> Atestados e Laudos</div>
+      <div class="doc-nav"><span class="ic">📁</span> Outros Documentos</div>
+
+      <div class="updates-box">
+        <div class="updates-title">ÚLTIMAS INFORMAÇÕES</div>
+        <div class="update-item">
+          <div class="dot" style="background:#E4F7EA;">🟢</div>
+          <div class="tx"><label>Último Atendimento</label><span>02/05/2025 – Consulta Ambulatorial</span></div>
+        </div>
+        <div class="update-item">
+          <div class="dot" style="background:#FCEAEC;">🩸</div>
+          <div class="tx"><label>Última Transfusão</label><span>15/04/2025 – Concentrado de Hemácias, 2 bolsas</span></div>
+        </div>
+        <div class="update-item">
+          <div class="dot" style="background:#E7EEF9;">🧪</div>
+          <div class="tx"><label>Últimos Exames</label><span>28/04/2025 – Hemograma Completo</span></div>
+        </div>
+        <div class="update-item">
+          <div class="dot" style="background:#F0E7F9;">👤</div>
+          <div class="tx"><label>Profissional Responsável</label><span>Dr. Rodrigo Cahuana — Hematologista</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-head">
+          <h3>RECEITAS MÉDICAS</h3>
+          ${podeCriarDocumentos() ? `<button class="btn-new" onclick="abrirNovaReceita()">+ Nova Receita</button>` : ''}
+        </div>
+        <table>
+          <thead><tr><th>Data</th><th>Medicamento</th><th>Uso</th><th>Médico</th><th>Ações</th></tr></thead>
+          <tbody id="receitas-tbody">${receitasRows()}</tbody>
+        </table>
+        <div class="panel-foot" onclick="clickNav('receitas')">Ver todas as receitas →</div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h3>SOLICITAÇÕES DE LABORATÓRIOS</h3>
+          ${podeCriarDocumentos() ? `<button class="btn-new" onclick="abrirNovaSolicitacaoLab()">+ Nova Solicitação</button>` : ''}
+        </div>
+        <table>
+          <thead><tr><th>Data</th><th>Exame Solicitado</th><th>Situação</th><th>Médico</th><th>Ações</th></tr></thead>
+          <tbody id="labs-tbody">${labsRows()}</tbody>
+        </table>
+        <div class="panel-foot" onclick="clickNav('laboratorios')">Ver todas as solicitações →</div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h3>SOLICITAÇÕES DE HEMOCOMPONENTES</h3>
+          ${podeCriarDocumentos() ? `<button class="btn-new red" onclick="abrirNovaSolicitacaoHemo()">+ Nova Solicitação</button>` : ''}
+        </div>
+        <table>
+          <thead><tr><th>Data</th><th>Hemocomponente</th><th>Quantidade</th><th>Situação</th><th>Médico</th><th>Ações</th></tr></thead>
+          <tbody id="hemos-tbody">${hemosRows()}</tbody>
+        </table>
+        <div class="panel-foot" onclick="clickNav('hemocomponentes')">Ver todas as solicitações →</div>
+      </div>
+    </div>
+  </div>
+  `;
+}
+
+function receitasRows(){
+  if(!receitas.length) return `<tr class="empty-row"><td colspan="5">Nenhuma receita registrada.</td></tr>`;
+  return receitas.map((r,i)=>`
+    <tr>
+      <td>${r.data}</td><td>${r.medicamento}</td><td>${r.uso}</td><td>${r.medico}</td>
+      <td class="row-actions">
+        <button title="Visualizar modelo" onclick="verReceita(${i})">👁️</button>
+        <button title="Imprimir" onclick="imprimirReceita(${i})">🖨️</button>
+        ${podeCriarDocumentos() ? `<button title="Editar" onclick="editarReceita(${i})">✏️</button>` : ''}
+        ${podeCriarDocumentos() ? `<button title="Excluir" onclick="excluirReceita(${i})">🗑️</button>` : ''}
+      </td>
+    </tr>`).join('');
+}
+
+/* ---------- Logos oficiais (extraidos dos formularios) ---------- */
+const LOGO_HEMOCENTRO = "data:image/jpeg;base64,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";
+const LOGO_SUS = "data:image/png;base64,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";
+
+/* ---------- Modelos oficiais de receita (F.CP.107.04 / F.CP.107.05) ---------- */
+function receitaTemplateHTML(r){
+  const isControlada = r.tipo === "Receituário de controle especial";
+  return isControlada ? templateControleEspecial(r) : templateReceituarioMedico(r);
+}
+
+function templateReceituarioMedico(r){
+  return `
+  <div class="rx-sheet">
+    <div class="pad-logos">
+      <img src="${LOGO_HEMOCENTRO}" class="pad-logo-hemo">
+      <img src="${LOGO_SUS}" class="pad-logo-sus">
+    </div>
+
+    <div class="field-line" style="margin-top:22px;">Paciente: <span class="filled">${paciente.nome}</span></div>
+    <div class="field-line">Data: <span class="filled">${r.data}</span></div>
+
+    <div class="rx-box">
+      <div class="rx-box-title">PRESCRIÇÃO</div>
+      <div class="rx-presc">${r.prescricao || (r.medicamento + ' — ' + r.uso)}</div>
+    </div>
+
+    <div class="rx-footer">
+      <div></div>
+      <div class="rx-sign">
+        <div class="rx-sign-line"></div>
+        <div>${r.medico}<br><span class="rx-sign-sub">Assinatura e carimbo do médico</span></div>
+      </div>
+    </div>
+
+    <div class="pad-footer">
+      <div class="pad-code">F.CP.107.04.06</div>
+      <div class="pad-footer-line"></div>
+      <div class="pad-address">
+        Av: Dom Pedro II, 1548, Jaguaribe, João Pessoa-PB.<br>
+        E-mail: hemocentrodaparaiba@yahoo.com.br. Fone: (83) 3133-3463
+      </div>
+    </div>
+  </div>`;
+}
+
+function templateControleEspecial(r){
+  const via = (label) => `
+  <div class="rx-sheet ce">
+    <table class="ce-head">
+      <tr>
+        <td class="ce-head-info">
+          <b>HEMOCENTRO COORDENADOR DA PARAÍBA</b><br>
+          Av: Dom Pedro II, 1548, Jaguaribe, João Pessoa-PB<br>
+          E-MAIL: hemocentrodaparaiba@yahoo.com.br &nbsp; Fone: (83) 3133-3463
+        </td>
+        <td class="ce-head-via">${label}</td>
+      </tr>
+    </table>
+
+    <div class="ce-row"><b>Paciente:</b> ${paciente.nome} &nbsp;&nbsp; <b>Endereço:</b> ${paciente.endereco}</div>
+
+    <div class="ce-presc-box">
+      <div class="ce-presc-label"><b>Prescrição:</b></div>
+      <div class="ce-presc-text">${r.prescricao || (r.medicamento + ' — ' + r.uso)}</div>
+      <div class="ce-lines"></div>
+    </div>
+
+    <div class="ce-row ce-datesign">
+      Data: ____/ ____/ ____ &nbsp;&nbsp;&nbsp; Assinatura do Médico: ${r.medico}
+    </div>
+
+    <div class="ce-grid">
+      <div class="ce-col">
+        <div class="ce-col-title">IDENTIFICAÇÃO DO FORNECEDOR</div>
+        <div class="ce-blank-line"></div>
+        <div class="ce-small">ASSINATURA DO FARMACÊUTICO</div>
+        <div class="ce-small">DATA: ____/____/____</div>
+      </div>
+      <div class="ce-col">
+        <div class="ce-col-title">IDENTIFICAÇÃO DO COMPRADOR</div>
+        <div class="ce-small">NOME: ______________________________</div>
+        <div class="ce-small">RG: _________________________________</div>
+        <div class="ce-small">ENDEREÇO: ___________________________</div>
+        <div class="ce-small">CIDADE: __________________ UF: ____ FONE: ______________</div>
+      </div>
+    </div>
+    <div class="ce-code">F.CP.107.05.06</div>
+  </div>`;
+  return via('1ª Via – FARMÁCIA') + '<div class="ce-cut">✂ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</div>' + via('2ª Via - PACIENTE');
+}
+
+function printWindowShell(bodyHTML, title){
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${title}</title>
+  <style>
+    @page{ size:A4; margin:9mm 12mm; }
+    *{box-sizing:border-box;}
+    body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:0;padding:0;font-size:12px;}
+    .rx-sheet{padding:4px 4px 10px;}
+
+    .pad-logos{display:flex;align-items:center;gap:40px;}
+    .pad-logo-hemo{height:52px;}
+    .pad-logo-sus{height:44px;}
+    .field-line{font-size:12.5px;margin:10px 0;}
+    .filled{border-bottom:1px solid #333;padding:0 6px 1px;font-weight:700;}
+    .rx-box{border:1px solid #ccc;border-radius:6px;padding:16px;margin:16px 0 40px;min-height:220px;}
+    .rx-box-title{font-size:10px;font-weight:800;letter-spacing:.6px;color:#999;margin-bottom:10px;}
+    .rx-presc{font-size:14px;line-height:1.9;}
+    .rx-footer{display:flex;justify-content:space-between;align-items:flex-end;font-size:12px;margin-top:20px;}
+    .rx-sign{text-align:center;margin-left:auto;}
+    .rx-sign-line{width:230px;border-top:1px solid #333;margin-bottom:6px;}
+    .rx-sign-sub{font-size:10px;color:#777;}
+    .pad-footer{margin-top:50px;}
+    .pad-code{text-align:right;font-size:9.5px;color:#333;}
+    .pad-footer-line{border-top:1px solid #333;margin:2px 0 6px;}
+    .pad-address{text-align:center;font-size:9.5px;color:#333;line-height:1.5;}
+
+    .ce-head{width:100%;border-collapse:collapse;margin-bottom:10px;}
+    .ce-head td{border:1px solid #333;padding:8px;font-size:10.5px;vertical-align:middle;}
+    .ce-head-via{text-align:center;font-weight:700;width:130px;}
+    .ce-row{font-size:11.5px;margin:8px 0;}
+    .ce-presc-box{margin:10px 0 16px;}
+    .ce-presc-label{font-size:11.5px;margin-bottom:6px;}
+    .ce-presc-text{font-size:12px;line-height:1.8;border-bottom:1px solid #999;padding-bottom:6px;min-height:90px;}
+    .ce-datesign{font-size:11.5px;margin-bottom:14px;}
+    .ce-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:10px;}
+    .ce-col-title{font-weight:800;font-size:10.5px;margin-bottom:20px;}
+    .ce-blank-line{border-top:1px solid #333;width:80%;margin:30px auto 6px;}
+    .ce-small{font-size:10.5px;margin-bottom:8px;}
+    .ce-code{text-align:right;font-size:9px;color:#999;margin-top:14px;}
+    .ce-cut{text-align:center;font-size:11px;color:#999;margin:6px 0;}
+
+    .doc-head{width:100%;border-collapse:collapse;margin-bottom:8px;}
+    .doc-head td{border:1px solid #000;padding:6px 10px;font-size:11.5px;vertical-align:middle;}
+    .doc-head-logo{width:150px;text-align:center;}
+    .doc-head-logo img{height:46px;}
+    .doc-head-title{text-align:center;font-weight:800;font-size:16px;}
+    .doc-head-label{font-size:9.5px;letter-spacing:.3px;color:#111;text-transform:uppercase;}
+    .doc-head-value{font-size:12px;font-weight:700;text-align:center;}
+
+    .field-row{font-size:13px;margin:6px 0;}
+    .section-box{border:1px solid #000;margin:14px 0;}
+    .section-title{text-align:center;font-weight:800;font-size:11px;border-bottom:1px solid #000;padding:6px;}
+    .section-body{padding:10px 14px;}
+    .section-body .field-row{margin:9px 0;}
+
+    .checklist-box{border:1px solid #000;display:flex;margin:10px 0 14px;}
+    .checklist-col{flex:1;padding:8px 14px;}
+    .checklist-col.left{border-right:1px solid #000;}
+    .chk-cat-title{text-align:center;font-weight:800;font-size:12px;text-decoration:underline;margin:6px 0 3px;}
+    .chk-cat-title:first-child{margin-top:0;}
+    .chk-item{font-size:12px;padding:1px 0;line-height:1.25;}
+
+    .doc-footer-sign{display:flex;justify-content:space-around;margin:16px 0 10px;font-size:12.5px;text-align:center;}
+    .doc-footer-sign .line{border-top:1px solid #333;width:220px;margin:0 auto 4px;}
+    .entrega-box{border-top:2px solid #000;padding-top:8px;margin-top:6px;}
+    .entrega-title{text-align:center;font-weight:800;font-size:13.5px;margin-bottom:6px;}
+    .doc-code{text-align:right;font-size:9px;color:#999;margin-top:10px;}
+
+    .hemo-table{width:100%;border-collapse:collapse;margin:14px 0;font-size:10px;}
+    .hemo-table td, .hemo-table th{border:1px solid #000;padding:6px 8px;vertical-align:middle;}
+    .hemo-table th{font-size:9.5px;text-align:center;}
+    .hemo-comp-label{font-size:10.5px;width:34%;}
+    .hemo-mark{text-align:center;font-weight:800;font-size:13px;}
+    .hemo-small{font-size:8px;color:#444;font-weight:400;}
+    .urgencia-note{border:1px solid #000;padding:10px;font-size:10px;line-height:1.7;margin:14px 0;}
+    .componentes-box{border:1px solid #000;margin:14px 0;}
+    .componentes-title{text-align:center;font-weight:800;font-size:11px;border-bottom:1px solid #000;padding:6px;}
+    .componentes-body{padding:12px 14px;font-size:10px;line-height:1.65;}
+    .componentes-body p{margin:0 0 10px;}
+
+    .print-actions{text-align:center;padding:14px;}
+    .print-actions button{background:#C81E2C;color:#fff;border:none;padding:10px 22px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
+    @media print{ .print-actions{display:none;} }
+    .page-break{page-break-before:always;}
+
+    /* BPA-1 */
+    .bpa{font-size:9px;}
+    .bpa-top{width:100%;border-collapse:collapse;margin-bottom:6px;}
+    .bpa-top td{border:1.5px solid #000;padding:6px 10px;vertical-align:middle;}
+    .bpa-sus-box{width:90px;text-align:center;}
+    .bpa-title-box{width:110px;text-align:center;}
+    .bpa-main-title{text-align:center;}
+    .bpa-section-label{font-size:8.5px;font-weight:800;text-align:center;border:1px solid #000;padding:2px;margin:4px 0;}
+    .bpa-field-table{width:100%;border-collapse:collapse;margin-bottom:0;}
+    .bpa-field-table td{border:1px solid #000;padding:4px 8px;vertical-align:top;}
+    .bpa-mini-label{font-size:7px;font-weight:700;color:#333;margin-bottom:2px;}
+    .bpa-value{font-size:10px;font-weight:700;}
+    .digit-boxes{display:flex;gap:2px;margin-top:2px;}
+    .digit-boxes .dbox{border:1px solid #000;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;}
+    .digit-boxes.small .dbox{width:13px;height:13px;font-size:8px;}
+    .bpa-proc-grid{display:flex;gap:6px;margin-top:4px;}
+    .bpa-proc-col{flex:1;border:1px solid #000;padding:4px 6px;}
+    .bpa-proc-header{display:flex;justify-content:space-between;font-size:7.5px;font-weight:800;border-bottom:1px solid #000;padding-bottom:2px;margin-bottom:3px;}
+    .bpa-exam-name{font-size:8px;font-weight:700;margin-top:4px;}
+    .bpa-exam-line{display:flex;align-items:center;justify-content:space-between;gap:6px;}
+    .bpa-real{width:14px;height:14px;border:1px solid #000;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;}
+    .bpa-real.marked{background:#f0f0f0;}
+    .bpa-sign{margin-top:16px;font-size:10px;}
+  </style></head>
+  <body>
+    <div class="print-actions"><button onclick="window.print()">🖨️ Imprimir / Salvar PDF</button></div>
+    ${bodyHTML}
+  </body></html>`;
+}
+
+function verReceita(i){
+  const r = receitas[i];
+  const w = window.open('', '_blank');
+  w.document.write(printWindowShell(receitaTemplateHTML(r), r.tipo + ' — ' + paciente.nome));
+  w.document.close();
+}
+
+function imprimirReceita(i){
+  const r = receitas[i];
+  const w = window.open('', '_blank');
+  w.document.write(printWindowShell(receitaTemplateHTML(r), r.tipo + ' — ' + paciente.nome));
+  w.document.close();
+  w.onload = () => { w.focus(); w.print(); };
+}
+function labsRows(){
+  if(!labs.length) return `<tr class="empty-row"><td colspan="5">Nenhuma solicitação registrada.</td></tr>`;
+  return labs.map((r,i)=>`
+    <tr>
+      <td>${r.data}</td><td>${r.exame}</td><td><span class="status ${statusClass(r.situacao)}">${r.situacao}</span></td><td>${r.medico}</td>
+      <td class="row-actions">
+        <button title="Visualizar modelo" onclick="verLab(${i})">👁️</button>
+        <button title="Imprimir" onclick="imprimirLab(${i})">🖨️</button>
+        <button title="Imprimir BPA-1" onclick="imprimirBPA(${i})">🧾</button>
+        ${podeCriarDocumentos() ? `<button title="Editar" onclick="editarLab(${i})">✏️</button>` : ''}
+        ${podeCriarDocumentos() ? `<button title="Excluir" onclick="excluirLab(${i})">🗑️</button>` : ''}
+      </td>
+    </tr>`).join('');
+}
+function hemosRows(){
+  if(!hemos.length) return `<tr class="empty-row"><td colspan="6">Nenhuma solicitação registrada.</td></tr>`;
+  return hemos.map((r,i)=>`
+    <tr>
+      <td>${r.data}</td><td>${r.tipo}</td><td>${r.qtd}</td><td><span class="status ${statusClass(r.situacao)}">${r.situacao}</span></td><td>${r.medico}</td>
+      <td class="row-actions">
+        <button title="Visualizar modelo" onclick="verHemo(${i})">👁️</button>
+        <button title="Imprimir" onclick="imprimirHemo(${i})">🖨️</button>
+        ${podeCriarDocumentos() ? `<button title="Editar" onclick="editarHemo(${i})">✏️</button>` : ''}
+        ${podeCriarDocumentos() ? `<button title="Excluir" onclick="excluirHemo(${i})">🗑️</button>` : ''}
+      </td>
+    </tr>`).join('');
+}
+
+
+/* ---------- Modelo oficial: Solicitação de Exames (F.CP.107.02) ---------- */
+const EXAME_CATEGORIAS = {
+  "CITOHEMATOLOGIA": ["Hemograma","Reticulócitos","Fônio com Citrato","Fônio sem Citrato"],
+  "IMUNOHEMATOLOGIA": ["Classificação Sanguínea","Coombs Indireto","Coombs Direto","Prova Cruzada","Identificação de Anticorpo","Fenotipagem Eritrocitária"],
+  "HEMOGLOBINOPATIAS": ["Ferritina","Eletroforese de Hemoglobina","Folato","Vitamina B12","Homocisteína"],
+  "SOROLOGIA": ["HBsAG","Anti-HBc- IgG / IgM","Anti-HCV","Chagas-IgG","Sífilis","HTLV I / II","HIV I / II","NAT"]
+};
+const EXAME_CATEGORIAS_DIREITA = {
+  "HEMOSTASIA / TROMBOSE": ["Agregação Plaquetária","Anticoagulante Lúpico (AL)","Antitrombina (AT)","Atividade do FvW (cofator de Ristocetina)","Coagulograma","D-Dímero","Fator de Von Willebrand (FvW: Ag)","Fator II","Fator V","Fator VII","Fator VIII","Fator IX","Fator X","Fator XI","Fator XII","Fator XIII","Fibrinogênio (Fator I)","Pesquisa de Inibidor","Proteína C (PC)","Proteína S Livre (PS)","Resistência à Proteína C Ativada","Tempo de Trombina (TT)","Titulação de Inibidor em Hemofilia A","Titulação de Inibidor em Hemofilia B"]
+};
+
+function parseExamesList(str){
+  return (str || '').split(/;|,/).map(s=>s.trim()).filter(Boolean);
+}
+
+function examListMatches(examList, itemLabel){
+  const itl = itemLabel.toLowerCase();
+  return examList.some(sel=>{
+    const s = sel.toLowerCase();
+    return s === itl || s.includes(itl) || itl.includes(s);
+  });
+}
+
+function checklistColHTML(categorias, selecionadoList){
+  return Object.entries(categorias).map(([cat, itens])=>`
+    <div class="chk-cat-title">${cat}</div>
+    ${itens.map(it=>{
+      const bate = examListMatches(selecionadoList, it);
+      return `<div class="chk-item">${bate ? '☑' : '☐'} ${it}</div>`;
+    }).join('')}
+  `).join('');
+}
+
+/* ---------- Checklist de múltipla seleção no formulário "Nova Solicitação" ---------- */
+function renderLabExameChecklist(){
+  const container = document.getElementById('lab-exame-checklist');
+  if(!container) return;
+  const todasCategorias = Object.assign({}, EXAME_CATEGORIAS, EXAME_CATEGORIAS_DIREITA);
+  container.innerHTML = Object.entries(todasCategorias).map(([cat, itens])=>`
+    <div class="lab-cat-title">${cat}</div>
+    ${itens.map(it=>`
+      <label class="lab-check-item">
+        <input type="checkbox" class="lab-exame-cb" value="${it}"> ${it}
+      </label>`).join('')}
+  `).join('');
+}
+
+function templateSolicitacaoExames(r){
+  return `
+  <div class="rx-sheet">
+    <table class="doc-head">
+      <tr>
+        <td class="doc-head-logo" rowspan="3"><img src="${LOGO_HEMOCENTRO}"></td>
+        <td class="doc-head-title" colspan="5">Solicitação de exames</td>
+      </tr>
+      <tr>
+        <td class="doc-head-label">Processo</td>
+        <td class="doc-head-label">Área</td>
+        <td class="doc-head-label">Código</td>
+        <td class="doc-head-label">Revisão</td>
+        <td class="doc-head-label">Paginação</td>
+      </tr>
+      <tr>
+        <td class="doc-head-value">Coordenação de Atendimento ao Paciente</td>
+        <td class="doc-head-value">Ambulatório</td>
+        <td class="doc-head-value">F.CP.107.02</td>
+        <td class="doc-head-value">06</td>
+        <td class="doc-head-value">1 / 1</td>
+      </tr>
+    </table>
+
+    <div class="field-row">NOME DO PACIENTE: <span class="filled">${paciente.nome}</span> &nbsp;&nbsp; Idade: <span class="filled">${paciente.idade}</span></div>
+    <div class="field-row">SEXO: <span class="filled">${paciente.sexo}</span> &nbsp;&nbsp; DATA NASCIMENTO: <span class="filled">${paciente.nascimento}</span> &nbsp;&nbsp; Nº CARTÃO DO SUS: <span class="filled">${paciente.sus}</span></div>
+    <div class="field-row">ENDEREÇO: <span class="filled">${paciente.logradouro}</span> &nbsp;&nbsp; BAIRRO: <span class="filled">${paciente.bairro}</span></div>
+    <div class="field-row">CIDADE: <span class="filled">${paciente.cidade}${paciente.uf && paciente.uf !== '—' ? '/' + paciente.uf : ''}</span> &nbsp;&nbsp; CEP: <span class="filled">${paciente.cep}</span> &nbsp;&nbsp; TELEFONE: <span class="filled">${paciente.telefone}</span></div>
+    <div class="field-row">DATA DA COLETA: <span class="filled">${r.data}</span> &nbsp;&nbsp; PREVISÃO DE ENTREGA: <span class="filled">${r.previsao || '____/____/____'}</span></div>
+
+    <div class="checklist-box">
+      <div class="checklist-col left">${checklistColHTML(EXAME_CATEGORIAS, parseExamesList(r.exame))}</div>
+      <div class="checklist-col">${checklistColHTML(EXAME_CATEGORIAS_DIREITA, parseExamesList(r.exame))}</div>
+    </div>
+
+    <div class="doc-footer-sign">
+      <div><div class="line"></div>ASSINATURA DO MÉDICO</div>
+      <div><div class="line"></div>ASSINATURA DO PACIENTE</div>
+    </div>
+
+    <div class="entrega-box">
+      <div class="entrega-title">Controle de entrega de exames</div>
+      <div class="field-row">Nome do paciente: <span class="filled">${paciente.nome}</span></div>
+      <div class="field-row">Data coleta: <span class="filled">${r.data}</span> &nbsp; Previsão de entrega: <span class="filled">${r.previsao || '____/____/____'}</span> &nbsp; Data Nasc.: <span class="filled">${paciente.nascimento}</span></div>
+      <div class="field-row">Médico solicitante: <span class="filled">${r.medico}</span> &nbsp; Recepcionista responsável: <span class="filled">_____________________</span></div>
+      <div class="field-row">Exames solicitados: <span class="filled">${r.exame}</span></div>
+    </div>
+    <div class="doc-code">F.CP.107.02.06</div>
+  </div>`;
+}
+
+function verLab(i){
+  const r = labs[i];
+  const w = window.open('', '_blank');
+  w.document.write(printWindowShell(templateSolicitacaoExames(r), 'Solicitação de Exames — ' + paciente.nome));
+  w.document.close();
+}
+function imprimirLab(i){
+  const r = labs[i];
+  const w = window.open('', '_blank');
+  w.document.write(printWindowShell(templateSolicitacaoExames(r), 'Solicitação de Exames — ' + paciente.nome));
+  w.document.close();
+  w.onload = () => { w.focus(); w.print(); };
+}
+
+/* ---------- Modelo oficial: BPA-1 (Boletim de Produção Ambulatorial) ---------- */
+const BPA_LEFT = [
+  ["HEMOGRAMA","0202020380"],
+  ["RETICULÓCITOS","0202020037"],
+  ["FÔNIO C/S CITRATO","0202050084"],
+  ["HTLV I/ II","0202030318"],
+  ["FERRITINA","0202010384"],
+  ["ELETROFORESE DE HEMOGLOBINA","0202020355"],
+  ["IDENTIFICAÇÃO DE ANTICORPO","0202120040"],
+  ["ÁCIDO FÓLICO","0202010406"],
+  ["VITAMINA B 12","0202010708"],
+  ["HBsAG","0202031454"],
+  ["ANTI-HBC-IGG/IGM","0202030784"],
+  ["ANTI-HCV","0202031489"],
+  ["CHAGAS - IGG","0202030776"],
+  ["SÍFILIS","0202031110"],
+  ["TEMPO DE TROMBINA (TT)","0202020126"],
+  ["ATIVIDADE DO FVW(Contador de ristocetina)","0202020401"],
+  ["TITULAÇÃO DE INIBIDOR EM HEMOFILIA A/B","0202120104"],
+  ["RESISTENCIA À PROTEÍNA C/ATIVADA","0202030202"],
+];
+const BPA_RIGHT = [
+  ["HIV I / II","0202031519"],
+  ["COAGULOGRAMA","0202020070"],
+  ["TAP/INR (controle anticoagulante)","0202020142"],
+  ["FIBRINOGÊNIO ( FATOR I )","0202020290"],
+  ["FATOR II","0202020185"],
+  ["FATOR V","0202020207"],
+  ["FATOR VII","0202020215"],
+  ["FATOR VIII","0202020223"],
+  ["FATOR IX","0202020193"],
+  ["FATOR X","0202020258"],
+  ["FATOR XI","0202020266"],
+  ["FATOR XII","0202020274"],
+  ["FATOR XIII","0202020282"],
+  ["FATOR DEVON WILLEBRAND (FvW:ag)","0202030296"],
+  ["ANTROMBINA (AT)","0202020177"],
+  ["PROTEÍNA C (PC)","0202010619"],
+  ["PROTEÍNA S LIVRE","0202020568"],
+];
+
+function bpaMatch(examNameOrList, label){
+  const b = label.toLowerCase().replace(/\(.*?\)/g,'').trim();
+  const lista = Array.isArray(examNameOrList) ? examNameOrList : parseExamesList(examNameOrList);
+  return lista.some(a=>{
+    const al = a.toLowerCase();
+    return al === b || al.includes(b) || b.includes(al);
+  });
+}
+
+function digitBoxes(str, cls, minLength){
+  let chars = (str || '').split('');
+  if(minLength && chars.length < minLength){
+    chars = chars.concat(Array(minLength - chars.length).fill(''));
+  }
+  return `<div class="${cls || 'digit-boxes'}">${chars.map(c=>`<span class="dbox">${c}</span>`).join('')}</div>`;
+}
+
+function bpaExamRow(nome, codigo, bate){
+  return `
+    <div class="bpa-exam-name">${nome}</div>
+    <div class="bpa-exam-line">
+      ${digitBoxes(codigo, 'digit-boxes small')}
+      <span class="bpa-real ${bate?'marked':''}">${bate ? '✓' : ''}</span>
+    </div>`;
+}
+
+function templateBPA(r){
+  const sexoM = paciente.sexo === 'Masculino' ? 'X' : '';
+  const sexoF = paciente.sexo === 'Feminino' ? 'X' : '';
+  return `
+  <div class="rx-sheet bpa">
+    <table class="bpa-top">
+      <tr>
+        <td class="bpa-sus-box">
+          <b style="font-size:16px;">SUS</b><br>
+          <span style="font-size:8px;">SISTEMA ÚNICO<br>DE SAÚDE</span>
+        </td>
+        <td class="bpa-title-box"><b style="font-size:15px;">BPA - 1</b></td>
+        <td class="bpa-main-title">
+          <b>Boletim de Produção Ambulatorial</b><br>
+          <span style="font-size:10px;">Dados Individualizados</span><br>
+          <b style="font-size:12px;">CADASTRO DE PACIENTE</b>
+        </td>
+      </tr>
+    </table>
+
+    <div class="bpa-section-label">IDENTIFICAÇÃO DO ESTABELECIMENTO DE SAÚDE</div>
+    <table class="bpa-field-table">
+      <tr>
+        <td style="width:75%;">
+          <div class="bpa-mini-label">NOME DO ESTABELECIMENTO DE SAÚDE</div>
+          <div class="bpa-value">HEMOCENTRO DA PARAIBA</div>
+        </td>
+        <td>
+          <div class="bpa-mini-label">CNES</div>
+          ${digitBoxes('2399598')}
+        </td>
+      </tr>
+    </table>
+    <table class="bpa-field-table">
+      <tr>
+        <td style="width:45%;">
+          <div class="bpa-mini-label">C N S DO PROFISSIONAL</div>
+          ${digitBoxes('', 'digit-boxes', 15)}
+        </td>
+        <td>
+          <div class="bpa-mini-label">NOME DO PROFISSIONAL</div>
+          <div class="bpa-value">${r.medico}</div>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <div class="bpa-mini-label">CBO</div>
+          ${digitBoxes('223415')}
+        </td>
+        <td>
+          <div class="bpa-mini-label">EQUIPE</div>
+          <div class="bpa-value">&nbsp;</div>
+        </td>
+      </tr>
+    </table>
+
+    <div class="bpa-section-label">IDENTIFICAÇÃO DO PACIENTE</div>
+    <table class="bpa-field-table">
+      <tr>
+        <td>
+          <div class="bpa-mini-label">NOME DO PACIENTE</div>
+          <div class="bpa-value" style="font-size:12px;">${paciente.nome}</div>
+        </td>
+      </tr>
+    </table>
+    <table class="bpa-field-table">
+      <tr>
+        <td style="width:60%;">
+          <div class="bpa-mini-label">CNS - CARTÃO NACIONAL DO SUS E/OU C P F</div>
+          ${digitBoxes((paciente.sus && paciente.sus !== '—' ? paciente.sus : (paciente.cpf && paciente.cpf !== '—' ? paciente.cpf : '')).replace(/\D/g,''), 'digit-boxes', 15)}
+        </td>
+        <td style="width:25%;">
+          <div class="bpa-mini-label">DATA DE NASCIMENTO</div>
+          <div class="bpa-value">${paciente.nascimento}</div>
+        </td>
+        <td>
+          <div class="bpa-mini-label">IDADE</div>
+          <div class="bpa-value">${paciente.idade}</div>
+        </td>
+      </tr>
+    </table>
+    <table class="bpa-field-table">
+      <tr>
+        <td style="width:20%;">
+          <div class="bpa-mini-label">NACIONALIDADE</div>
+          <div class="bpa-value">10 (Brasileira)</div>
+        </td>
+        <td>
+          <div class="bpa-mini-label">RAÇA / COR</div>
+          <div class="bpa-value" style="font-size:9px;">
+            BRANCA (${paciente.racaCor==='Branca'?'X':' '}) &nbsp; PRETA (${paciente.racaCor==='Preta'?'X':' '}) &nbsp; PARDA (${paciente.racaCor==='Parda'?'X':' '}) &nbsp; AMARELA (${paciente.racaCor==='Amarela'?'X':' '}) &nbsp; INDÍGENA (${paciente.racaCor==='Indígena'?'X':' '})
+          </div>
+        </td>
+        <td style="width:18%;">
+          <div class="bpa-mini-label">SEXO</div>
+          <div class="bpa-value">MASC. ( ${sexoM} ) &nbsp; FEM. ( ${sexoF} )</div>
+        </td>
+      </tr>
+    </table>
+    <table class="bpa-field-table">
+      <tr>
+        <td style="width:75%;">
+          <div class="bpa-mini-label">ENDEREÇO DO PACIENTE</div>
+          <div class="bpa-value">${paciente.logradouro}</div>
+        </td>
+        <td>
+          <div class="bpa-mini-label">NÚMERO</div>
+          <div class="bpa-value">&nbsp;</div>
+        </td>
+      </tr>
+    </table>
+    <table class="bpa-field-table">
+      <tr>
+        <td style="width:25%;">
+          <div class="bpa-mini-label">COMPLEMENTO</div>
+          <div class="bpa-value">&nbsp;</div>
+        </td>
+        <td style="width:35%;">
+          <div class="bpa-mini-label">BAIRRO</div>
+          <div class="bpa-value">${paciente.bairro}</div>
+        </td>
+        <td>
+          <div class="bpa-mini-label">MUNICÍPIO</div>
+          <div class="bpa-value">${paciente.cidade}${paciente.uf && paciente.uf!=='—' ? '/'+paciente.uf : ''}</div>
+        </td>
+      </tr>
+    </table>
+    <table class="bpa-field-table">
+      <tr>
+        <td style="width:20%;">
+          <div class="bpa-mini-label">C E P</div>
+          <div class="bpa-value">${paciente.cep}</div>
+        </td>
+        <td style="width:35%;">
+          <div class="bpa-mini-label">CÓD DO MUNICÍPIO</div>
+          <div class="bpa-value">&nbsp;</div>
+        </td>
+        <td>
+          <div class="bpa-mini-label">Nº DO TELEFONE</div>
+          <div class="bpa-value">${paciente.telefone}</div>
+        </td>
+      </tr>
+    </table>
+
+    <div class="bpa-section-label" style="text-align:center;">PROCEDIMENTOS REALIZADOS/ EXAMES</div>
+    <div class="bpa-proc-grid">
+      <div class="bpa-proc-col">
+        <div class="bpa-proc-header"><span>NOME DO EXAME</span><span>Nº PROCEDIMENTO</span><span>REAL</span></div>
+        ${BPA_LEFT.map(([nome,cod])=>bpaExamRow(nome, cod, bpaMatch(r.exame, nome))).join('')}
+      </div>
+      <div class="bpa-proc-col">
+        <div class="bpa-proc-header"><span>NOME DO EXAME</span><span>Nº PROCEDIMENTO</span><span>REAL</span></div>
+        ${BPA_RIGHT.map(([nome,cod])=>bpaExamRow(nome, cod, bpaMatch(r.exame, nome))).join('')}
+      </div>
+    </div>
+
+    <div class="bpa-sign">ASSINATURA DO USUÁRIO: <span class="filled" style="display:inline-block;min-width:300px;">&nbsp;</span></div>
+  </div>`;
+}
+
+function verBPA(i){
+  const r = labs[i];
+  const w = window.open('', '_blank');
+  w.document.write(printWindowShell(templateBPA(r), 'BPA-1 — ' + paciente.nome));
+  w.document.close();
+}
+function imprimirBPA(i){
+  const r = labs[i];
+  const w = window.open('', '_blank');
+  w.document.write(printWindowShell(templateBPA(r), 'BPA-1 — ' + paciente.nome));
+  w.document.close();
+  w.onload = () => { w.focus(); w.print(); };
+}
+
+/* ---------- Modelo oficial: Solicitação de Hemocomponentes (F.CP.107.03) ---------- */
+const HEMO_COMPONENTES = [
+  { match:["Concentrado de Hemácias","Concentrado de Hemácias Filtradas","Concentrado de Hemácias Lavadas"],
+    label:"mL ou Unid. de Concentrado de Hemácias<br>( F ) Filtradas &nbsp; ( L ) Lavadas &nbsp; ( Fen ) Fenotipadas" },
+  { match:["Plasma Fresco Congelado"], label:"mL de Plasma Fresco Congelado" },
+  { match:["Concentrado de Plaquetas"], label:"Unid. de Concentrado de Plaquetas" },
+  { match:["Crioprecipitado"], label:"Unid. de Crioprecipitado" },
+  { match:["Plaquetaférese"], label:"Plaquetaféreses" },
+];
+const HEMO_URGENCIAS = ["Transfusão Programada","Não Urgente (24 horas)","Urgente (3 horas)","Extrema Urgência"];
+
+function hemoTableRows(r){
+  return HEMO_COMPONENTES.map(c=>{
+    const bate = c.match.includes(r.tipo);
+    const qtdTxt = bate ? ('<b>' + r.qtd + '</b>') : '_____';
+    return '<tr><td class="hemo-comp-label">' + qtdTxt + ' ' + c.label + '</td>' +
+      HEMO_URGENCIAS.map(u=>'<td class="hemo-mark">' + ((bate && u===r.urgencia) ? 'X' : '') + '</td>').join('') +
+      '</tr>';
+  }).join('');
+}
+
+function templateSolicitacaoHemo(r){
+  return `
+  <div class="rx-sheet">
+    <table class="doc-head">
+      <tr>
+        <td class="doc-head-logo" rowspan="3"><img src="${LOGO_HEMOCENTRO}"></td>
+        <td class="doc-head-title" colspan="5">Solicitação de Hemocomponentes</td>
+      </tr>
+      <tr>
+        <td class="doc-head-label">Processo</td>
+        <td class="doc-head-label">Área</td>
+        <td class="doc-head-label">Código</td>
+        <td class="doc-head-label">Revisão</td>
+        <td class="doc-head-label">Paginação</td>
+      </tr>
+      <tr>
+        <td class="doc-head-value">Coordenação de Atendimento ao Paciente</td>
+        <td class="doc-head-value">Ambulatório</td>
+        <td class="doc-head-value">F. CP.107.03</td>
+        <td class="doc-head-value">06</td>
+        <td class="doc-head-value">1 / 2</td>
+      </tr>
+    </table>
+
+    <div class="section-box">
+      <div class="section-title">IDENTIFICAÇÃO</div>
+      <div class="section-body">
+        <div class="field-row">Paciente: <span class="filled">${paciente.nome}</span> &nbsp; Prontuário: <span class="filled">${paciente.prontuario}</span></div>
+        <div class="field-row">Endereço: <span class="filled">${paciente.logradouro}</span> &nbsp; Bairro: <span class="filled">${paciente.bairro}</span></div>
+        <div class="field-row">Cep.: <span class="filled">${paciente.cep}</span> &nbsp; Cidade: <span class="filled">${paciente.cidade}${paciente.uf && paciente.uf !== '—' ? '/' + paciente.uf : ''}</span></div>
+      </div>
+    </div>
+
+    <div class="section-box">
+      <div class="section-title">DADOS CLÍNICOS E INDICAÇÃO DE TRANSFUSÃO</div>
+      <div class="section-body">
+        <div class="field-row">Sexo: <span class="filled">${paciente.sexo}</span> &nbsp; Idade: <span class="filled">${paciente.idade}</span> &nbsp; Peso: <span class="filled">${r.peso ? r.peso + ' Kg' : '____ Kg'}</span> &nbsp; Data Nasc.: <span class="filled">${paciente.nascimento}</span></div>
+        <div class="field-row">Convênio: <span class="filled">${paciente.convenio}</span> &nbsp; Cartão do SUS: <span class="filled">${paciente.sus}</span></div>
+        <div class="field-row">Hemoglobina: <span class="filled">${r.hemoglobina ? r.hemoglobina + ' g/dL' : '_____ g/dL'}</span> &nbsp; Hematócrito: <span class="filled">${r.hematocrito ? r.hematocrito + ' %' : '_____ %'}</span> &nbsp; Plaquetas: <span class="filled">${r.plaquetas ? r.plaquetas + ' /mm³' : '_____ /mm³'}</span></div>
+        <div class="field-row">Diagnóstico e Indicação Clínica: <span class="filled">${r.diagnostico || paciente.diagnostico}</span></div>
+        <div class="field-row">Distúrbio de Coagulação? <span class="filled">${r.coagulacao || '—'}</span></div>
+        <div class="field-row">Cirurgia proposta? <span class="filled">${r.cirurgia || '—'}</span></div>
+      </div>
+    </div>
+
+    <table class="hemo-table">
+      <tr>
+        <th rowspan="2" style="width:34%;">ESPECIFICAÇÃO DO HEMOCOMPONENTE</th>
+        <th colspan="4">TIPO DE ATENDIMENTO — TRANSFUSÃO</th>
+      </tr>
+      <tr>
+        <th>PROGRAMADA <span class="hemo-small">(data e hora)</span></th>
+        <th>NÃO URGENTE <span class="hemo-small">(24h)</span></th>
+        <th>URGENTE <span class="hemo-small">(3h)</span></th>
+        <th>EXTREMA URGÊNCIA <span class="hemo-small">(vide verso)</span></th>
+      </tr>
+      ${hemoTableRows(r)}
+    </table>
+
+    <div class="doc-footer-sign">
+      <div><div class="line"></div>${r.medico}<br>MÉDICO SOLICITANTE (Carimbo)</div>
+      <div><div class="line"></div>Assinatura</div>
+      <div><div class="line"></div>DATA: ${r.data}</div>
+    </div>
+    <div class="doc-code">F.CP.107.03.06 — página 1/2</div>
+
+    <div class="page-break"></div>
+
+    <div class="urgencia-note">
+      TRANSFUSÃO DE EXTREMA URGÊNCIA, SEM O TÉRMINO DO TESTE DE COMPATIBILIDADE: só é indicada em raríssimas exceções, quando existe risco de óbito associado ao atraso da transfusão. Será feita a classificação sanguínea do paciente e a reclassificação do doador, não sendo finalizada a prova de compatibilidade pré-transfusional (prova cruzada) antes do início da transfusão. Portanto, o risco de reação hemolítica por anticorpos irregulares existirá e será de responsabilidade do médico requisitante, isentando o serviço de hemoterapia das consequências delas advindas.
+      <br><br>
+      Assinatura, de acordo, para atendimento à solicitação: <span class="filled" style="display:inline-block;min-width:260px;">&nbsp;</span>
+    </div>
+
+    <div class="componentes-box">
+      <div class="componentes-title">COMPONENTES, CONTEÚDOS E INDICAÇÕES</div>
+      <div class="componentes-body">
+        <p><b>CONCENTRADO DE HEMÁCIAS:</b> volume médio de 300mL. Contém plasma residual e leucócitos. Indicado no tratamento de anemias. Uma unidade aumenta cerca de 1g/dL de hemoglobina ou 3% do hematócrito (adulto).</p>
+        <p><b>CONCENTRADO DE HEMÁCIAS LAVADAS:</b> volume médio de 300mL. Indicado em pacientes que apresentaram reações transfusionais alérgicas graves.</p>
+        <p><b>CONCENTRADO DE PLAQUETAS:</b> volume entre 50 a 70mL. Indicado em pacientes com plaquetopenia e na prevenção de sangramento em pacientes com doenças hematológicas e oncológicas, antes de procedimentos cirúrgicos, quimioterapia e radioterapia.</p>
+        <p><b>CRIOPRECIPITADO:</b> volume entre 10 a 20mL. Contém principalmente Fator VIII, Fator Von Willebrand, Fibrinogênio e fator XIII. Indicado nas Hipofibrinogenemia herdada ou adquirida, Disfibrinogenemia e Deficiência de Fator XIII. Só é indicado no tratamento de Hemofilia A e Von Willebrand quando não houver disponibilidade de concentrado de Fator VIII liofilizado.</p>
+        <p><b>PLASMA FRESCO CONGELADO:</b> volume entre 180-250mL. Possui todos os fatores de coagulação. Indicado em pacientes com sangramento nas deficiências múltiplas de fatores de coagulação secundária e hepatopatias, CIVD ou Coagulopatias Dilucional.</p>
+        <p>RESPONSÁVEL PELOS TESTES: <span class="filled" style="display:inline-block;min-width:220px;">&nbsp;</span> &nbsp; DATA: ${r.data}</p>
+      </div>
+    </div>
+    <div class="doc-code">F.CP.107.03.06 — página 2/2</div>
+  </div>`;
+}
+
+function verHemo(i){
+  const r = hemos[i];
+  const w = window.open('', '_blank');
+  w.document.write(printWindowShell(templateSolicitacaoHemo(r), 'Solicitação de Hemocomponentes — ' + paciente.nome));
+  w.document.close();
+}
+function imprimirHemo(i){
+  const r = hemos[i];
+  const w = window.open('', '_blank');
+  w.document.write(printWindowShell(templateSolicitacaoHemo(r), 'Solicitação de Hemocomponentes — ' + paciente.nome));
+  w.document.close();
+  w.onload = () => { w.focus(); w.print(); };
+}
+
+function fullListTemplate(title, icon, rows, headers, modalCall, btnLabel){
+  return `
+    <div class="placeholder" style="padding:12px 18px;text-align:left;margin-bottom:12px;background:#FCEAEC;border:1px solid #C81E2C33;">
+      <div style="font-size:12.5px;">👤 <b>Paciente ativo:</b> ${paciente.nome} <span style="color:var(--muted);">— é pra ele(a) que qualquer novo registro criado aqui vai ser salvo. Errado? Troque em "Dados do Paciente".</span></div>
+    </div>
+    <div class="panel" style="margin-top:4px;">
+      <div class="panel-head">
+        <h3>${icon} ${title.toUpperCase()}</h3>
+        ${podeCriarDocumentos() ? `<button class="btn-new" onclick="${modalCall}">${btnLabel}</button>` : ''}
+      </div>
+      <table>
+        <thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function brDateToSortable(br){
+  if(!br || br === '—') return '0000-00-00';
+  const [d,m,y] = br.split('/');
+  return `${y}-${m}-${d}`;
+}
+
+function documentosTemplate(){
+  const todos = [
+    ...receitas.map((r,i)=>({...r, _tipo:'receita', _idx:i, _label:r.tipo, _icon:'📋', _resumo:r.medicamento})),
+    ...labs.map((r,i)=>({...r, _tipo:'exame', _idx:i, _label:'Solicitação de Exames', _icon:'🧪', _resumo:r.exame})),
+    ...hemos.map((r,i)=>({...r, _tipo:'hemo', _idx:i, _label:'Solicitação de Hemocomponentes', _icon:'🩸', _resumo:r.tipo})),
+  ].sort((a,b)=> brDateToSortable(b.data).localeCompare(brDateToSortable(a.data)));
+
+  const rows = todos.length ? todos.map(d=>{
+    const verFn = d._tipo==='receita' ? `verReceita(${d._idx})` : d._tipo==='exame' ? `verLab(${d._idx})` : `verHemo(${d._idx})`;
+    const imprimirFn = d._tipo==='receita' ? `imprimirReceita(${d._idx})` : d._tipo==='exame' ? `imprimirLab(${d._idx})` : `imprimirHemo(${d._idx})`;
+    const editarFn = d._tipo==='receita' ? `editarReceita(${d._idx})` : d._tipo==='exame' ? `editarLab(${d._idx})` : `editarHemo(${d._idx})`;
+    const excluirFn = d._tipo==='receita' ? `excluirReceita(${d._idx})` : d._tipo==='exame' ? `excluirLab(${d._idx})` : `excluirHemo(${d._idx})`;
+    const bpaBtn = d._tipo==='exame' ? `<button title="Imprimir BPA-1" onclick="imprimirBPA(${d._idx})">🧾</button>` : '';
+    return `
+    <tr>
+      <td>${d.data}</td>
+      <td>${d._icon} ${d._label}</td>
+      <td>${d._resumo}</td>
+      <td>${d.medico || '—'}</td>
+      <td class="row-actions">
+        <button title="Visualizar" onclick="${verFn}">👁️</button>
+        <button title="Imprimir" onclick="${imprimirFn}">🖨️</button>
+        ${bpaBtn}
+        ${podeCriarDocumentos() ? `<button title="Editar" onclick="${editarFn}">✏️</button>` : ''}
+        ${podeCriarDocumentos() ? `<button title="Excluir" onclick="${excluirFn}">🗑️</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('') : `<tr class="empty-row"><td colspan="5">Nenhum documento registrado para este paciente.</td></tr>`;
+
+  return `
+  <div class="panel" style="margin-top:4px;">
+    <div class="panel-head">
+      <h3>📄 DOCUMENTOS — ${paciente.nome}</h3>
+    </div>
+    <table>
+      <thead><tr><th>Data</th><th>Tipo de Documento</th><th>Resumo</th><th>Médico</th><th>Ações</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>
+  `;
+}
+
+function placeholderTemplate(page){
+  const titles = {
+    atendimentos:['🗓️','Atendimentos','Histórico de consultas e atendimentos ambulatoriais.'],
+    documentos:['📄','Documentos','Repositório central de documentos do paciente.'],
+    evolucoes:['📝','Evoluções','Registro de evolução clínica do paciente.'],
+    transfusoes:['💉','Transfusões','Histórico de transfusões realizadas.'],
+    historico:['📖','Histórico Clínico','Linha do tempo clínica completa do paciente.'],
+    exames:['🔬','Exames Realizados','Resultados de exames laboratoriais concluídos.'],
+    alergias:['⚠️','Alergias e Reações','Registro de alergias e reações adversas.'],
+    relatorios:['📊','Relatórios','Geração de relatórios administrativos e clínicos.'],
+    anexos:['📎','Anexos','Arquivos e imagens anexados ao prontuário.'],
+    config:['⚙️','Configurações','Preferências do sistema e da conta.'],
+    acesso_negado:['🚫','Acesso restrito','Esta área é exclusiva do perfil Gestor.'],
+  };
+  const [ic,title,desc] = titles[page] || ['📁','Em construção','Esta seção estará disponível em breve.'];
+  return `<div class="placeholder"><div class="ic">${ic}</div><h3>${title}</h3><p>${desc}</p></div>`;
+}
+
+function pacientesTemplate(){
+  const semSupabase = !supabaseConfigured;
+  const lista = semSupabase ? [{id:'demo', nome:paciente.nome, prontuario:paciente.prontuario, sus:paciente.sus, tipo_sanguineo:paciente.tipoSanguineo}] : pacientesList;
+  return `
+  ${semSupabase ? `
+  <div class="placeholder" style="padding:20px 24px;text-align:left;margin-bottom:16px;">
+    <div style="display:flex;gap:12px;align-items:flex-start;">
+      <div style="font-size:22px;">ℹ️</div>
+      <div>
+        <h3 style="margin:0 0 6px;font-size:14.5px;">Cadastro de pacientes ainda não é permanente</h3>
+        <p style="margin:0;font-size:13px;">O Supabase não está configurado neste arquivo, então qualquer paciente novo cadastrado aqui some ao fechar a aba. Configure a URL e a chave anon no início do &lt;script&gt; para que os cadastros fiquem salvos de verdade.</p>
+      </div>
+    </div>
+  </div>` : ''}
+
+  <div class="placeholder" style="padding:14px 20px;text-align:left;margin-bottom:16px;background:#FCEAEC;border:1px solid #C81E2C33;">
+    <div style="font-size:13px;"><b>Paciente ativo agora:</b> ${paciente.nome} — todas as novas receitas e solicitações criadas em qualquer tela vão ser registradas para ele(a). Clique em 👁️ numa linha abaixo pra trocar.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h3>👥 PACIENTES CADASTRADOS</h3>
+      <button class="btn-new" onclick="abrirNovoPaciente()">+ Novo Paciente</button>
+    </div>
+    <table>
+      <thead><tr><th>Nome</th><th>Prontuário</th><th>SUS</th><th>Tipo Sanguíneo</th><th>Ações</th></tr></thead>
+      <tbody>
+        ${lista.map(p=>{
+          const ativo = (semSupabase && p.id === 'demo') || p.id === currentPacienteId;
+          return `
+          <tr style="${ativo ? 'background:#FCEAEC;' : ''}">
+            <td>${ativo ? '🔴 ' : ''}${p.nome}${ativo ? ' <b style=\"color:#C81E2C;font-size:11px;\">(ativo)</b>' : ''}</td><td>${p.prontuario || '—'}</td><td>${p.sus || '—'}</td><td>${p.tipo_sanguineo || p.tipoSanguineo || '—'}</td>
+            <td class="row-actions">
+              <button title="Selecionar como paciente ativo" onclick="selecionarPaciente('${p.id}')">👁️</button>
+              ${semSupabase ? '' : `<button title="Editar dados" onclick="editarPaciente('${p.id}')">✏️</button>`}
+            </td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>
+  `;
+}
+
+let usuariosList = [];
+
+function usuariosTemplate(){
+  if(!supabaseConfigured){
+    return `<div class="placeholder"><div class="ic">🔑</div><h3>Configure o Supabase primeiro</h3><p>O cadastro de usuários (médicos e recepção) precisa do banco conectado para funcionar e persistir.</p></div>`;
+  }
+  const rotulos = {gestor:'Gestor', medico:'Médico(a)', recepcao:'Recepção'};
+  return `
+  <div class="panel">
+    <div class="panel-head">
+      <h3>🔑 USUÁRIOS DO SISTEMA</h3>
+      <button class="btn-new" onclick="abrirNovoUsuario()">+ Novo Usuário</button>
+    </div>
+    <table>
+      <thead><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>CRM</th><th>Status</th><th>Ações</th></tr></thead>
+      <tbody>
+        ${usuariosList.length ? usuariosList.map(u=>`
+          <tr>
+            <td>${u.nome}</td><td>${u.login}</td><td>${rotulos[u.tipo] || u.tipo}</td><td>${u.crm || '—'}</td>
+            <td><span class="status ${u.ativo ? 'concluido' : 'urgente'}">${u.ativo ? 'Ativo' : 'Inativo'}</span></td>
+            <td class="row-actions">
+              ${u.tipo !== 'gestor' ? `
+                <button title="Editar" onclick="editarUsuario('${u.id}')">✏️</button>
+                <button title="${u.ativo ? 'Desativar' : 'Ativar'}" onclick="alternarStatusUsuario('${u.id}', ${!u.ativo})">${u.ativo ? '🚫' : '✅'}</button>
+              ` : '<span style="color:#B7C0CD;font-size:11px;">—</span>'}
+            </td>
+          </tr>`).join('') : `<tr class="empty-row"><td colspan="6">Nenhum usuário cadastrado ainda além do gestor padrão.</td></tr>`}
+      </tbody>
+    </table>
+  </div>
+  `;
+}
+
+async function carregarUsuarios(){
+  if(!supabaseConfigured || !currentUser || currentUser.tipo !== 'gestor') return;
+  const { data, error } = await supabaseClient.from('usuarios').select('*').order('created_at', {ascending:true});
+  if(!error && data) usuariosList = data;
+}
+
+let editingUsuarioId = null;
+
+function abrirNovoUsuario(){
+  editingUsuarioId = null;
+  document.getElementById('modal-usuario-title').textContent = 'Novo Usuário';
+  document.getElementById('modal-usuario-btn').textContent = 'Salvar Usuário';
+  ['usr-nome','usr-login','usr-crm'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('usr-senha').value = '';
+  document.getElementById('usr-senha').placeholder = 'Defina uma senha';
+  document.getElementById('usr-login').disabled = false;
+  document.getElementById('usr-tipo').value = 'medico';
+  openModal('modal-usuario');
+}
+
+function editarUsuario(id){
+  const u = usuariosList.find(x=>x.id === id);
+  if(!u){ showToast('Usuário não encontrado.'); return; }
+  editingUsuarioId = id;
+  document.getElementById('modal-usuario-title').textContent = 'Editar Usuário';
+  document.getElementById('modal-usuario-btn').textContent = 'Salvar Alterações';
+  document.getElementById('usr-nome').value = u.nome;
+  document.getElementById('usr-login').value = u.login;
+  document.getElementById('usr-login').disabled = true;
+  document.getElementById('usr-tipo').value = u.tipo;
+  document.getElementById('usr-crm').value = u.crm || '';
+  document.getElementById('usr-senha').value = '';
+  document.getElementById('usr-senha').placeholder = 'Deixe em branco para manter a senha atual';
+  openModal('modal-usuario');
+}
+
+function alternarStatusUsuario(id, novoStatus){
+  supabaseClient.from('usuarios').update({ativo: novoStatus}).eq('id', id).then(({error})=>{
+    if(error){ showToast('Erro ao atualizar status.'); console.error(error); return; }
+    const u = usuariosList.find(x=>x.id === id);
+    if(u) u.ativo = novoStatus;
+    showToast(novoStatus ? 'Usuário reativado.' : 'Usuário desativado — não conseguirá mais entrar.');
+    renderPage('usuarios');
+  });
+}
+
+function salvarUsuario(){
+  const nome = document.getElementById('usr-nome').value.trim();
+  const login = document.getElementById('usr-login').value.trim().toLowerCase();
+  const senha = document.getElementById('usr-senha').value.trim();
+  const tipo = document.getElementById('usr-tipo').value;
+  const crm = document.getElementById('usr-crm').value.trim() || null;
+  if(!nome || !login){ showToast('Preencha nome e login.'); return; }
+  if(!editingUsuarioId && !senha){ showToast('Defina uma senha.'); return; }
+  if(!supabaseConfigured){ showToast('Configure o Supabase primeiro.'); return; }
+
+  if(editingUsuarioId){
+    const updates = {nome, tipo, crm};
+    if(senha) updates.senha = senha;
+    supabaseClient.from('usuarios').update(updates).eq('id', editingUsuarioId).select().then(({data, error})=>{
+      if(error){ showToast('Erro ao salvar alterações.'); console.error(error); return; }
+      const idx = usuariosList.findIndex(x=>x.id === editingUsuarioId);
+      if(idx > -1) usuariosList[idx] = data[0];
+      closeModal('modal-usuario');
+      showToast('Alterações salvas com sucesso.');
+      renderPage('usuarios');
+    });
+  } else {
+    supabaseClient.from('usuarios').insert({nome, login, senha, tipo, crm}).select().then(({data, error})=>{
+      if(error){
+        showToast(error.code === '23505' ? 'Esse login já existe — escolha outro.' : 'Erro ao salvar usuário.');
+        console.error(error);
+        return;
+      }
+      usuariosList.push(data[0]);
+      closeModal('modal-usuario');
+      showToast(`${tipo === 'medico' ? 'Médico(a)' : 'Recepcionista'} cadastrado(a) com sucesso.`);
+      renderPage('usuarios');
+    });
+  }
+}
+
+function ativarPaciente(p, mostrarToast){
+  currentPacienteId = p.id;
+  Object.assign(paciente, {
+    nome:p.nome, prontuario:p.prontuario || '—', nascimento: p.nascimento ? isoToBR(p.nascimento) : '—',
+    idade: calcIdade(p.nascimento), sexo:p.sexo || '—', telefone:p.telefone || '—', cpf:p.cpf || '—',
+    sus:p.sus || '—', logradouro:p.logradouro || '—', bairro:p.bairro || '—', cidade:p.cidade || '—',
+    uf:p.uf || '—', cep:p.cep || '—', tipoSanguineo:p.tipo_sanguineo || '—', racaCor:p.raca_cor || '—',
+    alergias:p.alergias || '—', diagnostico:p.diagnostico || '—', convenio:p.convenio || '—'
+  });
+  paciente.endereco = montarEndereco(paciente);
+  if(mostrarToast) showToast(`Paciente ativo: ${p.nome}`);
+  return loadDocumentosDoPaciente();
+}
+
+function selecionarPaciente(id){
+  if(id === 'demo' || !supabaseConfigured){
+    clickNav('resumo');
+    return;
+  }
+  const p = pacientesList.find(x=>x.id === id);
+  if(!p){ showToast('Paciente não encontrado.'); return; }
+  ativarPaciente(p, true).then(()=>clickNav('resumo'));
+}
+
+function calcIdade(nascISO){
+  if(!nascISO) return '—';
+  const nasc = new Date(nascISO);
+  const hoje = new Date();
+  let idade = hoje.getFullYear() - nasc.getFullYear();
+  const m = hoje.getMonth() - nasc.getMonth();
+  if(m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
+  return idade + ' anos';
+}
+
+function clickNav(page){
+  document.querySelectorAll('.nav-item[data-page]').forEach(i=>i.classList.remove('active'));
+  document.querySelector(`.nav-item[data-page="${page}"]`).classList.add('active');
+  renderPage(page);
+}
+
+function bindResumoEvents(){
+  document.querySelectorAll('.tab').forEach(t=>{
+    t.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+      t.classList.add('active');
+      if(t.dataset.tab !== 'docs'){
+        showToast('Esta aba estará disponível em breve.');
+        t.classList.remove('active');
+        document.querySelector('.tab[data-tab="docs"]').classList.add('active');
+      }
+    });
+  });
+  document.querySelectorAll('.doc-nav').forEach((d,idx)=>{
+    d.addEventListener('click', ()=>{
+      document.querySelectorAll('.doc-nav').forEach(x=>x.classList.remove('active'));
+      d.classList.add('active');
+      if(idx===0) clickNav('receitas');
+      else if(idx===1) clickNav('laboratorios');
+      else if(idx===2) clickNav('hemocomponentes');
+      else showToast('Seção em construção.');
+    });
+  });
+}
+
+/* ================= MODALS ================= */
+const MEDICO_FIELD_BY_MODAL = {'modal-receita':'rx-medico', 'modal-lab':'lab-medico', 'modal-hemo':'hemo-medico'};
+const PACIENTE_FIELD_BY_MODAL = {'modal-receita':'rx-paciente-display', 'modal-lab':'lab-paciente-display', 'modal-hemo':'hemo-paciente-display'};
+function openModal(id){
+  const fieldId = MEDICO_FIELD_BY_MODAL[id];
+  if(fieldId && currentUser){
+    const field = document.getElementById(fieldId);
+    if(field){
+      if(currentUser.tipo === 'medico'){
+        field.value = currentUser.nome + (currentUser.crm ? ' (' + currentUser.crm + ')' : '');
+        field.disabled = true;
+      } else {
+        // Gestor/administrador: não preenche com o próprio nome, pois quem loga
+        // como gestor normalmente não é o médico que está solicitando de fato.
+        field.disabled = false;
+        field.value = '';
+      }
+    }
+  }
+  const pacienteFieldId = PACIENTE_FIELD_BY_MODAL[id];
+  if(pacienteFieldId){
+    const pacienteField = document.getElementById(pacienteFieldId);
+    if(pacienteField) pacienteField.value = paciente.nome;
+  }
+  if(id === 'modal-lab') renderLabExameChecklist();
+  document.getElementById(id).classList.add('show');
+}
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+document.querySelectorAll('.modal-overlay').forEach(ov=>{
+  ov.addEventListener('click', e=>{ if(e.target === ov) ov.classList.remove('show'); });
+});
+
+function fmtDate(iso){
+  if(!iso) return new Date().toLocaleDateString('pt-BR');
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+let editingReceitaId = null;
+let editingLabId = null;
+let editingHemoId = null;
+
+function abrirNovaReceita(){
+  editingReceitaId = null;
+  document.getElementById('modal-receita-title').textContent = 'Nova Receita Médica';
+  document.getElementById('modal-receita-btn').textContent = 'Salvar Receita';
+  document.getElementById('rx-medicamento').value = '';
+  document.getElementById('rx-uso').value = '';
+  document.getElementById('rx-prescricao').value = '';
+  document.getElementById('rx-data').value = '';
+  document.getElementById('rx-tipo').value = 'Receituário médico';
+  openModal('modal-receita');
+}
+
+function editarReceita(i){
+  const r = receitas[i];
+  editingReceitaId = i;
+  document.getElementById('modal-receita-title').textContent = 'Editar Receita Médica';
+  document.getElementById('modal-receita-btn').textContent = 'Salvar Alterações';
+  document.getElementById('rx-medicamento').value = r.medicamento || '';
+  document.getElementById('rx-uso').value = r.uso === '—' ? '' : (r.uso || '');
+  document.getElementById('rx-prescricao').value = r.prescricao || '';
+  document.getElementById('rx-tipo').value = r.tipo || 'Receituário médico';
+  openModal('modal-receita');
+  document.getElementById('rx-medico').value = r.medico || '';
+  document.getElementById('rx-medico').disabled = (currentUser && currentUser.tipo === 'medico');
+}
+
+function salvarReceita(){
+  const med = document.getElementById('rx-medicamento').value.trim();
+  const uso = document.getElementById('rx-uso').value.trim();
+  const data = document.getElementById('rx-data').value;
+  const tipo = document.getElementById('rx-tipo').value;
+  const prescricao = document.getElementById('rx-prescricao').value.trim();
+  const medico = document.getElementById('rx-medico').value.trim();
+  if(!med){ showToast('Informe o nome do medicamento.'); return; }
+  if(!medico){ showToast('Informe o nome do médico solicitante.'); return; }
+  const prescricaoFinal = prescricao || (med + (uso ? ' — ' + uso : ''));
+
+  if(editingReceitaId !== null){
+    const idx = editingReceitaId;
+    const r = receitas[idx];
+    Object.assign(r, {medicamento:med, uso: uso || '—', medico, tipo, prescricao: prescricaoFinal});
+    if(data) r.data = fmtDate(data);
+    closeModal('modal-receita');
+    refreshTables();
+    if(supabaseConfigured && r.id){
+      supabaseClient.from('receitas').update({medicamento:med, uso: uso || null, medico, tipo, prescricao: prescricaoFinal}).eq('id', r.id).then(({error})=>{
+        showToast(error ? 'Erro ao salvar alterações no Supabase.' : 'Receita atualizada com sucesso.');
+        if(error) console.error(error);
+      });
+    } else {
+      showToast('Receita atualizada nesta sessão.');
+    }
+    return;
+  }
+
+  const novaReceita = {
+    data:fmtDate(data), medicamento:med, uso: uso || '—', medico:medico,
+    tipo:tipo, prescricao: prescricaoFinal
+  };
+  receitas.unshift(novaReceita);
+  closeModal('modal-receita');
+  refreshTables();
+
+  if(supabaseConfigured){
+    supabaseClient.from('receitas').insert({
+      data: data || new Date().toISOString().slice(0,10),
+      tipo: tipo, medicamento: med, uso: uso || null, prescricao: novaReceita.prescricao, medico: medico,
+      paciente_id: currentPacienteId, paciente_nome: paciente.nome
+    }).select().then(({data:inserted, error})=>{
+      if(!error && inserted && inserted[0]) novaReceita.id = inserted[0].id;
+      showToast(error ? 'Salvo localmente (falha ao gravar no Supabase).' : 'Receita salva no Supabase — não some ao fechar.');
+    });
+  } else {
+    showToast('Receita registrada (Supabase não configurado — some ao fechar o app).');
+  }
+}
+
+function abrirNovaSolicitacaoLab(){
+  editingLabId = null;
+  document.getElementById('modal-lab-title').textContent = 'Nova Solicitação de Exames (F.CP.107.02)';
+  document.getElementById('modal-lab-btn').textContent = 'Salvar Solicitação';
+  document.getElementById('lab-data').value = '';
+  document.getElementById('lab-previsao').value = '';
+  openModal('modal-lab');
+  document.querySelectorAll('.lab-exame-cb').forEach(cb=>cb.checked=false);
+}
+
+function editarLab(i){
+  const r = labs[i];
+  editingLabId = i;
+  document.getElementById('modal-lab-title').textContent = 'Editar Solicitação de Exames';
+  document.getElementById('modal-lab-btn').textContent = 'Salvar Alterações';
+  document.getElementById('lab-previsao').value = '';
+  openModal('modal-lab');
+  const selecionados = parseExamesList(r.exame).map(e=>e.toLowerCase());
+  document.querySelectorAll('.lab-exame-cb').forEach(cb=>{
+    cb.checked = selecionados.includes(cb.value.toLowerCase());
+  });
+  document.getElementById('lab-medico').value = r.medico || '';
+  document.getElementById('lab-medico').disabled = (currentUser && currentUser.tipo === 'medico');
+}
+
+function salvarLab(){
+  const checked = [...document.querySelectorAll('.lab-exame-cb:checked')].map(cb=>cb.value);
+  if(!checked.length){ showToast('Marque ao menos um exame na lista.'); return; }
+  const exame = checked.join('; ');
+  const data = document.getElementById('lab-data').value;
+  const previsao = document.getElementById('lab-previsao').value;
+  const medico = document.getElementById('lab-medico').value.trim();
+  if(!medico){ showToast('Informe o nome do médico solicitante.'); return; }
+
+  if(editingLabId !== null){
+    const idx = editingLabId;
+    const r = labs[idx];
+    Object.assign(r, {exame, medico});
+    if(data) r.data = fmtDate(data);
+    if(previsao) r.previsao = fmtDate(previsao);
+    closeModal('modal-lab');
+    refreshTables();
+    document.querySelectorAll('.lab-exame-cb:checked').forEach(cb=>cb.checked=false);
+    if(supabaseConfigured && r.id){
+      supabaseClient.from('solicitacoes_exames').update({exame, medico}).eq('id', r.id).then(({error})=>{
+        showToast(error ? 'Erro ao salvar alterações no Supabase.' : 'Solicitação atualizada com sucesso.');
+        if(error) console.error(error);
+      });
+    } else {
+      showToast('Solicitação atualizada nesta sessão.');
+    }
+    return;
+  }
+
+  labs.unshift({data:fmtDate(data), exame:exame, situacao:'Pendente', medico:medico, previsao: previsao ? fmtDate(previsao) : null});
+  closeModal('modal-lab');
+  refreshTables();
+  document.querySelectorAll('.lab-exame-cb:checked').forEach(cb=>cb.checked=false);
+
+  if(supabaseConfigured){
+    supabaseClient.from('solicitacoes_exames').insert({
+      data: data || new Date().toISOString().slice(0,10),
+      previsao: previsao || null, exame: exame, situacao:'Pendente', medico: medico,
+      paciente_id: currentPacienteId, paciente_nome: paciente.nome
+    }).select().then(({data:inserted, error})=>{
+      if(!error && inserted && inserted[0]) labs[0].id = inserted[0].id;
+      showToast(error ? 'Salvo localmente (falha ao gravar no Supabase).' : `${checked.length} exame(s) salvos no Supabase em uma única solicitação.`);
+    });
+  } else {
+    showToast(`${checked.length} exame(s) registrados nesta solicitação (Supabase não configurado — some ao fechar o app).`);
+  }
+}
+
+function abrirNovaSolicitacaoHemo(){
+  editingHemoId = null;
+  document.getElementById('modal-hemo-title').textContent = 'Solicitação de Hemocomponentes (F.CP.107.03)';
+  document.getElementById('modal-hemo-btn').textContent = 'Salvar Solicitação';
+  ['hemo-qtd','hemo-diagnostico','hemo-data','hemo-hemoglobina','hemo-hematocrito','hemo-plaquetas','hemo-peso','hemo-coagulacao','hemo-cirurgia'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('hemo-tipo').value = 'Concentrado de Hemácias';
+  document.getElementById('hemo-urgencia').value = 'Transfusão Programada';
+  openModal('modal-hemo');
+}
+
+function editarHemo(i){
+  const r = hemos[i];
+  editingHemoId = i;
+  document.getElementById('modal-hemo-title').textContent = 'Editar Solicitação de Hemocomponentes';
+  document.getElementById('modal-hemo-btn').textContent = 'Salvar Alterações';
+  document.getElementById('hemo-tipo').value = r.tipo || 'Concentrado de Hemácias';
+  document.getElementById('hemo-qtd').value = r.qtd || '';
+  document.getElementById('hemo-urgencia').value = r.urgencia || 'Transfusão Programada';
+  document.getElementById('hemo-diagnostico').value = r.diagnostico || '';
+  document.getElementById('hemo-hemoglobina').value = r.hemoglobina || '';
+  document.getElementById('hemo-hematocrito').value = r.hematocrito || '';
+  document.getElementById('hemo-plaquetas').value = r.plaquetas || '';
+  document.getElementById('hemo-peso').value = r.peso || '';
+  document.getElementById('hemo-coagulacao').value = r.coagulacao || '';
+  document.getElementById('hemo-cirurgia').value = r.cirurgia || '';
+  openModal('modal-hemo');
+  document.getElementById('hemo-medico').value = r.medico || '';
+  document.getElementById('hemo-medico').disabled = (currentUser && currentUser.tipo === 'medico');
+}
+
+function salvarHemo(){
+  const tipo = document.getElementById('hemo-tipo').value;
+  const qtd = document.getElementById('hemo-qtd').value.trim();
+  const data = document.getElementById('hemo-data').value;
+  const urgencia = document.getElementById('hemo-urgencia').value;
+  const diagnostico = document.getElementById('hemo-diagnostico').value.trim();
+  const hemoglobina = document.getElementById('hemo-hemoglobina').value.trim();
+  const hematocrito = document.getElementById('hemo-hematocrito').value.trim();
+  const plaquetas = document.getElementById('hemo-plaquetas').value.trim();
+  const peso = document.getElementById('hemo-peso').value.trim();
+  const coagulacao = document.getElementById('hemo-coagulacao').value.trim();
+  const cirurgia = document.getElementById('hemo-cirurgia').value.trim();
+  const medico = document.getElementById('hemo-medico').value.trim();
+  if(!qtd){ showToast('Informe a quantidade solicitada.'); return; }
+  if(!medico){ showToast('Informe o nome do médico solicitante.'); return; }
+
+  const labData = {hemoglobina, hematocrito, plaquetas, peso, coagulacao, cirurgia};
+
+  if(editingHemoId !== null){
+    const idx = editingHemoId;
+    const r = hemos[idx];
+    Object.assign(r, {tipo, qtd, urgencia, diagnostico, medico, ...labData});
+    if(data) r.data = fmtDate(data);
+    closeModal('modal-hemo');
+    refreshTables();
+    if(supabaseConfigured && r.id){
+      supabaseClient.from('solicitacoes_hemocomponentes').update({
+        tipo, quantidade:qtd, urgencia, diagnostico: diagnostico || null, medico,
+        hemoglobina: hemoglobina || null, hematocrito: hematocrito || null, plaquetas: plaquetas || null,
+        peso: peso || null, coagulacao: coagulacao || null, cirurgia: cirurgia || null
+      }).eq('id', r.id).then(({error})=>{
+        showToast(error ? 'Erro ao salvar alterações no Supabase.' : 'Solicitação atualizada com sucesso.');
+        if(error) console.error(error);
+      });
+    } else {
+      showToast('Solicitação atualizada nesta sessão.');
+    }
+    return;
+  }
+
+  hemos.unshift({data:fmtDate(data), tipo:tipo, qtd:qtd, situacao:'Pendente', medico:medico, urgencia:urgencia, diagnostico:diagnostico, ...labData});
+  closeModal('modal-hemo');
+  refreshTables();
+  ['hemo-qtd','hemo-diagnostico','hemo-hemoglobina','hemo-hematocrito','hemo-plaquetas','hemo-peso','hemo-coagulacao','hemo-cirurgia'].forEach(id=>document.getElementById(id).value='');
+
+  if(supabaseConfigured){
+    supabaseClient.from('solicitacoes_hemocomponentes').insert({
+      data: data || new Date().toISOString().slice(0,10),
+      tipo: tipo, quantidade: qtd, urgencia: urgencia, diagnostico: diagnostico || null,
+      hemoglobina: hemoglobina || null, hematocrito: hematocrito || null, plaquetas: plaquetas || null,
+      peso: peso || null, coagulacao: coagulacao || null, cirurgia: cirurgia || null,
+      situacao:'Pendente', medico: medico, paciente_id: currentPacienteId, paciente_nome: paciente.nome
+    }).select().then(({data:inserted, error})=>{
+      if(!error && inserted && inserted[0]) hemos[0].id = inserted[0].id;
+      showToast(error ? 'Salvo localmente (falha ao gravar no Supabase).' : 'Solicitação de hemocomponente salva no Supabase — não some ao fechar.');
+    });
+  } else {
+    showToast('Solicitação registrada (Supabase não configurado — some ao fechar o app).');
+  }
+}
+
+/* ================= EXCLUIR DOCUMENTOS ================= */
+function excluirReceita(i){
+  const r = receitas[i];
+  if(!confirm(`Excluir a receita de "${r.medicamento}" (${r.data})? Essa ação não pode ser desfeita.`)) return;
+  receitas.splice(i, 1);
+  refreshTables();
+  if(supabaseConfigured && r.id){
+    supabaseClient.from('receitas').delete().eq('id', r.id).then(({error})=>{
+      showToast(error ? 'Erro ao excluir no Supabase.' : 'Receita excluída.');
+      if(error) console.error(error);
+    });
+  } else {
+    showToast('Receita excluída desta sessão.');
+  }
+}
+
+function excluirLab(i){
+  const r = labs[i];
+  if(!confirm(`Excluir a solicitação de exame "${r.exame}" (${r.data})? Essa ação não pode ser desfeita.`)) return;
+  labs.splice(i, 1);
+  refreshTables();
+  if(supabaseConfigured && r.id){
+    supabaseClient.from('solicitacoes_exames').delete().eq('id', r.id).then(({error})=>{
+      showToast(error ? 'Erro ao excluir no Supabase.' : 'Solicitação excluída.');
+      if(error) console.error(error);
+    });
+  } else {
+    showToast('Solicitação excluída desta sessão.');
+  }
+}
+
+function excluirHemo(i){
+  const r = hemos[i];
+  if(!confirm(`Excluir a solicitação de "${r.tipo}" (${r.data})? Essa ação não pode ser desfeita.`)) return;
+  hemos.splice(i, 1);
+  refreshTables();
+  if(supabaseConfigured && r.id){
+    supabaseClient.from('solicitacoes_hemocomponentes').delete().eq('id', r.id).then(({error})=>{
+      showToast(error ? 'Erro ao excluir no Supabase.' : 'Solicitação excluída.');
+      if(error) console.error(error);
+    });
+  } else {
+    showToast('Solicitação excluída desta sessão.');
+  }
+}
+
+let editingPacienteId = null;
+
+function abrirNovoPaciente(){
+  editingPacienteId = null;
+  document.getElementById('modal-paciente-title').textContent = 'Novo Paciente';
+  document.getElementById('modal-paciente-btn').textContent = 'Salvar Paciente';
+  ['pac-nome','pac-prontuario','pac-nascimento','pac-telefone','pac-cpf','pac-sus','pac-logradouro','pac-bairro','pac-cidade','pac-uf','pac-cep','pac-convenio','pac-alergias','pac-diagnostico'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pac-sexo').value = 'Feminino';
+  document.getElementById('pac-tipo-sanguineo').value = 'A+';
+  document.getElementById('pac-raca-cor').value = '';
+  openModal('modal-paciente');
+}
+
+function editarPaciente(id){
+  const p = pacientesList.find(x=>x.id === id);
+  if(!p){ showToast('Paciente não encontrado.'); return; }
+  editingPacienteId = id;
+  document.getElementById('modal-paciente-title').textContent = 'Editar Paciente';
+  document.getElementById('modal-paciente-btn').textContent = 'Salvar Alterações';
+  document.getElementById('pac-nome').value = p.nome || '';
+  document.getElementById('pac-prontuario').value = p.prontuario || '';
+  document.getElementById('pac-nascimento').value = p.nascimento || '';
+  document.getElementById('pac-sexo').value = p.sexo || 'Feminino';
+  document.getElementById('pac-telefone').value = p.telefone || '';
+  document.getElementById('pac-cpf').value = p.cpf || '';
+  document.getElementById('pac-sus').value = p.sus || '';
+  document.getElementById('pac-logradouro').value = p.logradouro || '';
+  document.getElementById('pac-bairro').value = p.bairro || '';
+  document.getElementById('pac-cidade').value = p.cidade || '';
+  document.getElementById('pac-uf').value = p.uf || '';
+  document.getElementById('pac-cep').value = p.cep || '';
+  document.getElementById('pac-tipo-sanguineo').value = p.tipo_sanguineo || 'A+';
+  document.getElementById('pac-raca-cor').value = p.raca_cor || '';
+  document.getElementById('pac-convenio').value = p.convenio || '';
+  document.getElementById('pac-alergias').value = p.alergias || '';
+  document.getElementById('pac-diagnostico').value = p.diagnostico || '';
+  openModal('modal-paciente');
+}
+
+function editarPacienteAtivo(){
+  if(!supabaseConfigured){ showToast('Configure o Supabase para poder editar dados de pacientes.'); return; }
+  if(!currentPacienteId){ showToast('Nenhum paciente ativo selecionado.'); return; }
+  editarPaciente(currentPacienteId);
+}
+
+function salvarPaciente(){
+  const nome = document.getElementById('pac-nome').value.trim();
+  if(!nome){ showToast('Informe o nome do paciente.'); return; }
+  if(!supabaseConfigured){
+    showToast('Configure o Supabase primeiro — sem isso o cadastro não persiste.');
+    closeModal('modal-paciente');
+    return;
+  }
+  const logradouro = document.getElementById('pac-logradouro').value.trim() || null;
+  const bairro = document.getElementById('pac-bairro').value.trim() || null;
+  const cidade = document.getElementById('pac-cidade').value.trim() || null;
+  const uf = document.getElementById('pac-uf').value.trim() || null;
+  const cep = document.getElementById('pac-cep').value.trim() || null;
+  const dados = {
+    nome, prontuario: document.getElementById('pac-prontuario').value.trim() || null,
+    nascimento: document.getElementById('pac-nascimento').value || null,
+    sexo: document.getElementById('pac-sexo').value,
+    telefone: document.getElementById('pac-telefone').value.trim() || null,
+    cpf: document.getElementById('pac-cpf').value.trim() || null,
+    sus: document.getElementById('pac-sus').value.trim() || null,
+    logradouro, bairro, cidade, uf, cep,
+    endereco: montarEndereco({logradouro, bairro, cidade, uf, cep}),
+    tipo_sanguineo: document.getElementById('pac-tipo-sanguineo').value,
+    raca_cor: document.getElementById('pac-raca-cor').value || null,
+    convenio: document.getElementById('pac-convenio').value.trim() || null,
+    alergias: document.getElementById('pac-alergias').value.trim() || null,
+    diagnostico: document.getElementById('pac-diagnostico').value.trim() || null,
+  };
+
+  if(editingPacienteId){
+    supabaseClient.from('pacientes').update(dados).eq('id', editingPacienteId).select().then(({data, error})=>{
+      if(error){ showToast('Erro ao salvar alterações do paciente.'); console.error(error); return; }
+      const idx = pacientesList.findIndex(x=>x.id === editingPacienteId);
+      if(idx > -1) pacientesList[idx] = data[0];
+      closeModal('modal-paciente');
+      showToast('Dados do paciente atualizados com sucesso.');
+      if(currentPacienteId === editingPacienteId){
+        ativarPaciente(data[0], false).then(()=>renderPage('resumo'));
+      } else {
+        renderPage('dados');
+      }
+    });
+  } else {
+    supabaseClient.from('pacientes').insert(dados).select().then(({data, error})=>{
+      if(error){ showToast('Erro ao salvar paciente no Supabase.'); console.error(error); return; }
+      pacientesList.unshift(data[0]);
+      closeModal('modal-paciente');
+      ativarPaciente(data[0], false).then(()=>{
+        showToast(`Paciente cadastrado e ativado: ${data[0].nome}`);
+        renderPage('dados');
+      });
+    });
+  }
+}
+
+/* ================= CARREGAR DADOS DO SUPABASE ================= */
+async function initFromSupabase(){
+  if(!supabaseConfigured){
+    showToast('Supabase não configurado — dados de exemplo somem ao fechar o app.');
+    return;
+  }
+  try{
+    const pacRes = await supabaseClient.from('pacientes').select('*').order('created_at', {ascending:true});
+    if(pacRes.data && pacRes.data.length){
+      pacientesList = pacRes.data;
+      await ativarPaciente(pacientesList[0], false);
+    } else {
+      await loadDocumentosDoPaciente();
+    }
+    showToast('Dados carregados do Supabase — os cadastros agora persistem.');
+  }catch(e){
+    console.error(e);
+    showToast('Erro ao conectar ao Supabase — usando dados locais.');
+  }
+}
+
+async function loadDocumentosDoPaciente(){
+  if(!supabaseConfigured) return;
+  try{
+    let rxQuery = supabaseClient.from('receitas').select('*').order('created_at', {ascending:false});
+    let labQuery = supabaseClient.from('solicitacoes_exames').select('*').order('created_at', {ascending:false});
+    let hemoQuery = supabaseClient.from('solicitacoes_hemocomponentes').select('*').order('created_at', {ascending:false});
+    if(currentPacienteId){
+      rxQuery = rxQuery.eq('paciente_id', currentPacienteId);
+      labQuery = labQuery.eq('paciente_id', currentPacienteId);
+      hemoQuery = hemoQuery.eq('paciente_id', currentPacienteId);
+    }
+    const [rxRes, labRes, hemoRes] = await Promise.all([rxQuery, labQuery, hemoQuery]);
+
+    if(rxRes.data){
+      receitas = rxRes.data.map(r=>({
+        id:r.id, data:isoToBR(r.data), medicamento:r.medicamento, uso:r.uso || '—',
+        medico:r.medico, tipo:r.tipo, prescricao:r.prescricao
+      }));
+    }
+    if(labRes.data){
+      labs = labRes.data.map(r=>({
+        id:r.id, data:isoToBR(r.data), exame:r.exame, situacao:r.situacao, medico:r.medico,
+        previsao: r.previsao ? isoToBR(r.previsao) : null
+      }));
+    }
+    if(hemoRes.data){
+      hemos = hemoRes.data.map(r=>({
+        id:r.id, data:isoToBR(r.data), tipo:r.tipo, qtd:r.quantidade, situacao:r.situacao,
+        medico:r.medico, urgencia:r.urgencia, diagnostico:r.diagnostico,
+        hemoglobina:r.hemoglobina, hematocrito:r.hematocrito, plaquetas:r.plaquetas,
+        peso:r.peso, coagulacao:r.coagulacao, cirurgia:r.cirurgia
+      }));
+    }
+    refreshTables();
+  }catch(e){
+    console.error(e);
+  }
+}
+
+function refreshTables(){
+  const activePage = document.querySelector('.nav-item.active')?.dataset.page;
+  if(activePage === 'resumo' || !activePage){
+    const rtb = document.getElementById('receitas-tbody');
+    const ltb = document.getElementById('labs-tbody');
+    const htb = document.getElementById('hemos-tbody');
+    if(rtb) rtb.innerHTML = receitasRows();
+    if(ltb) ltb.innerHTML = labsRows();
+    if(htb) htb.innerHTML = hemosRows();
+  } else {
+    renderPage(activePage);
+  }
+}
+
+/* ================= TOAST ================= */
+let toastTimer;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+</script>
+</body>
+</html>
