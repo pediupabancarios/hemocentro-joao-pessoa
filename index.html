@@ -2127,6 +2127,13 @@ function printWindowShell(bodyHTML, title){
       font-family:Arial,Helvetica,sans-serif;font-weight:800;font-size:34px;letter-spacing:1px;color:#111;
       box-shadow:0 1px 3px rgba(0,0,0,.12);
     }
+    /* Mesmo número, no "Controle de entrega de exames" (canto direito do título) */
+    .reg-etiqueta-mini{
+      position:absolute;right:4px;top:6px;
+      padding:2px 16px;text-align:center;
+      background:#fff;border:1px solid #c9c9c9;border-radius:4px;
+      font-family:Arial,Helvetica,sans-serif;font-weight:800;font-size:22px;letter-spacing:1px;color:#111;
+    }
 
     .doc-footer-sign{display:flex;justify-content:space-around;margin:14px 0 8px;font-size:12.5px;text-align:center;}
     .doc-footer-sign .line{border-top:1px solid #333;width:220px;margin:0 auto 4px;}
@@ -2363,7 +2370,8 @@ function templateSolicitacaoExames(r){
       <div><div class="line"></div>ASSINATURA DO PACIENTE</div>
     </div>
 
-    <div class="entrega-box">
+    <div class="entrega-box" style="position:relative;">
+      ${r.registro_numero ? `<div class="reg-etiqueta-mini">${r.registro_numero}</div>` : ''}
       <div class="entrega-title">Controle de entrega de exames</div>
       <div class="field-row">Nome do paciente: <span class="filled">${paciente.nome}</span></div>
       <div class="field-row">Data coleta: <span class="filled">${r.data}</span> &nbsp; Previsão de entrega: <span class="filled">${r.previsao || '____/____/____'}</span> &nbsp; Data Nasc.: <span class="filled">${paciente.nascimento}</span></div>
