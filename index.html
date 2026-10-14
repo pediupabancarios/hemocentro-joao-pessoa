@@ -897,6 +897,10 @@
           <label>Previsão de entrega</label>
           <input type="date" id="lab-previsao">
         </div>
+        <div class="form-field full">
+          <label>Nº do laboratório / etiqueta (sai impresso em destaque, como na etiqueta)</label>
+          <input type="text" id="lab-registro" placeholder="Ex.: 3328" inputmode="numeric" maxlength="12">
+        </div>
       </div>
 
       <div class="form-section-title">Exames solicitados (marque quantos precisar)</div>
@@ -2115,6 +2119,14 @@ function printWindowShell(bodyHTML, title){
     .chk-cat-title{text-align:center;font-weight:800;font-size:12px;text-decoration:underline;margin:6px 0 3px;}
     .chk-cat-title:first-child{margin-top:0;}
     .chk-item{font-size:12px;padding:1px 0;line-height:1.25;}
+    /* Etiqueta com o nº do laboratório (como o adesivo colado na folha física) */
+    .reg-etiqueta{
+      position:absolute;right:12px;top:52%;
+      min-width:110px;padding:8px 26px;text-align:center;
+      background:#fff;border:1px solid #c9c9c9;border-radius:4px;
+      font-family:Arial,Helvetica,sans-serif;font-weight:800;font-size:34px;letter-spacing:1px;color:#111;
+      box-shadow:0 1px 3px rgba(0,0,0,.12);
+    }
 
     .doc-footer-sign{display:flex;justify-content:space-around;margin:14px 0 8px;font-size:12.5px;text-align:center;}
     .doc-footer-sign .line{border-top:1px solid #333;width:220px;margin:0 auto 4px;}
@@ -2343,7 +2355,7 @@ function templateSolicitacaoExames(r){
 
     <div class="checklist-box">
       <div class="checklist-col left">${checklistColHTML(EXAME_CATEGORIAS, parseExamesList(r.exame))}</div>
-      <div class="checklist-col">${checklistColHTML(EXAME_CATEGORIAS_DIREITA, parseExamesList(r.exame))}</div>
+      <div class="checklist-col" style="position:relative;">${checklistColHTML(EXAME_CATEGORIAS_DIREITA, parseExamesList(r.exame))}${r.registro_numero ? `<div class="reg-etiqueta">${r.registro_numero}</div>` : ''}</div>
     </div>
 
     <div class="doc-footer-sign">
@@ -4206,6 +4218,7 @@ async function abrirNovaSolicitacaoLab(){
   document.getElementById('modal-lab-btn').textContent = 'Salvar Solicitação';
   document.getElementById('lab-data').value = '';
   document.getElementById('lab-previsao').value = '';
+  document.getElementById('lab-registro').value = '';
   await garantirMedicosCarregados();
   renderMedicoSelectOptions('lab-medico-select');
   openModal('modal-lab');
@@ -4218,6 +4231,7 @@ async function editarLab(i){
   document.getElementById('modal-lab-title').textContent = 'Editar Solicitação de Exames';
   document.getElementById('modal-lab-btn').textContent = 'Salvar Alterações';
   document.getElementById('lab-previsao').value = '';
+  document.getElementById('lab-registro').value = r.registro_numero || '';
   await garantirMedicosCarregados();
   renderMedicoSelectOptions('lab-medico-select');
   openModal('modal-lab');
@@ -4247,19 +4261,20 @@ function salvarLab(){
   const previsao = document.getElementById('lab-previsao').value;
   const medico = document.getElementById('lab-medico').value.trim();
   const medicoCrm = document.getElementById('lab-medico-crm').value.trim();
+  const registro = document.getElementById('lab-registro').value.trim();
   if(!medico){ showToast('Selecione o médico solicitante.'); return; }
 
   if(editingLabId !== null){
     const idx = editingLabId;
     const r = labs[idx];
-    Object.assign(r, {exame, medico, medico_crm: medicoCrm || null});
+    Object.assign(r, {exame, medico, medico_crm: medicoCrm || null, registro_numero: registro || null});
     if(data) r.data = fmtDate(data);
     if(previsao) r.previsao = fmtDate(previsao);
     closeModal('modal-lab');
     refreshTables();
     document.querySelectorAll('.lab-exame-cb:checked').forEach(cb=>cb.checked=false);
     if(supabaseConfigured && r.id){
-      supabaseClient.from('solicitacoes_exames').update({exame, medico, medico_crm: medicoCrm || null}).eq('id', r.id).then(({error})=>{
+      supabaseClient.from('solicitacoes_exames').update({exame, medico, medico_crm: medicoCrm || null, registro_numero: registro || null}).eq('id', r.id).then(({error})=>{
         showToast(error ? 'Erro ao salvar alterações no Supabase.' : 'Solicitação atualizada com sucesso.');
         if(error) console.error(error);
       });
@@ -4269,7 +4284,7 @@ function salvarLab(){
     return;
   }
 
-  labs.unshift({data:fmtDate(data), exame:exame, situacao:'Pendente', medico:medico, medico_crm: medicoCrm || null, previsao: previsao ? fmtDate(previsao) : null});
+  labs.unshift({data:fmtDate(data), exame:exame, situacao:'Pendente', medico:medico, medico_crm: medicoCrm || null, registro_numero: registro || null, previsao: previsao ? fmtDate(previsao) : null});
   closeModal('modal-lab');
   refreshTables();
   document.querySelectorAll('.lab-exame-cb:checked').forEach(cb=>cb.checked=false);
@@ -4278,6 +4293,7 @@ function salvarLab(){
     supabaseClient.from('solicitacoes_exames').insert({
       data: data || new Date().toISOString().slice(0,10),
       previsao: previsao || null, exame: exame, situacao:'Pendente', medico: medico, medico_crm: medicoCrm || null,
+      registro_numero: registro || null,
       paciente_id: currentPacienteId, paciente_nome: paciente.nome
     }).select().then(({data:inserted, error})=>{
       if(!error && inserted && inserted[0]) labs[0].id = inserted[0].id;
