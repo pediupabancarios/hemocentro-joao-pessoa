@@ -578,6 +578,13 @@
     .stats-row{grid-template-columns:1fr 1fr;}
   }
   /* Tabelas viram cartões no celular (os rótulos vêm do data-label, colocado por rotularTabelas()) */
+  .recep-tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);padding:0 14px;overflow-x:auto;}
+  .recep-tab{display:flex;align-items:center;gap:7px;padding:12px 14px;font-size:13.5px;font-weight:700;color:var(--muted);background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;font-family:inherit;}
+  .recep-tab.on{color:var(--red-dark);border-bottom-color:var(--red);}
+  .recep-pane{padding:18px;}
+  .recep-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:11px 14px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;font-size:13.5px;}
+  .recep-row .grow{flex:1;min-width:200px;}
+  .recep-row .sub{font-size:12px;color:var(--muted);margin-top:2px;}
   @media (max-width:700px){
     .main table.cards thead{display:none;}
     .main table.cards, .main table.cards tbody{display:block;width:100%;}
@@ -721,6 +728,7 @@
 
       <div class="nav-group" id="navgroup-atendimento">
         <div class="nav-group-header" onclick="toggleNavGroup(this)">Atendimento <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></div>
+        <div class="nav-item" data-page="recepcao"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Recepção</div>
         <div class="nav-item" data-page="meudia"><svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg> Meu Dia</div>
         <div class="nav-item active" data-page="resumo"><svg class="nav-icon" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg> Resumo do Paciente</div>
         <div class="nav-item" data-page="dados"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Dados do Paciente</div>
@@ -815,6 +823,7 @@
       <div class="nav-divider"></div>
       <div class="nav-group">
         <div class="nav-group-header">Clínico</div>
+        <div class="nav-item" data-page="recepcao" onclick="fecharMenuMobile()"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Recepção</div>
         <div class="nav-item" data-page="meudia" onclick="fecharMenuMobile()"><svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg> Meu Dia</div>
         <div class="nav-item" data-page="agenda" onclick="fecharMenuMobile()"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg> Agenda</div>
         <div class="nav-item" data-page="filalab" onclick="fecharMenuMobile()"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg> Fila do Laboratório</div>
@@ -1635,11 +1644,13 @@ document.getElementById('login-form').addEventListener('submit', async function(
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     aplicarPermissoesUsuario();
-    if(currentUser.tipo === 'recepcao'){ filaLabFiltro = 'Concluído'; filaLabOrdem = 'recentes'; }   // recepção vê os resultados já liberados
+    recepAba = 0;
     if(currentUser.tipo === 'laboratorio'){
       // Laboratório já entra na fila de exames de todos os pacientes
       document.getElementById('navgroup-laboratorio')?.classList.remove('collapsed');
       clickNav('filalab');
+    } else if(currentUser.tipo === 'recepcao'){
+      clickNav('recepcao'); // recepção já entra na tela de atendimento (abas)
     } else if(currentUser.tipo === 'medico'){
       clickNav('meudia');   // médico já entra na agenda/pendências do dia
     } else {
@@ -1696,6 +1707,8 @@ function aplicarMenuPorPerfil(){
   const esconder = el => { el.style.display = 'none'; el.dataset.escondidoPerfil = '1'; };
   // "Meu Dia" só faz sentido para o médico; a Fila do Laboratório não é do médico
   document.querySelectorAll('.nav-item[data-page="meudia"]').forEach(el=>{ if(!ehMedico) esconder(el); });
+  // "Recepção" (abas de atendimento) só para a recepção e o gestor
+  document.querySelectorAll('.nav-item[data-page="recepcao"]').forEach(el=>{ if(tipo !== 'recepcao' && tipo !== 'gestor') esconder(el); });
   if(ehMedico) document.querySelectorAll('.nav-item[data-page="filalab"]').forEach(esconder);
   if(!ehLab) return;
 
@@ -1848,7 +1861,7 @@ const NOMES_PAGINA = {
   atendimentos:'Atendimentos', historico:'Histórico Clínico', alergias:'Alergias e Reações',
   receitas:'Receitas Médicas', documentos:'Documentos', evolucoes:'Evoluções', anexos:'Anexos',
   medceaf:'Solicitação de Medicamentos (CEAF)', incidentes:'Incidentes Transfusionais',
-  meudia:'Meu Dia', filalab:'Fila do Laboratório',
+  meudia:'Meu Dia', recepcao:'Recepção', filalab:'Fila do Laboratório',
   laboratorios:'Solicitações de Laboratórios', hemocomponentes:'Solicitações de Hemocomponentes',
   transfusoes:'Transfusões', exames:'Exames Realizados',
   usuarios:'Usuários', relatorios:'Relatórios', config:'Configurações'
@@ -1895,6 +1908,8 @@ function renderPage(page){
     main.innerHTML = fullListTemplate('Solicitações de Laboratórios','🧪', labsRows(), ['Data','Exame Solicitado','Situação','Médico','Ações'], "abrirNovaSolicitacaoLab()", '+ Nova Solicitação', 'laboratorios', podeCriarLaboratorio());
   } else if(page === 'hemocomponentes'){
     main.innerHTML = fullListTemplate('Solicitações de Hemocomponentes','🩸', hemosRows(), ['Data','Hemocomponente','Quantidade','Situação','Médico','Ações'], "abrirNovaSolicitacaoHemo()", '+ Nova Solicitação', 'hemocomponentes');
+  } else if(page === 'recepcao'){
+    recepRedesenhar();
   } else if(page === 'meudia'){
     main.innerHTML = meuDiaTemplate();
     carregarMeuDia().then(()=>{
@@ -3874,6 +3889,274 @@ async function filaLabRegistrar(labId, pacId){
   if(bp) bp.style.display = '';
 }
 
+/* ================= RECEPÇÃO (abas de atendimento) ================= */
+let recepAba = 0;            // 0 paciente novo | 1 já cadastrado | 2 solicitar laboratório | 3 imprimir resultados
+let recepBusca = '';
+let recepBuscaResultados = '';
+let recepPeriodo = '7d';     // 'hoje' | 'ontem' | '7d' | 'todos'
+let recepBuscaLab = '';
+const RECEP_ABAS = [['user-plus','Paciente novo'],['user-search','Já cadastrado'],['flask','Solicitar laboratório'],['printer','Imprimir resultados']];
+
+function recepIcone(n){
+  const m = {
+    'user-plus':'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',
+    'user-search':'<circle cx="11" cy="8" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h3"/><circle cx="17" cy="17" r="3"/><path d="m21 21-1.9-1.9"/>',
+    'flask':'<path d="M9 2v6l-5.5 9.5A2 2 0 0 0 5.2 21h13.6a2 2 0 0 0 1.7-3.5L15 8V2"/><path d="M9 2h6M8.5 13h7"/>',
+    'printer':'<path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/>'
+  };
+  return `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${m[n] || ''}</svg>`;
+}
+
+function recepTemplate(){
+  if(!supabaseConfigured){
+    return `<div class="placeholder"><div class="ic">💁</div><h3>Configure o Supabase primeiro</h3><p>A tela da recepção precisa do banco conectado.</p></div>`;
+  }
+  const abas = RECEP_ABAS.map((a,i)=>`<button class="recep-tab ${recepAba === i ? 'on' : ''}" onclick="recepIrAba(${i})">${recepIcone(a[0])}${a[1]}</button>`).join('');
+  return `
+  <div class="panel" style="margin-top:4px;">
+    <div class="panel-head"><h3>💁 RECEPÇÃO</h3>${currentPacienteId ? `<span style="font-size:12.5px;color:var(--muted);">Paciente ativo: <b>${paciente.nome}</b></span>` : ''}</div>
+    <div class="recep-tabs">${abas}</div>
+    <div class="recep-pane" id="recep-pane">${[recepPaneNovo, recepPaneBusca, recepPaneLab, recepPaneImprimir][recepAba]()}</div>
+  </div>`;
+}
+
+function recepRedesenhar(){
+  const m = document.getElementById('main-content'); if(!m) return;
+  m.innerHTML = recepTemplate();
+  if(recepAba === 1) recepFiltrarBusca();
+  if(recepAba === 3 && !filaLabCarregada) carregarFilaLab().then(()=>{ if(recepAba === 3 && document.getElementById('recep-pane')) recepRedesenhar(); });
+  atualizarPacienteTopo();
+}
+
+function recepIrAba(i){
+  recepAba = i;
+  recepRedesenhar();
+  if(i === 3) carregarFilaLab().then(()=>{ if(recepAba === 3 && document.getElementById('recep-lista-imp')) recepAtualizarListaImp(); });
+}
+
+/* ---- Aba 1: paciente novo ---- */
+function recepPaneNovo(){
+  const tipos = ['A+','A-','B+','B-','AB+','AB-','O+','O-'].map(t=>`<option>${t}</option>`).join('');
+  return `
+  <div id="rp-dup-aviso" style="display:none;margin-bottom:14px;"></div>
+  <div class="form-grid">
+    <div class="form-field full"><label>Nome completo</label><input type="text" id="rp-nome" placeholder="Nome do paciente" oninput="recepVerificarDuplicado()"></div>
+    <div class="form-field"><label>Data de nascimento</label><input type="date" id="rp-nasc" oninput="recepVerificarDuplicado()" onchange="recepVerificarDuplicado()"></div>
+    <div class="form-field"><label>Sexo</label><select id="rp-sexo"><option>Feminino</option><option>Masculino</option></select></div>
+    <div class="form-field"><label>Nome da mãe</label><input type="text" id="rp-mae" placeholder="Nome completo da mãe" oninput="recepVerificarDuplicado()"></div>
+    <div class="form-field"><label>CPF</label><input type="text" id="rp-cpf" placeholder="000.000.000-00" oninput="recepVerificarDuplicado()"></div>
+    <div class="form-field"><label>Cartão do SUS</label><input type="text" id="rp-sus" placeholder="0000 0000 0000 0000" oninput="recepVerificarDuplicado()"></div>
+    <div class="form-field"><label>Telefone</label><input type="text" id="rp-tel" placeholder="(83) 90000-0000"></div>
+    <div class="form-field"><label>Tipo sanguíneo</label><select id="rp-tipo"><option value="">— Não informado —</option>${tipos}</select></div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;">
+    <button class="btn-primary" onclick="recepSalvarNovo('ficar')">Salvar paciente</button>
+    <button class="btn-secondary" onclick="recepSalvarNovo('lab')">Salvar e solicitar exames</button>
+    <button class="btn-secondary" onclick="recepSalvarNovo('agenda')">Salvar e agendar</button>
+  </div>
+  <p style="font-size:12px;color:var(--muted);margin:10px 0 0;">Endereço, convênio e alergias podem ser preenchidos depois no <a href="#" onclick="event.preventDefault();abrirNovoPaciente()">cadastro completo</a>.</p>`;
+}
+
+function recepDadosNovo(){
+  const g = id => document.getElementById(id).value;
+  return { cpf: g('rp-cpf'), sus: g('rp-sus'), nome: g('rp-nome'), nascimento: g('rp-nasc'), nomeMae: g('rp-mae') };
+}
+let _recepDupTimer = null;
+function recepVerificarDuplicado(){
+  clearTimeout(_recepDupTimer);
+  _recepDupTimer = setTimeout(()=>{
+    if(!document.getElementById('rp-nome')) return;
+    const d = recepDadosNovo();
+    const igual = encontrarPacienteDuplicado(d, null);
+    let parecido = null;
+    const nomeN = normNome(d.nome);
+    if(!igual && nomeN.length >= 8) parecido = pacientesList.find(p=>normNome(p.nome) === nomeN) || null;
+    mostrarAvisoDuplicado(igual, parecido, 'rp-dup-aviso');
+    // nesta tela o botão "Abrir ficha" leva para a aba de solicitação com o paciente já ativo
+    document.querySelectorAll('#rp-dup-aviso button').forEach(b=>{
+      const id = (b.getAttribute('onclick') || '').match(/'([^']+)'/);
+      if(id) b.setAttribute('onclick', `recepAbrirDuplicado('${id[1]}')`);
+    });
+  }, 250);
+}
+
+async function recepSalvarNovo(depois){
+  const d = recepDadosNovo();
+  const nome = d.nome.trim();
+  if(!nome){ showToast('Informe o nome do paciente.'); return; }
+  if(!d.nascimento){ showToast('Informe a data de nascimento.'); return; }
+  const dup = encontrarPacienteDuplicado(d, null);
+  if(dup){
+    recepVerificarDuplicado();
+    showToast('Paciente já cadastrado — veja o aviso no topo.');
+    return;
+  }
+  const g = id => document.getElementById(id).value.trim() || null;
+  const dados = {
+    nome, nome_mae: g('rp-mae'), nascimento: d.nascimento, sexo: document.getElementById('rp-sexo').value,
+    telefone: g('rp-tel'), cpf: g('rp-cpf'), sus: g('rp-sus'), tipo_sanguineo: g('rp-tipo') || null,
+    endereco: montarEndereco({})
+  };
+  const { data, error } = await supabaseClient.from('pacientes').insert(dados).select();
+  if(error){ showToast('Erro ao salvar paciente no Supabase.'); console.error(error); return; }
+  pacientesList.unshift(data[0]);
+  await ativarPaciente(data[0], false);
+  showToast(`Paciente cadastrado: ${data[0].nome}`);
+  if(depois === 'lab'){ recepAba = 2; recepRedesenhar(); abrirNovaSolicitacaoLab(); }
+  else if(depois === 'agenda'){ recepAgendar(data[0].id); }
+  else { recepAba = 0; recepRedesenhar(); }
+}
+
+/* ---- Aba 2: já cadastrado ---- */
+function recepPaneBusca(){
+  return `
+  <div class="form-field" style="margin-bottom:14px;"><label>Buscar paciente</label>
+    <input type="text" id="recep-busca" value="${recepBusca.replace(/"/g,'&quot;')}" placeholder="Nome, CPF, Cartão do SUS ou prontuário" oninput="recepBusca=this.value;recepFiltrarBusca()" autocomplete="off">
+  </div>
+  <div id="recep-resultados"></div>`;
+}
+function recepFiltrarBusca(){
+  const box = document.getElementById('recep-resultados'); if(!box) return;
+  const t = normNome(recepBusca), dig = recepBusca.replace(/\D/g,'');
+  let lista, titulo = '';
+  if(!t && !dig){
+    lista = pacientesList.slice(0, 8);
+    titulo = '<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Cadastrados mais recentemente</div>';
+  } else {
+    lista = pacientesList.filter(p=>{
+      if(t && normNome(p.nome).includes(t)) return true;
+      if(dig.length >= 3){
+        if((p.cpf || '').replace(/\D/g,'').includes(dig)) return true;
+        if((p.sus || '').replace(/\D/g,'').includes(dig)) return true;
+        if(String(p.prontuario || '').replace(/\D/g,'').includes(dig)) return true;
+      }
+      return false;
+    }).slice(0, 15);
+  }
+  if(!lista.length){ box.innerHTML = `<div style="padding:10px;color:var(--muted);font-size:13px;">Nenhum paciente encontrado. Use a aba "Paciente novo" para cadastrar.</div>`; return; }
+  box.innerHTML = titulo + lista.map(p=>`
+    <div class="recep-row">
+      <div class="grow"><b>${p.nome}</b><div class="sub">Prontuário ${p.prontuario || '—'}${p.nascimento ? ' · nasc. ' + isoToBR(p.nascimento) : ''}${p.nome_mae ? ' · mãe: ' + p.nome_mae : ''}</div></div>
+      <button class="btn-secondary" onclick="recepAgendar('${p.id}')">Agendar</button>
+      <button class="btn-secondary" onclick="recepEscolherPaciente('${p.id}', 2)">Solicitar exames</button>
+      <button class="btn-secondary" onclick="selecionarPaciente('${p.id}')">Abrir ficha</button>
+    </div>`).join('');
+}
+async function recepEscolherPaciente(id, aba){
+  const p = pacientesList.find(x=>x.id === id);
+  if(!p){ showToast('Paciente não encontrado.'); return; }
+  await ativarPaciente(p, false);
+  recepAba = aba;
+  recepRedesenhar();
+}
+function recepAgendar(id){
+  agendaPacientePreSel = id;
+  const p = pacientesList.find(x=>x.id === id);
+  clickNav('agenda');
+  showToast(`${p ? p.nome : 'Paciente'}: escolha o médico, o dia e o horário livre.`);
+}
+
+/* ---- Aba 3: solicitar laboratório ---- */
+function recepPaneLab(){
+  if(!currentPacienteId){
+    return `<div style="padding:24px;text-align:center;color:var(--muted);">
+      <p style="margin:0 0 12px;">Escolha primeiro o paciente.</p>
+      <button class="btn-primary" onclick="recepIrAba(1)">Buscar paciente cadastrado</button>
+      <button class="btn-secondary" onclick="recepIrAba(0)">Cadastrar paciente novo</button></div>`;
+  }
+  return `
+  <div class="recep-row" style="background:var(--bg);">
+    <div class="grow"><b>${paciente.nome}</b><div class="sub">Prontuário ${paciente.prontuario} · nasc. ${paciente.nascimento}</div></div>
+    <button class="btn-secondary" onclick="recepIrAba(1)">Trocar paciente</button>
+    <button class="btn-primary" onclick="abrirNovaSolicitacaoLab()">+ Nova solicitação de exames</button>
+  </div>
+  <div style="font-size:12px;color:var(--muted);margin:14px 0 6px;font-weight:700;">SOLICITAÇÕES DESTE PACIENTE</div>
+  <div style="overflow-x:auto;"><table>
+    <thead><tr><th>Data</th><th>Exame Solicitado</th><th>Situação</th><th>Médico</th><th>Ações</th></tr></thead>
+    <tbody id="labs-tbody">${labsRows()}</tbody>
+  </table></div>`;
+}
+
+/* ---- Aba 4: imprimir resultados ---- */
+function recepDataRef(r){ return r.situacao === 'Concluído' ? (r.data_resultado || r.data) : r.data; }
+function recepPassaPeriodo(r){
+  const d = recepDataRef(r);
+  if(recepPeriodo === 'hoje')  return d === isoDeslocado(0);
+  if(recepPeriodo === 'ontem') return d === isoDeslocado(-1);
+  if(recepPeriodo === '7d')    return d >= isoDeslocado(-6) && d <= isoDeslocado(0);
+  return true;
+}
+function recepLinhasImp(){
+  const t = normNome(recepBuscaLab);
+  return filaLab.filter(r=>{
+    if(!recepPassaPeriodo(r)) return false;
+    if(!t) return true;
+    return normNome([r.paciente_nome, r.exame, r.registro_numero].join(' ')).includes(t);
+  }).sort((a,b)=>{
+    const ca = a.situacao === 'Concluído' ? 0 : 1, cb = b.situacao === 'Concluído' ? 0 : 1;
+    return ca - cb || (recepDataRef(b) || '').localeCompare(recepDataRef(a) || '');
+  });
+}
+function recepPaneImprimir(){
+  const chip = (id, rot) => `<button class="btn-secondary" style="padding:7px 12px;font-size:12px;${recepPeriodo === id ? 'background:var(--red);color:#fff;' : ''}" onclick="recepPeriodo='${id}';recepRedesenhar();carregarFilaLab().then(()=>recepAtualizarListaImp())">${rot}</button>`;
+  return `
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+    ${chip('hoje','Hoje')}${chip('ontem','Ontem')}${chip('7d','Últimos 7 dias')}${chip('todos','Todos')}
+    <input type="text" value="${recepBuscaLab.replace(/"/g,'&quot;')}" placeholder="Buscar paciente, exame ou nº da etiqueta" oninput="recepBuscaLab=this.value;recepAtualizarListaImp()"
+      style="flex:1;min-width:220px;padding:9px 14px;border:1.5px solid var(--line);border-radius:9px;font-size:13.5px;outline:none;">
+  </div>
+  <div id="recep-lista-imp">${recepListaImpHTML()}</div>
+  <div id="recep-barra-imp" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">${recepBarraImpHTML()}</div>`;
+}
+function recepListaImpHTML(){
+  if(!filaLabCarregada) return `<div style="padding:12px;color:var(--muted);">Carregando...</div>`;
+  const todas = recepLinhasImp();
+  if(!todas.length) return `<div style="padding:12px;color:var(--muted);font-size:13px;">Nenhum exame neste período.</div>`;
+  const lista = todas.slice(0, 100);
+  const aviso = todas.length > lista.length ? `<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Mostrando 100 de ${todas.length} — use a busca ou o período.</div>` : '';
+  return aviso + lista.map(r=>{
+    const ok = r.situacao === 'Concluído';
+    const quando = ok ? `liberado em ${isoToBR(r.data_resultado || r.data)}` : `pedido em ${isoToBR(r.data)}`;
+    return `
+    <div class="recep-row" style="${ok ? '' : 'opacity:.7;'}">
+      <input type="checkbox" ${ok ? '' : 'disabled'} ${filaLabSel.has(r.id) ? 'checked' : ''} onchange="recepToggleSel('${r.id}', this.checked)">
+      <div class="grow"><b>${r.paciente_nome || '—'}</b><div class="sub">${r.exame}${r.registro_numero ? ' · etiqueta ' + r.registro_numero : ''} · ${quando}</div></div>
+      ${ok ? `<span class="status concluido">Liberado</span><button class="btn-secondary" onclick="filaLabImprimirUm('${r.id}')">${ico('verresultado')} Imprimir</button>`
+           : `<span class="status ${statusClass(r.situacao)}">${r.situacao}</span><span class="sub">Aguardando laboratório</span>`}
+    </div>`;
+  }).join('');
+}
+function recepBarraImpHTML(){
+  const n = filaLabSel.size;
+  return `
+    <button class="btn-primary" onclick="filaLabImprimirResultados()">Imprimir ${n ? n + ' selecionado' + (n > 1 ? 's' : '') : 'selecionados'}</button>
+    <button class="btn-secondary" onclick="recepMarcarLiberados()">Marcar todos os liberados</button>
+    <span style="flex:1;"></span>
+    <span style="font-size:12px;color:var(--muted);">Dia:</span>
+    <input type="date" id="fila-lab-dia-res" value="${filaLabDiaResultados || isoLocal(new Date())}" onchange="filaLabDiaResultados=this.value"
+      style="padding:6px 10px;border:1.5px solid var(--line);border-radius:9px;font-size:12.5px;outline:none;">
+    <button class="btn-secondary" onclick="filaLabImprimirResultados(filaLabDiaEscolhido())">PDF dos laudos do dia</button>
+    <button class="btn-secondary" onclick="filaLabBaixarResultadosExcel()">Excel do dia</button>`;
+}
+function recepAtualizarListaImp(){
+  const l = document.getElementById('recep-lista-imp'); if(l) l.innerHTML = recepListaImpHTML();
+  const b = document.getElementById('recep-barra-imp'); if(b){
+    const dia = document.getElementById('fila-lab-dia-res'); if(dia) filaLabDiaResultados = dia.value;
+    b.innerHTML = recepBarraImpHTML();
+  }
+}
+function recepToggleSel(id, marcado){
+  if(marcado) filaLabSel.add(id); else filaLabSel.delete(id);
+  const b = document.getElementById('recep-barra-imp'); if(b){
+    const dia = document.getElementById('fila-lab-dia-res'); if(dia) filaLabDiaResultados = dia.value;
+    b.innerHTML = recepBarraImpHTML();
+  }
+}
+function recepMarcarLiberados(){
+  recepLinhasImp().slice(0, 100).forEach(r=>{ if(r.situacao === 'Concluído') filaLabSel.add(r.id); });
+  recepAtualizarListaImp();
+}
+
 /* ================= MEU DIA (perfil Médico) ================= */
 let meuDiaData = null;      // dia da agenda exibida (ISO)
 let meuDiaAgenda = [];
@@ -4109,6 +4392,7 @@ let agendaDataSelecionada = null;
 let agendaAgendamentos = [];
 let agendaDiasCache = {};
 let agendaSlotEscolhido = null;
+let agendaPacientePreSel = null;   // paciente escolhido na tela da Recepção (pré-preenche o agendamento)
 
 function podeAgendar(){
   return currentUser && (currentUser.tipo === 'recepcao' || currentUser.tipo === 'gestor');
@@ -4275,6 +4559,10 @@ function abrirAgendarSlot(periodo, horario){
   document.getElementById('agendamento-cpf').value = '';
   document.getElementById('agendamento-observacoes').value = '';
   document.getElementById('agendamento-paciente-resultados').innerHTML = '';
+  if(agendaPacientePreSel){
+    const pp = pacientesList.find(x=>x.id === agendaPacientePreSel);
+    if(pp) selecionarPacientePraAgendamento(pp.id, pp.nome, pp.cpf || '');
+  }
   openModal('modal-agendamento');
 }
 
@@ -4932,7 +5220,7 @@ function salvarLab(){
 
   if(supabaseConfigured){
     supabaseClient.from('solicitacoes_exames').insert({
-      data: data || new Date().toISOString().slice(0,10),
+      data: data || isoLocal(new Date()),
       previsao: previsao || null, exame: exame, situacao:'Pendente', medico: medico, medico_crm: medicoCrm || null,
       registro_numero: registro || null,
       paciente_id: currentPacienteId, paciente_nome: paciente.nome
@@ -5803,8 +6091,8 @@ function dadosPacienteDoFormulario(){
     nomeMae: document.getElementById('pac-nome-mae').value
   };
 }
-function mostrarAvisoDuplicado(igual, parecido){
-  const el = document.getElementById('pac-dup-aviso'); if(!el) return;
+function mostrarAvisoDuplicado(igual, parecido, elId){
+  const el = document.getElementById(elId || 'pac-dup-aviso'); if(!el) return;
   const ficha = p => `<b>${p.nome}</b> — Prontuário ${p.prontuario || '—'}${p.nascimento ? ' · nasc. ' + isoToBR(p.nascimento) : ''}${p.nome_mae ? ' · mãe: ' + p.nome_mae : ''}`;
   if(igual){
     el.style.display = 'block';
@@ -5823,6 +6111,7 @@ function mostrarAvisoDuplicado(igual, parecido){
   } else { el.style.display = 'none'; el.innerHTML = ''; }
 }
 function abrirPacienteDuplicado(id){ closeModal('modal-paciente'); selecionarPaciente(id); }
+function recepAbrirDuplicado(id){ recepEscolherPaciente(id, 2); }
 let _dupTimer = null;
 function verificarDuplicadoAoDigitar(){
   clearTimeout(_dupTimer);
