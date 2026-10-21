@@ -1204,6 +1204,7 @@
   <div class="modal">
     <div class="modal-head"><h3 id="modal-paciente-title">Novo Paciente</h3><button class="close" onclick="closeModal('modal-paciente')">✕</button></div>
     <div class="modal-body">
+      <div id="pac-dup-aviso" style="display:none;margin-bottom:14px;"></div>
       <div class="form-grid">
         <div class="form-field full">
           <label>Nome completo</label>
@@ -5636,6 +5637,7 @@ function abrirNovoPaciente(){
   document.getElementById('pac-tipo-sanguineo').value = '';
   document.getElementById('pac-raca-cor').value = '';
   document.getElementById('pac-cep-status').textContent = '';
+  mostrarAvisoDuplicado(null, null);
   openModal('modal-paciente');
 }
 
@@ -5643,6 +5645,7 @@ function editarPaciente(id){
   const p = pacientesList.find(x=>x.id === id);
   if(!p){ showToast('Paciente não encontrado.'); return; }
   editingPacienteId = id;
+  mostrarAvisoDuplicado(null, null);
   document.getElementById('modal-paciente-title').textContent = 'Editar Paciente';
   document.getElementById('modal-paciente-btn').textContent = 'Salvar Alterações';
   document.getElementById('pac-nome').value = p.nome || '';
@@ -5779,6 +5782,53 @@ function encontrarPacienteDuplicado(dados, excluirId){
   }) || null;
 }
 
+// Aviso de cadastro repetido, ao digitar (antes de preencher o formulário todo)
+function dadosPacienteDoFormulario(){
+  return {
+    cpf: document.getElementById('pac-cpf').value, sus: document.getElementById('pac-sus').value,
+    nome: document.getElementById('pac-nome').value, nascimento: document.getElementById('pac-nascimento').value,
+    nomeMae: document.getElementById('pac-nome-mae').value
+  };
+}
+function mostrarAvisoDuplicado(igual, parecido){
+  const el = document.getElementById('pac-dup-aviso'); if(!el) return;
+  const ficha = p => `<b>${p.nome}</b> — Prontuário ${p.prontuario || '—'}${p.nascimento ? ' · nasc. ' + isoToBR(p.nascimento) : ''}${p.nome_mae ? ' · mãe: ' + p.nome_mae : ''}`;
+  if(igual){
+    el.style.display = 'block';
+    el.innerHTML = `<div style="background:#FDECEC;border:1px solid #F0B4B4;border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.5;">
+      <b style="color:#B3261E;">⚠ Este paciente já está cadastrado</b><br>${ficha(igual)}<br>
+      <span style="color:#6b2a2a;">Mesmo CPF, Cartão do SUS ou mesmo nome e data de nascimento — não dá para cadastrar de novo.</span><br>
+      <button type="button" class="btn-primary" style="margin-top:8px;padding:7px 14px;" onclick="abrirPacienteDuplicado('${igual.id}')">Abrir a ficha existente</button>
+    </div>`;
+  } else if(parecido){
+    el.style.display = 'block';
+    el.innerHTML = `<div style="background:#FFF6E0;border:1px solid #EBD28F;border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.5;">
+      <b style="color:#8A6100;">Atenção: já existe alguém com este nome</b><br>${ficha(parecido)}<br>
+      <span style="color:#6b5420;">Se for a mesma pessoa, abra a ficha em vez de cadastrar de novo.</span>
+      <button type="button" class="btn-secondary" style="margin-left:6px;padding:5px 12px;" onclick="abrirPacienteDuplicado('${parecido.id}')">Abrir ficha</button>
+    </div>`;
+  } else { el.style.display = 'none'; el.innerHTML = ''; }
+}
+function abrirPacienteDuplicado(id){ closeModal('modal-paciente'); selecionarPaciente(id); }
+let _dupTimer = null;
+function verificarDuplicadoAoDigitar(){
+  clearTimeout(_dupTimer);
+  _dupTimer = setTimeout(()=>{
+    const d = dadosPacienteDoFormulario();
+    const igual = encontrarPacienteDuplicado(d, editingPacienteId);
+    let parecido = null;
+    const nomeN = normNome(d.nome);
+    if(!igual && nomeN.length >= 8) parecido = pacientesList.find(p=>p.id !== editingPacienteId && normNome(p.nome) === nomeN) || null;
+    mostrarAvisoDuplicado(igual, parecido);
+  }, 250);
+}
+document.getElementById('modal-paciente').addEventListener('input', e=>{
+  if(['pac-nome','pac-nome-mae','pac-nascimento','pac-cpf','pac-sus'].includes(e.target.id)) verificarDuplicadoAoDigitar();
+});
+document.getElementById('modal-paciente').addEventListener('change', e=>{
+  if(['pac-nascimento'].includes(e.target.id)) verificarDuplicadoAoDigitar();
+});
+
 function salvarPaciente(){
   const nome = document.getElementById('pac-nome').value.trim();
   if(!nome){ showToast('Informe o nome do paciente.'); return; }
@@ -5802,18 +5852,10 @@ function salvarPaciente(){
     nomeMae: document.getElementById('pac-nome-mae').value
   }, editingPacienteId);
   if(duplicado){
-    // Já existe um paciente com os mesmos dados — não deixa cadastrar/salvar de novo
-    const motivo = editingPacienteId
-      ? 'Esses dados já pertencem a outro cadastro — não é possível salvar.'
-      : 'Não é possível cadastrar o mesmo paciente duas vezes.';
-    const abrir = confirm(
-      `Este paciente já está cadastrado:\n\n` +
-      `${duplicado.nome} — Prontuário: ${duplicado.prontuario || '—'}\n` +
-      `(mesmo CPF, Cartão do SUS, ou mesmo nome e data de nascimento)\n\n` +
-      `${motivo}\n\nDeseja abrir o cadastro existente?`
-    );
-    closeModal('modal-paciente');
-    if(abrir) selecionarPaciente(duplicado.id);
+    // Já existe um paciente com os mesmos dados — não grava; mostra o aviso no próprio formulário (sem perder o que foi digitado)
+    mostrarAvisoDuplicado(duplicado, null);
+    document.querySelector('#modal-paciente .modal-body').scrollTo?.(0, 0);
+    showToast(editingPacienteId ? 'Esses dados já pertencem a outro cadastro.' : 'Paciente já cadastrado — veja o aviso no topo.');
     return;
   }
 
