@@ -1635,6 +1635,7 @@ document.getElementById('login-form').addEventListener('submit', async function(
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     aplicarPermissoesUsuario();
+    if(currentUser.tipo === 'recepcao'){ filaLabFiltro = 'Concluído'; filaLabOrdem = 'recentes'; }   // recepção vê os resultados já liberados
     if(currentUser.tipo === 'laboratorio'){
       // Laboratório já entra na fila de exames de todos os pacientes
       document.getElementById('navgroup-laboratorio')?.classList.remove('collapsed');
@@ -3627,7 +3628,7 @@ function filaLabRows(){
     const av = proxima[r.situacao];
     return `
     <tr>
-      <td class="col-check">${pode ? `<input type="checkbox" ${filaLabSel.has(r.id) ? 'checked' : ''} onchange="filaLabToggleSel('${r.id}', this.checked)">` : ''}</td>
+      <td class="col-check">${(pode || r.situacao === 'Concluído') ? `<input type="checkbox" ${filaLabSel.has(r.id) ? 'checked' : ''} onchange="filaLabToggleSel('${r.id}', this.checked)">` : ''}</td>
       <td>${isoToBR(r.data)}${filaLabSeloAtraso(r)}</td>
       <td><b>${r.paciente_nome || '—'}</b></td>
       <td>${r.exame}</td>
@@ -3636,6 +3637,7 @@ function filaLabRows(){
       <td><span class="status ${statusClass(r.situacao)}">${r.situacao}</span></td>
       <td class="row-actions">
         ${pode && av ? `<button title="${av[1]}" onclick="filaLabMudarEtapa('${r.id}','${av[0]}')">${ico('avancar')}</button>` : ''}
+        ${r.situacao === 'Concluído' ? `<button title="Imprimir resultado" onclick="filaLabImprimirUm('${r.id}')">${ico('verresultado')}</button>` : ''}
         ${pode ? `<button title="${r.situacao === 'Concluído' ? 'Editar resultado' : 'Registrar resultado'}" onclick="filaLabRegistrar('${r.id}','${r.paciente_id}')">${ico('resultado')}</button>` : ''}
         <button title="Abrir paciente" onclick="selecionarPaciente('${r.paciente_id}')">${ico('ver')}</button>
       </td>
@@ -3649,8 +3651,8 @@ function filaLabBarraLote(){
   return `
   <div style="margin:10px 18px 0;padding:10px 14px;background:#EAF1FB;border:1px solid #C9DAF3;border-radius:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
     <b style="font-size:13px;color:var(--navy);margin-right:6px;">${n} selecionado${n > 1 ? 's' : ''}</b>
-    <button class="btn-secondary" onclick="filaLabEtapaLote('Coletado')">Marcar como coletados</button>
-    <button class="btn-secondary" onclick="filaLabEtapaLote('Em análise')">Colocar em análise</button>
+    ${podeRegistrarResultado() ? `<button class="btn-secondary" onclick="filaLabEtapaLote('Coletado')">Marcar como coletados</button>
+    <button class="btn-secondary" onclick="filaLabEtapaLote('Em análise')">Colocar em análise</button>` : ''}
     <button class="btn-secondary" onclick="filaLabImprimirResultados()">🖨️ Imprimir resultados</button>
     <button class="btn-secondary" onclick="filaLabLimparSel()">Limpar seleção</button>
   </div>`;
@@ -3670,7 +3672,7 @@ function filaLabTemplate(){
   return `
   <div class="panel" style="margin-top:4px;">
     <div class="panel-head">
-      <h3>📋 FILA DO LABORATÓRIO — TODOS OS PACIENTES</h3>
+      <h3>${currentUser && currentUser.tipo === 'recepcao' ? '🖨️ RESULTADOS LIBERADOS — TODOS OS PACIENTES' : '📋 FILA DO LABORATÓRIO — TODOS OS PACIENTES'}</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         ${btn('Aberto', `Em aberto${c ? ' ('+nAberto+')' : ''}`)}
         ${btn('Atrasado', `Atrasados${c ? ' ('+nAtr+')' : ''}`)}
@@ -3713,7 +3715,7 @@ function filaLabTemplate(){
     <div id="fila-lab-lote">${filaLabBarraLote()}</div>
     <div style="overflow-x:auto;margin-top:8px;">
       <table>
-        <thead><tr><th style="width:32px;">${podeRegistrarResultado() ? `<input type="checkbox" title="Marcar todos os exibidos" onchange="filaLabSelTodos(this.checked)">` : ''}</th><th>Data</th><th>Paciente</th><th>Exame(s)</th><th>Médico</th><th>Nº etiqueta</th><th>Situação</th><th>Ações</th></tr></thead>
+        <thead><tr><th style="width:32px;"><input type="checkbox" title="Marcar todos os exibidos" onchange="filaLabSelTodos(this.checked)"></th><th>Data</th><th>Paciente</th><th>Exame(s)</th><th>Médico</th><th>Nº etiqueta</th><th>Situação</th><th>Ações</th></tr></thead>
         <tbody id="fila-lab-tbody">${filaLabRows()}</tbody>
       </table>
     </div>
@@ -3738,7 +3740,10 @@ function filaLabToggleSel(id, marcado){
   const lote = document.getElementById('fila-lab-lote'); if(lote) lote.innerHTML = filaLabBarraLote();
 }
 function filaLabSelTodos(marcado){
-  filaLabLinhas().slice(0, FILA_LAB_MAX_LINHAS).forEach(r=>{ if(marcado) filaLabSel.add(r.id); else filaLabSel.delete(r.id); });
+  filaLabLinhas().slice(0, FILA_LAB_MAX_LINHAS).forEach(r=>{
+    if(!podeRegistrarResultado() && r.situacao !== 'Concluído') return;
+    if(marcado) filaLabSel.add(r.id); else filaLabSel.delete(r.id);
+  });
   filaLabRedesenhar();
 }
 function filaLabLimparSel(){ filaLabSel.clear(); filaLabRedesenhar(); }
@@ -3789,6 +3794,14 @@ function filaLabFolhaResultado(row){
     responsavel_registro: row.responsavel_registro, data_resultado: row.data_resultado ? isoToBR(row.data_resultado) : null
   };
   return templateResultadoExame(r, pac);
+}
+
+// Imprime o laudo de um exame concluído (qualquer perfil que veja a fila)
+async function filaLabImprimirUm(id){
+  const { data, error } = await supabaseClient.from('solicitacoes_exames').select('*').eq('id', id).single();
+  if(error || !data){ console.error(error); showToast('Erro ao buscar o resultado.'); return; }
+  if(data.situacao !== 'Concluído'){ showToast('Este exame ainda não foi liberado pelo laboratório.'); return; }
+  abrirDocumentoImpressao(printWindowShell(filaLabFolhaResultado(data), `Resultado de exame — ${data.paciente_nome || ''}`), true);
 }
 
 // Imprime/salva em PDF os laudos (um por folha): do dia informado ou, sem dia, dos exames marcados na fila
