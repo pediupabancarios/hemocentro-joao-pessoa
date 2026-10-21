@@ -467,6 +467,8 @@
   .status.concluido{background:var(--green-bg);color:var(--green-text);}
   .status.autorizada{background:var(--green-bg);color:var(--green-text);}
   .status.urgente{background:#FCE4E4;color:var(--red-dark);}
+  .status.coletado{background:#E4EEFC;color:#1D63C9;}
+  .status.analise{background:#EFE6FA;color:#6B3FA0;}
   .row-actions{display:flex;gap:6px;}
   .row-actions button{
     width:30px;height:30px;border-radius:7px;border:none;background:#F5F6F8;
@@ -574,6 +576,22 @@
     .patient-grid{grid-template-columns:repeat(2,1fr)!important;}
     .info-strip-grid{grid-template-columns:repeat(2,1fr)!important;}
     .stats-row{grid-template-columns:1fr 1fr;}
+  }
+  /* Tabelas viram cartões no celular (os rótulos vêm do data-label, colocado por rotularTabelas()) */
+  @media (max-width:700px){
+    .main table.cards thead{display:none;}
+    .main table.cards, .main table.cards tbody{display:block;width:100%;}
+    .main table.cards tr{display:block;border:1px solid var(--line);border-radius:12px;margin:10px 12px;padding:8px 12px;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.04);}
+    .main table.cards tr:hover{background:#fff;}
+    .main table.cards td{display:flex;gap:12px;justify-content:space-between;align-items:flex-start;padding:5px 0;border:none;text-align:right;font-size:13px;}
+    .main table.cards td::before{content:attr(data-label);font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);text-align:left;flex-shrink:0;padding-top:2px;}
+    .main table.cards td.row-actions{justify-content:flex-end;padding-top:8px;margin-top:4px;border-top:1px solid var(--line);}
+    .main table.cards td.row-actions::before{display:none;}
+    .main table.cards td[colspan]{display:block;text-align:center;}
+    .main table.cards td[colspan]::before{display:none;}
+    .main table.cards td.col-check:empty{display:none;}
+    .main table.cards td.col-check{padding-bottom:0;}
+    .main table.cards td.col-check input{width:20px;height:20px;}
   }
   @media (max-width:1100px){
     .patient-grid{grid-template-columns:repeat(3,1fr);}
@@ -1712,6 +1730,29 @@ function podeImprimirBPA(){
   return !currentUser || currentUser.tipo === 'recepcao' || currentUser.tipo === 'gestor';
 }
 
+/* ================= TABELAS COMO CARTÕES NO CELULAR ================= */
+function rotularTabelas(){
+  document.querySelectorAll('#main-content table').forEach(t=>{
+    const ths = [...t.querySelectorAll('thead th')].map(th=>th.textContent.trim());
+    if(!ths.length) return;
+    t.classList.add('cards');
+    t.querySelectorAll('tbody tr').forEach(tr=>{
+      [...tr.children].forEach((td,i)=>{
+        if(td.hasAttribute('colspan') || td.dataset.label !== undefined) return;
+        td.dataset.label = ths[i] || '';
+        if(!ths[i]) td.classList.add('col-check');   // coluna sem título (ex.: caixa de seleção)
+      });
+    });
+  });
+}
+(function(){
+  const alvo = document.getElementById('main-content');
+  if(!alvo) return;
+  let timer = null;
+  new MutationObserver(()=>{ clearTimeout(timer); timer = setTimeout(rotularTabelas, 30); })
+    .observe(alvo, {childList:true, subtree:true});
+})();
+
 /* ================= NAVIGATION ================= */
 // Seções ainda sem tela própria — marcadas visualmente com "em breve"
 const PAGINAS_EM_BREVE = ['atendimentos','historico','alergias','evolucoes','transfusoes','exames','relatorios','config'];
@@ -1768,7 +1809,7 @@ function restaurarEstadoMenu(){
 restaurarEstadoMenu();
 
 function statusClass(s){
-  const map = {"Pendente":"pendente","Concluído":"concluido","Autorizada":"autorizada","Urgente":"urgente","Agendado":"pendente","Confirmado":"autorizada","Atendido":"concluido","Cancelado":"urgente"};
+  const map = {"Pendente":"pendente","Coletado":"coletado","Em análise":"analise","Concluído":"concluido","Autorizada":"autorizada","Urgente":"urgente","Agendado":"pendente","Confirmado":"autorizada","Atendido":"concluido","Cancelado":"urgente"};
   return map[s] || "pendente";
 }
 
@@ -1783,6 +1824,7 @@ const _ICONES = {
   bpa:'<path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"/><path d="M9 7h6M9 11h6M9 15h4"/>',
   ativar:'<path d="M20 6 9 17l-5-5"/>',
   bloquear:'<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>',
+  avancar:'<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
   baixar:'<path d="M12 15V3"/><path d="m7 10 5 5 5-5"/><path d="M21 21H3"/>'
 };
 function ico(nome){
@@ -1881,7 +1923,7 @@ function statsCardsHTML(){
   const mesAtual = hoje.getMonth();
   const anoAtual = hoje.getFullYear();
 
-  const examesPendentes = labs.filter(r=>r.situacao === 'Pendente').length;
+  const examesPendentes = labs.filter(r=>r.situacao !== 'Concluído').length;
 
   const receitasMes = receitas.filter(r=>{
     const [d,m,y] = (r.data||'').split('/');
@@ -3076,7 +3118,8 @@ function salvarResultadoExame(proximo){
   }
 }
 
-function templateResultadoExame(r){
+function templateResultadoExame(r, pac){
+  pac = pac || paciente;
   let parametros = [];
   try{ parametros = r.parametros_json ? JSON.parse(r.parametros_json) : []; }catch(e){ parametros = []; }
   const linhasTabela = parametros.map(p=>`
@@ -3107,8 +3150,8 @@ function templateResultadoExame(r){
     </table>
 
     <div class="field-row">Registro: <span class="filled">${r.registro_numero || '—'}</span></div>
-    <div class="field-row">Nome: <span class="filled">${paciente.nome}</span></div>
-    <div class="field-row">Data de nascimento: <span class="filled">${paciente.nascimento}</span></div>
+    <div class="field-row">Nome: <span class="filled">${pac.nome}</span></div>
+    <div class="field-row">Data de nascimento: <span class="filled">${pac.nascimento}</span></div>
     <div class="field-row">Solicitante Dr(a): <span class="filled">${r.medico}</span></div>
     <div class="field-row">Data da coleta: <span class="filled">${r.data}</span> &nbsp;&nbsp; Data da liberação: <span class="filled">${r.data_resultado || '—'}</span></div>
 
@@ -3476,13 +3519,16 @@ function excluirAnexo(i){
 /* ================= FILA DO LABORATÓRIO (todos os pacientes) ================= */
 let filaLab = [];
 let filaLabCarregada = false;
-let filaLabFiltro = 'Pendente';    // 'Pendente' | 'Atrasado' | 'Concluído' | 'Todos'
+let filaLabFiltro = 'Aberto';      // 'Aberto' (não concluídos) | 'Atrasado' | 'Concluído' | 'Todos'
+let filaLabEtapa = 'todas';        // 'todas' | 'Pendente' | 'Coletado' | 'Em análise'
 let filaLabBusca = '';
 let filaLabPeriodo = 'todos';      // 'todos' | 'hoje' | 'ontem' | '7d' | 'data'
 let filaLabData = '';              // usado quando filaLabPeriodo === 'data' (ISO yyyy-mm-dd)
 let filaLabOrdem = 'antigos';      // 'antigos' | 'recentes'
+let filaLabSel = new Set();        // exames marcados na caixa de seleção (ações em lote)
 const FILA_LAB_MAX_LINHAS = 300;   // evita tabela gigante; use os filtros para achar o resto
-const FILA_LAB_DIAS_ATRASO = 7;    // pendente há mais de N dias = atrasado
+const FILA_LAB_DIAS_ATRASO = 7;    // em aberto há mais de N dias = atrasado
+const FILA_LAB_ETAPAS = ['Pendente','Coletado','Em análise'];   // antes de Concluído
 
 function isoLocal(d){
   const z = n => String(n).padStart(2,'0');
@@ -3499,7 +3545,7 @@ function diasDesdeISO(iso){
   return Math.round((h - a) / 86400000);
 }
 function filaLabAtrasado(r){
-  return r.situacao === 'Pendente' && diasDesdeISO(r.data) > FILA_LAB_DIAS_ATRASO;
+  return r.situacao !== 'Concluído' && diasDesdeISO(r.data) > FILA_LAB_DIAS_ATRASO;
 }
 
 async function carregarFilaLab(){
@@ -3510,6 +3556,8 @@ async function carregarFilaLab(){
   if(error){ console.error(error); showToast('Erro ao carregar a fila do laboratório.'); return; }
   filaLab = data || [];
   filaLabCarregada = true;
+  // tira da seleção o que não existe mais
+  filaLabSel = new Set([...filaLabSel].filter(id=>filaLab.some(r=>r.id === id)));
 }
 
 function filaLabPassaPeriodo(r){
@@ -3523,8 +3571,10 @@ function filaLabPassaPeriodo(r){
 function filaLabLinhas(){
   const t = normNome(filaLabBusca);
   let lista = filaLab.filter(r=>{
-    if(filaLabFiltro === 'Atrasado'){ if(!filaLabAtrasado(r)) return false; }
-    else if(filaLabFiltro !== 'Todos' && r.situacao !== filaLabFiltro) return false;
+    if(filaLabFiltro === 'Aberto'){ if(r.situacao === 'Concluído') return false; }
+    else if(filaLabFiltro === 'Atrasado'){ if(!filaLabAtrasado(r)) return false; }
+    else if(filaLabFiltro === 'Concluído'){ if(r.situacao !== 'Concluído') return false; }
+    if(filaLabEtapa !== 'todas' && r.situacao !== filaLabEtapa) return false;
     if(!filaLabPassaPeriodo(r)) return false;
     if(!t) return true;
     return normNome([r.paciente_nome, r.exame, r.medico, r.registro_numero].join(' ')).includes(t);
@@ -3533,9 +3583,9 @@ function filaLabLinhas(){
   return lista.slice().sort((a,b)=> dir * (a.data||'').localeCompare(b.data||''));
 }
 
-// Próximo exame PENDENTE depois do atual, na ordem em que a fila está sendo exibida
+// Próximo exame EM ABERTO depois do atual, na ordem em que a fila está sendo exibida
 function filaLabProximoDe(idAtual){
-  const lista = filaLabLinhas().filter(r=>r.situacao === 'Pendente' || r.id === idAtual);
+  const lista = filaLabLinhas().filter(r=>r.situacao !== 'Concluído' || r.id === idAtual);
   const pos = lista.findIndex(r=>r.id === idAtual);
   const depois = lista.slice(pos + 1).find(r=>r.id !== idAtual);
   if(depois) return depois;
@@ -3550,17 +3600,22 @@ function filaLabSeloAtraso(r){
 }
 
 function filaLabRows(){
-  if(!filaLabCarregada) return `<tr class="empty-row"><td colspan="7">Carregando fila...</td></tr>`;
+  if(!filaLabCarregada) return `<tr class="empty-row"><td colspan="8">Carregando fila...</td></tr>`;
   const todas = filaLabLinhas();
   if(!todas.length){
-    const limpo = filaLabFiltro === 'Pendente' && !filaLabBusca && filaLabPeriodo === 'todos';
-    return `<tr class="empty-row"><td colspan="7">${limpo ? 'Nenhum exame pendente. 🎉' : 'Nenhuma solicitação encontrada.'}</td></tr>`;
+    const limpo = filaLabFiltro === 'Aberto' && !filaLabBusca && filaLabPeriodo === 'todos' && filaLabEtapa === 'todas';
+    return `<tr class="empty-row"><td colspan="8">${limpo ? 'Nenhum exame em aberto. 🎉' : 'Nenhuma solicitação encontrada.'}</td></tr>`;
   }
   const lista = todas.slice(0, FILA_LAB_MAX_LINHAS);
   const aviso = todas.length > lista.length
-    ? `<tr class="empty-row"><td colspan="7">Mostrando ${lista.length} de ${todas.length} — use a busca ou o período para achar os demais.</td></tr>` : '';
-  return aviso + lista.map(r=>`
+    ? `<tr class="empty-row"><td colspan="8">Mostrando ${lista.length} de ${todas.length} — use a busca ou o período para achar os demais.</td></tr>` : '';
+  const pode = podeRegistrarResultado();
+  const proxima = {'Pendente':['Coletado','Marcar como coletado'], 'Coletado':['Em análise','Colocar em análise']};
+  return aviso + lista.map(r=>{
+    const av = proxima[r.situacao];
+    return `
     <tr>
+      <td class="col-check">${pode ? `<input type="checkbox" ${filaLabSel.has(r.id) ? 'checked' : ''} onchange="filaLabToggleSel('${r.id}', this.checked)">` : ''}</td>
       <td>${isoToBR(r.data)}${filaLabSeloAtraso(r)}</td>
       <td><b>${r.paciente_nome || '—'}</b></td>
       <td>${r.exame}</td>
@@ -3568,10 +3623,25 @@ function filaLabRows(){
       <td>${r.registro_numero ? `<b>${r.registro_numero}</b>` : '—'}</td>
       <td><span class="status ${statusClass(r.situacao)}">${r.situacao}</span></td>
       <td class="row-actions">
-        ${podeRegistrarResultado() ? `<button title="${r.situacao === 'Concluído' ? 'Editar resultado' : 'Registrar resultado'}" onclick="filaLabRegistrar('${r.id}','${r.paciente_id}')">${ico('resultado')}</button>` : ''}
+        ${pode && av ? `<button title="${av[1]}" onclick="filaLabMudarEtapa('${r.id}','${av[0]}')">${ico('avancar')}</button>` : ''}
+        ${pode ? `<button title="${r.situacao === 'Concluído' ? 'Editar resultado' : 'Registrar resultado'}" onclick="filaLabRegistrar('${r.id}','${r.paciente_id}')">${ico('resultado')}</button>` : ''}
         <button title="Abrir paciente" onclick="selecionarPaciente('${r.paciente_id}')">${ico('ver')}</button>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
+}
+
+function filaLabBarraLote(){
+  const n = filaLabSel.size;
+  if(!n) return '';
+  return `
+  <div style="margin:10px 18px 0;padding:10px 14px;background:#EAF1FB;border:1px solid #C9DAF3;border-radius:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+    <b style="font-size:13px;color:var(--navy);margin-right:6px;">${n} selecionado${n > 1 ? 's' : ''}</b>
+    <button class="btn-secondary" onclick="filaLabEtapaLote('Coletado')">Marcar como coletados</button>
+    <button class="btn-secondary" onclick="filaLabEtapaLote('Em análise')">Colocar em análise</button>
+    <button class="btn-secondary" onclick="filaLabImprimirResultados()">🖨️ Imprimir resultados</button>
+    <button class="btn-secondary" onclick="filaLabLimparSel()">Limpar seleção</button>
+  </div>`;
 }
 
 function filaLabTemplate(){
@@ -3579,7 +3649,7 @@ function filaLabTemplate(){
     return `<div class="placeholder"><div class="ic">📋</div><h3>Configure o Supabase primeiro</h3><p>A fila do laboratório precisa do banco conectado.</p></div>`;
   }
   const c = filaLabCarregada;
-  const nPend = filaLab.filter(r=>r.situacao === 'Pendente').length;
+  const nAberto = filaLab.filter(r=>r.situacao !== 'Concluído').length;
   const nAtr  = filaLab.filter(filaLabAtrasado).length;
   const nConc = filaLab.filter(r=>r.situacao === 'Concluído').length;
   const ativo = 'background:var(--red);color:#fff;';
@@ -3590,7 +3660,7 @@ function filaLabTemplate(){
     <div class="panel-head">
       <h3>📋 FILA DO LABORATÓRIO — TODOS OS PACIENTES</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        ${btn('Pendente', `Pendentes${c ? ' ('+nPend+')' : ''}`)}
+        ${btn('Aberto', `Em aberto${c ? ' ('+nAberto+')' : ''}`)}
         ${btn('Atrasado', `Atrasados${c ? ' ('+nAtr+')' : ''}`)}
         ${btn('Concluído', `Concluídos${c ? ' ('+nConc+')' : ''}`)}
         ${btn('Todos', 'Todos')}
@@ -3600,6 +3670,11 @@ function filaLabTemplate(){
       <input type="text" placeholder="🔍 Filtrar por paciente, exame, médico ou nº da etiqueta..." value="${filaLabBusca.replace(/"/g,'&quot;')}"
         style="flex:1;min-width:240px;padding:10px 14px;border:1.5px solid var(--line);border-radius:9px;font-size:13.5px;outline:none;"
         oninput="filaLabBuscar(this.value)">
+      <select onchange="filaLabEtapaSet(this.value)" title="Etapa do exame"
+        style="padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;font-size:13px;outline:none;background:#fff;">
+        <option value="todas" ${filaLabEtapa === 'todas' ? 'selected' : ''}>Todas as etapas</option>
+        ${FILA_LAB_ETAPAS.map(e=>`<option value="${e}" ${filaLabEtapa === e ? 'selected' : ''}>${e}</option>`).join('')}
+      </select>
       <select onchange="filaLabOrdemSet(this.value)" title="Ordem da lista"
         style="padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;font-size:13px;outline:none;background:#fff;">
         <option value="antigos" ${filaLabOrdem === 'antigos' ? 'selected' : ''}>Mais antigos primeiro</option>
@@ -3612,10 +3687,15 @@ function filaLabTemplate(){
       <input type="date" value="${filaLabPeriodo === 'data' ? filaLabData : ''}" title="Escolher uma data específica"
         style="padding:6px 10px;border:1.5px solid ${filaLabPeriodo === 'data' ? 'var(--red)' : 'var(--line)'};border-radius:9px;font-size:12.5px;outline:none;"
         onchange="filaLabDataSet(this.value)">
+      <span style="flex:1;"></span>
+      <button class="btn-secondary" onclick="exportarExcel('filalab')" title="Exporta a lista filtrada">📊 Excel</button>
+      <button class="btn-secondary" onclick="exportarPDF('filalab')" title="Lista filtrada para imprimir">📄 PDF</button>
+      ${podeRegistrarResultado() ? `<button class="btn-secondary" onclick="filaLabImprimirResultados()" title="Imprime os resultados marcados — ou, sem marcar nada, os liberados hoje">🖨️ Resultados</button>` : ''}
     </div>
+    <div id="fila-lab-lote">${filaLabBarraLote()}</div>
     <div style="overflow-x:auto;margin-top:8px;">
       <table>
-        <thead><tr><th>Data</th><th>Paciente</th><th>Exame(s)</th><th>Médico</th><th>Nº etiqueta</th><th>Situação</th><th>Ações</th></tr></thead>
+        <thead><tr><th style="width:32px;">${podeRegistrarResultado() ? `<input type="checkbox" title="Marcar todos os exibidos" onchange="filaLabSelTodos(this.checked)">` : ''}</th><th>Data</th><th>Paciente</th><th>Exame(s)</th><th>Médico</th><th>Nº etiqueta</th><th>Situação</th><th>Ações</th></tr></thead>
         <tbody id="fila-lab-tbody">${filaLabRows()}</tbody>
       </table>
     </div>
@@ -3623,15 +3703,76 @@ function filaLabTemplate(){
 }
 
 function filaLabRedesenhar(){ const m = document.getElementById('main-content'); if(m) m.innerHTML = filaLabTemplate(); }
-function filaLabBuscar(v){
-  filaLabBusca = v;
-  const tb = document.getElementById('fila-lab-tbody');
-  if(tb) tb.innerHTML = filaLabRows();
+function filaLabAtualizarLista(){
+  const tb = document.getElementById('fila-lab-tbody'); if(tb) tb.innerHTML = filaLabRows();
+  const lote = document.getElementById('fila-lab-lote'); if(lote) lote.innerHTML = filaLabBarraLote();
 }
+function filaLabBuscar(v){ filaLabBusca = v; filaLabAtualizarLista(); }
 function filaLabFiltrar(f){ filaLabFiltro = f; filaLabRedesenhar(); }
+function filaLabEtapaSet(e){ filaLabEtapa = e; filaLabRedesenhar(); }
 function filaLabPeriodoSet(p){ filaLabPeriodo = p; filaLabData = ''; filaLabRedesenhar(); }
 function filaLabDataSet(v){ filaLabData = v || ''; filaLabPeriodo = v ? 'data' : 'todos'; filaLabRedesenhar(); }
 function filaLabOrdemSet(v){ filaLabOrdem = v; filaLabRedesenhar(); }
+
+/* --- seleção e ações em lote --- */
+function filaLabToggleSel(id, marcado){
+  if(marcado) filaLabSel.add(id); else filaLabSel.delete(id);
+  const lote = document.getElementById('fila-lab-lote'); if(lote) lote.innerHTML = filaLabBarraLote();
+}
+function filaLabSelTodos(marcado){
+  filaLabLinhas().slice(0, FILA_LAB_MAX_LINHAS).forEach(r=>{ if(marcado) filaLabSel.add(r.id); else filaLabSel.delete(r.id); });
+  filaLabRedesenhar();
+}
+function filaLabLimparSel(){ filaLabSel.clear(); filaLabRedesenhar(); }
+
+// Muda a etapa de um exame (Pendente → Coletado → Em análise). "Concluído" só pelo registro do resultado.
+async function filaLabMudarEtapa(id, etapa){
+  const { error } = await supabaseClient.from('solicitacoes_exames').update({situacao: etapa}).eq('id', id);
+  if(error){ console.error(error); showToast('Erro ao mudar a etapa.'); return; }
+  const r = filaLab.find(x=>x.id === id); if(r) r.situacao = etapa;
+  const l = labs.find(x=>x.id === id); if(l) l.situacao = etapa;
+  filaLabRedesenhar();
+}
+async function filaLabEtapaLote(etapa){
+  const ids = [...filaLabSel].filter(id=>{ const r = filaLab.find(x=>x.id === id); return r && r.situacao !== 'Concluído'; });
+  if(!ids.length){ showToast('Selecione exames que ainda não foram concluídos.'); return; }
+  const { error } = await supabaseClient.from('solicitacoes_exames').update({situacao: etapa}).in('id', ids);
+  if(error){ console.error(error); showToast('Erro ao atualizar os exames selecionados.'); return; }
+  ids.forEach(id=>{
+    const r = filaLab.find(x=>x.id === id); if(r) r.situacao = etapa;
+    const l = labs.find(x=>x.id === id); if(l) l.situacao = etapa;
+  });
+  filaLabSel.clear();
+  showToast(`${ids.length} exame(s) marcados como "${etapa}".`);
+  filaLabRedesenhar();
+}
+
+// Imprime os resultados (um por folha) dos exames marcados — ou, sem seleção, dos liberados hoje
+async function filaLabImprimirResultados(){
+  const hojeLocal = isoLocal(new Date());
+  const hojeUTC = new Date().toISOString().slice(0,10);
+  let ids = [...filaLabSel].filter(id=>{ const r = filaLab.find(x=>x.id === id); return r && r.situacao === 'Concluído'; });
+  const usouSelecao = filaLabSel.size > 0;
+  if(!usouSelecao) ids = filaLab.filter(r=>r.situacao === 'Concluído' && (r.data_resultado === hojeLocal || r.data_resultado === hojeUTC)).map(r=>r.id);
+  if(!ids.length){ showToast(usouSelecao ? 'Nenhum dos marcados está concluído.' : 'Nenhum resultado liberado hoje. Marque exames concluídos para imprimir.'); return; }
+  if(ids.length > 60 && !confirm(`Imprimir ${ids.length} resultados de uma vez? Isso pode demorar.`)) return;
+  const { data, error } = await supabaseClient.from('solicitacoes_exames').select('*').in('id', ids);
+  if(error || !data){ console.error(error); showToast('Erro ao buscar os resultados.'); return; }
+  data.sort((a,b)=>(a.paciente_nome || '').localeCompare(b.paciente_nome || ''));
+  const folhas = data.map(row=>{
+    const p = pacientesList.find(x=>x.id === row.paciente_id);
+    const pac = { nome: (p && p.nome) || row.paciente_nome || '—', nascimento: p && p.nascimento ? isoToBR(p.nascimento) : '—' };
+    const r = {
+      data: isoToBR(row.data), medico: row.medico, exame: row.exame,
+      resultado: row.resultado, formato_resultado: row.formato_resultado, parametros_json: row.parametros_json,
+      categoria_laboratorio: row.categoria_laboratorio, registro_numero: row.registro_numero,
+      observacoes_resultado: row.observacoes_resultado, responsavel_laboratorio: row.responsavel_laboratorio,
+      responsavel_registro: row.responsavel_registro, data_resultado: row.data_resultado ? isoToBR(row.data_resultado) : null
+    };
+    return templateResultadoExame(r, pac);
+  });
+  abrirDocumentoImpressao(printWindowShell(folhas.join('<div class="page-break"></div>'), `Resultados de exames — ${folhas.length} folha(s)`), true);
+}
 
 // Abre o registro de resultado de um exame de QUALQUER paciente: ativa o
 // paciente (carrega as solicitações dele) e abre o modal de resultado.
@@ -3714,7 +3855,7 @@ function meuDiaTemplate(){
   const dia = meuDiaData || isoLocal(new Date());
   const ehHoje = dia === isoLocal(new Date());
   const meus = meuDiaMeusPedidos();
-  const pend = meus.filter(r=>r.situacao === 'Pendente').sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+  const pend = meus.filter(r=>r.situacao !== 'Concluído').sort((a,b)=>(a.data||'').localeCompare(b.data||''));
   const prontos = meus.filter(r=>r.situacao === 'Concluído').sort((a,b)=>(b.data_resultado || b.data || '').localeCompare(a.data_resultado || a.data || ''));
   const card = (n, rotulo, cor) => `<div class="stat-card"><div><div class="stat-value" style="color:${cor};">${n}</div><div class="stat-label">${rotulo}</div></div></div>`;
   const semId = !currentUser || !currentUser.id;
@@ -3750,9 +3891,10 @@ function meuDiaTemplate(){
       <td>${isoToBR(r.data)}${d > FILA_LAB_DIAS_ATRASO && d <= 1000 ? `<br><span class="status urgente">há ${d} dias</span>` : ''}</td>
       <td><b>${r.paciente_nome || '—'}</b></td>
       <td>${r.exame}</td>
+      <td><span class="status ${statusClass(r.situacao)}">${r.situacao}</span></td>
       <td class="row-actions"><button title="Abrir paciente" onclick="selecionarPaciente('${r.paciente_id}')">${ico('ver')}</button></td>
     </tr>`;
-  }).join('') || `<tr class="empty-row"><td colspan="4">${filaLabCarregada ? 'Nenhum pedido seu aguardando o laboratório. 🎉' : 'Carregando...'}</td></tr>`;
+  }).join('') || `<tr class="empty-row"><td colspan="5">${filaLabCarregada ? 'Nenhum pedido seu aguardando o laboratório. 🎉' : 'Carregando...'}</td></tr>`;
 
   const nota = (lista) => lista.length > MEU_DIA_MAX ? `<div class="panel-foot" style="color:var(--muted);cursor:default;">Mostrando ${MEU_DIA_MAX} de ${lista.length}.</div>` : '';
 
@@ -3790,7 +3932,7 @@ function meuDiaTemplate(){
   <div class="panel" style="margin-top:18px;">
     <div class="panel-head"><h3>⏳ MEUS EXAMES AGUARDANDO O LABORATÓRIO</h3></div>
     <div style="overflow-x:auto;"><table>
-      <thead><tr><th>Pedido em</th><th>Paciente</th><th>Exame(s)</th><th>Ações</th></tr></thead>
+      <thead><tr><th>Pedido em</th><th>Paciente</th><th>Exame(s)</th><th>Etapa</th><th>Ações</th></tr></thead>
       <tbody>${linhasPend}</tbody>
     </table></div>${nota(pend)}
   </div>`;
@@ -5772,6 +5914,14 @@ function datasetExport(tipo){
       titulo: `Solicitações de Exames — ${paciente.nome}`,
       cols: ['Data','Exame(s) Solicitado(s)','Situação','Médico','Previsão de Entrega'],
       rows: labs.map(r=>[r.data, r.exame, r.situacao, r.medico, r.previsao || ''])
+    };
+  }
+  if(tipo === 'filalab'){
+    const rotuloFiltro = {Aberto:'em aberto', Atrasado:'atrasados', 'Concluído':'concluídos', Todos:'todos'}[filaLabFiltro] || '';
+    return {
+      titulo: `Fila do Laboratório (${rotuloFiltro}) — ${isoToBR(isoLocal(new Date()))}`,
+      cols: ['Data','Paciente','Exame(s)','Médico','Nº etiqueta','Situação','Dias em aberto'],
+      rows: filaLabLinhas().map(r=>[isoToBR(r.data), r.paciente_nome, r.exame, r.medico, r.registro_numero || '', r.situacao, r.situacao === 'Concluído' ? '' : diasDesdeISO(r.data)])
     };
   }
   if(tipo === 'hemocomponentes'){
