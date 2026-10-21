@@ -3535,6 +3535,7 @@ let filaLabBusca = '';
 let filaLabPeriodo = 'todos';      // 'todos' | 'hoje' | 'ontem' | '7d' | 'data'
 let filaLabData = '';              // usado quando filaLabPeriodo === 'data' (ISO yyyy-mm-dd)
 let filaLabOrdem = 'antigos';      // 'antigos' | 'recentes'
+let filaLabDiaResultados = '';     // dia (ISO) dos resultados a baixar; vazio = hoje
 let filaLabSel = new Set();        // exames marcados na caixa de seleção (ações em lote)
 const FILA_LAB_MAX_LINHAS = 300;   // evita tabela gigante; use os filtros para achar o resto
 const FILA_LAB_DIAS_ATRASO = 7;    // em aberto há mais de N dias = atrasado
@@ -3700,7 +3701,13 @@ function filaLabTemplate(){
       <span style="flex:1;"></span>
       <button class="btn-secondary" onclick="exportarExcel('filalab')" title="Exporta a lista filtrada">📊 Excel</button>
       <button class="btn-secondary" onclick="exportarPDF('filalab')" title="Lista filtrada para imprimir">📄 PDF</button>
-      ${podeRegistrarResultado() ? `<button class="btn-secondary" onclick="filaLabImprimirResultados()" title="Imprime os resultados marcados — ou, sem marcar nada, os liberados hoje">🖨️ Resultados</button>` : ''}
+    </div>
+    <div style="padding:10px 18px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <span style="font-size:12px;color:var(--muted);font-weight:700;">Baixar resultados liberados em:</span>
+      <input type="date" id="fila-lab-dia-res" value="${filaLabDiaResultados || isoLocal(new Date())}" onchange="filaLabDiaResultados=this.value"
+        style="padding:6px 10px;border:1.5px solid var(--line);border-radius:9px;font-size:12.5px;outline:none;">
+      <button class="btn-secondary" onclick="filaLabBaixarResultadosExcel()" title="Planilha com todos os resultados (valor por valor) liberados no dia">📊 Excel do dia</button>
+      <button class="btn-secondary" onclick="filaLabImprimirResultados(filaLabDiaEscolhido())" title="Todos os laudos do dia, um por folha — na janela, use Imprimir / Salvar PDF">📄 PDF dos laudos do dia</button>
     </div>
     <div id="fila-lab-lote">${filaLabBarraLote()}</div>
     <div style="overflow-x:auto;margin-top:8px;">
@@ -3757,31 +3764,80 @@ async function filaLabEtapaLote(etapa){
   filaLabRedesenhar();
 }
 
-// Imprime os resultados (um por folha) dos exames marcados — ou, sem seleção, dos liberados hoje
-async function filaLabImprimirResultados(){
-  const hojeLocal = isoLocal(new Date());
-  const hojeUTC = new Date().toISOString().slice(0,10);
-  let ids = [...filaLabSel].filter(id=>{ const r = filaLab.find(x=>x.id === id); return r && r.situacao === 'Concluído'; });
-  const usouSelecao = filaLabSel.size > 0;
-  if(!usouSelecao) ids = filaLab.filter(r=>r.situacao === 'Concluído' && (r.data_resultado === hojeLocal || r.data_resultado === hojeUTC)).map(r=>r.id);
-  if(!ids.length){ showToast(usouSelecao ? 'Nenhum dos marcados está concluído.' : 'Nenhum resultado liberado hoje. Marque exames concluídos para imprimir.'); return; }
-  if(ids.length > 60 && !confirm(`Imprimir ${ids.length} resultados de uma vez? Isso pode demorar.`)) return;
-  const { data, error } = await supabaseClient.from('solicitacoes_exames').select('*').in('id', ids);
-  if(error || !data){ console.error(error); showToast('Erro ao buscar os resultados.'); return; }
-  data.sort((a,b)=>(a.paciente_nome || '').localeCompare(b.paciente_nome || ''));
-  const folhas = data.map(row=>{
-    const p = pacientesList.find(x=>x.id === row.paciente_id);
-    const pac = { nome: (p && p.nome) || row.paciente_nome || '—', nascimento: p && p.nascimento ? isoToBR(p.nascimento) : '—' };
-    const r = {
-      data: isoToBR(row.data), medico: row.medico, exame: row.exame,
-      resultado: row.resultado, formato_resultado: row.formato_resultado, parametros_json: row.parametros_json,
-      categoria_laboratorio: row.categoria_laboratorio, registro_numero: row.registro_numero,
-      observacoes_resultado: row.observacoes_resultado, responsavel_laboratorio: row.responsavel_laboratorio,
-      responsavel_registro: row.responsavel_registro, data_resultado: row.data_resultado ? isoToBR(row.data_resultado) : null
-    };
-    return templateResultadoExame(r, pac);
+function filaLabDiaEscolhido(){
+  const el = document.getElementById('fila-lab-dia-res');
+  return (el && el.value) || filaLabDiaResultados || isoLocal(new Date());
+}
+
+// Busca no banco os exames concluídos cuja liberação foi no dia (ISO)
+async function filaLabResultadosDoDia(dia){
+  const { data, error } = await supabaseClient.from('solicitacoes_exames').select('*')
+    .eq('situacao','Concluído').eq('data_resultado', dia).order('paciente_nome', {ascending:true}).limit(2000);
+  if(error){ console.error(error); showToast('Erro ao buscar os resultados do dia.'); return null; }
+  return data || [];
+}
+
+function filaLabFolhaResultado(row){
+  const p = pacientesList.find(x=>x.id === row.paciente_id);
+  const pac = { nome: (p && p.nome) || row.paciente_nome || '—', nascimento: p && p.nascimento ? isoToBR(p.nascimento) : '—' };
+  const r = {
+    data: isoToBR(row.data), medico: row.medico, exame: row.exame,
+    resultado: row.resultado, formato_resultado: row.formato_resultado, parametros_json: row.parametros_json,
+    categoria_laboratorio: row.categoria_laboratorio, registro_numero: row.registro_numero,
+    observacoes_resultado: row.observacoes_resultado, responsavel_laboratorio: row.responsavel_laboratorio,
+    responsavel_registro: row.responsavel_registro, data_resultado: row.data_resultado ? isoToBR(row.data_resultado) : null
+  };
+  return templateResultadoExame(r, pac);
+}
+
+// Imprime/salva em PDF os laudos (um por folha): do dia informado ou, sem dia, dos exames marcados na fila
+async function filaLabImprimirResultados(dia){
+  let data;
+  if(dia){
+    data = await filaLabResultadosDoDia(dia);
+    if(data === null) return;
+    if(!data.length){ showToast(`Nenhum resultado liberado em ${isoToBR(dia)}.`); return; }
+  } else {
+    const ids = [...filaLabSel].filter(id=>{ const r = filaLab.find(x=>x.id === id); return r && r.situacao === 'Concluído'; });
+    if(!ids.length){ showToast('Nenhum dos marcados está concluído.'); return; }
+    const res = await supabaseClient.from('solicitacoes_exames').select('*').in('id', ids);
+    if(res.error || !res.data){ console.error(res.error); showToast('Erro ao buscar os resultados.'); return; }
+    data = res.data.sort((a,b)=>(a.paciente_nome || '').localeCompare(b.paciente_nome || ''));
+  }
+  if(data.length > 60 && !confirm(`Gerar ${data.length} laudos de uma vez? Isso pode demorar.`)) return;
+  const folhas = data.map(filaLabFolhaResultado);
+  const titulo = dia ? `Laudos liberados em ${isoToBR(dia)} — ${folhas.length} folha(s)` : `Resultados de exames — ${folhas.length} folha(s)`;
+  abrirDocumentoImpressao(printWindowShell(folhas.join('<div class="page-break"></div>'), titulo), false);
+}
+
+// Planilha Excel com os resultados liberados no dia: aba "Resultados" (um valor por linha) e aba "Resumo" (um exame por linha)
+async function filaLabBaixarResultadosExcel(){
+  const dia = filaLabDiaEscolhido();
+  const data = await filaLabResultadosDoDia(dia);
+  if(data === null) return;
+  if(!data.length){ showToast(`Nenhum resultado liberado em ${isoToBR(dia)}.`); return; }
+  const colsRes = ['Data liberação','Nº etiqueta','Paciente','Exame','Parâmetro','Resultado','Unidade','Valores de referência','Médico solicitante','Responsável','Registro profissional'];
+  const colsResumo = ['Data coleta','Data liberação','Nº etiqueta','Paciente','Exame','Categoria','Médico solicitante','Responsável','Registro profissional','Observações'];
+  const linhas = [], resumo = [];
+  data.forEach(r=>{
+    const base = [isoToBR(r.data_resultado), r.registro_numero || '', r.paciente_nome || '', r.exame];
+    const fim = [r.medico || '', r.responsavel_laboratorio || '', r.responsavel_registro || ''];
+    let params = [];
+    try{ params = r.parametros_json ? JSON.parse(r.parametros_json) : []; }catch(e){ params = []; }
+    if(r.formato_resultado !== 'texto' && params.length){
+      params.forEach(p=>linhas.push([...base, p.parametro, p.resultado, p.unidade || '', p.referencia || '', ...fim]));
+    } else {
+      linhas.push([...base, '(resultado em texto)', r.resultado || '', '', '', ...fim]);
+    }
+    resumo.push([isoToBR(r.data), isoToBR(r.data_resultado), r.registro_numero || '', r.paciente_nome || '', r.exame, r.categoria_laboratorio || '', r.medico || '', r.responsavel_laboratorio || '', r.responsavel_registro || '', r.observacoes_resultado || '']);
   });
-  abrirDocumentoImpressao(printWindowShell(folhas.join('<div class="page-break"></div>'), `Resultados de exames — ${folhas.length} folha(s)`), true);
+  try{
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([colsRes, ...linhas]), 'Resultados');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([colsResumo, ...resumo]), 'Resumo');
+    XLSX.writeFile(wb, `Resultados_${dia}.xlsx`);
+    showToast(`Planilha gerada: ${data.length} exame(s) de ${isoToBR(dia)}.`);
+  }catch(e){ console.error(e); showToast('Erro ao gerar Excel.'); }
 }
 
 // Abre o registro de resultado de um exame de QUALQUER paciente: ativa o
