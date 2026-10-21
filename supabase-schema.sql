@@ -213,7 +213,8 @@ create table if not exists usuarios (
   ativo boolean not null default true,
   created_at timestamptz default now()
 );
-alter table usuarios add column if not exists crm text;
+alter table usuarios add column if not exists crm text;      -- nº do registro profissional
+alter table usuarios add column if not exists conselho text;  -- CRM | CRF | CRBM | COREN (laboratório usa CRF/CRBM)
 alter table usuarios add column if not exists ativo boolean not null default true;
 
 -- ==========================================================

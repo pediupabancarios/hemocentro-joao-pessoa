@@ -1314,15 +1314,25 @@
         </div>
         <div class="form-field">
           <label>Perfil</label>
-          <select id="usr-tipo" onchange="alternarCampoDiasAtendimento()">
+          <select id="usr-tipo" onchange="alternarCampoDiasAtendimento(); sugerirConselho()">
             <option value="medico">Médico(a)</option>
             <option value="recepcao">Recepção</option>
             <option value="laboratorio">Laboratório</option>
           </select>
         </div>
         <div class="form-field">
-          <label>CRM (se médico)</label>
-          <input type="text" id="usr-crm" placeholder="Ex.: CRM-PB 12345">
+          <label>Conselho profissional</label>
+          <select id="usr-conselho">
+            <option value="CRM">CRM — Médico(a)</option>
+            <option value="CRF">CRF — Farmacêutico(a)</option>
+            <option value="CRBM">CRBM — Biomédico(a)</option>
+            <option value="COREN">COREN — Enfermagem</option>
+            <option value="">Nenhum</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Nº do registro</label>
+          <input type="text" id="usr-crm" placeholder="Ex.: 12345">
         </div>
         <div class="form-field">
           <label>Login</label>
@@ -1565,7 +1575,7 @@ let currentPacienteId = null;
 /* ================= LOGIN ================= */
 const VALID_USER = "hemocentro";
 const VALID_PASS = "1234";
-let currentUser = null; // {id, nome, tipo, crm, login}
+let currentUser = null; // {id, nome, tipo, crm, conselho, login}
 let perfilLoginSelecionado = null;
 
 function selecionarPerfilLogin(perfil){
@@ -3034,7 +3044,7 @@ function abrirRegistrarResultado(i){
   document.getElementById('resultado-data-liberacao').value = r.data_resultado ? brToISO(r.data_resultado) : '';
   document.getElementById('resultado-observacoes').value = r.observacoes_resultado || '';
   document.getElementById('resultado-responsavel').value = r.responsavel_laboratorio || (currentUser ? currentUser.nome : '');
-  document.getElementById('resultado-registro-profissional').value = r.responsavel_registro || '';
+  document.getElementById('resultado-registro-profissional').value = r.responsavel_registro || ((currentUser && currentUser.tipo === 'laboratorio' && currentUser.crm) ? ((currentUser.conselho || 'CRF') + ' ' + currentUser.crm) : '');
 
   const body = document.getElementById('resultado-parametros-body');
   body.innerHTML = '';
@@ -4289,11 +4299,11 @@ function usuariosTemplate(){
       <button class="btn-new" onclick="abrirNovoUsuario()">+ Novo Usuário</button>
     </div>
     <table>
-      <thead><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>CRM</th><th>Status</th><th>Ações</th></tr></thead>
+      <thead><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Registro profissional</th><th>Status</th><th>Ações</th></tr></thead>
       <tbody>
         ${usuariosList.length ? usuariosList.map(u=>`
           <tr>
-            <td>${u.nome}</td><td>${u.login}</td><td>${rotulos[u.tipo] || u.tipo}</td><td>${u.crm || '—'}</td>
+            <td>${u.nome}</td><td>${u.login}</td><td>${rotulos[u.tipo] || u.tipo}</td><td>${u.crm ? ((u.conselho || 'CRM') + ' ' + u.crm) : '—'}</td>
             <td><span class="status ${u.ativo ? 'concluido' : 'urgente'}">${u.ativo ? 'Ativo' : 'Inativo'}</span></td>
             <td class="row-actions">
               ${u.tipo !== 'gestor' ? `
@@ -4315,6 +4325,12 @@ async function carregarUsuarios(){
 }
 
 let editingUsuarioId = null;
+
+// ao trocar o perfil, sugere o conselho típico (o laboratório pode ser CRF ou CRBM — ajuste na lista)
+function sugerirConselho(){
+  const tipo = document.getElementById('usr-tipo').value;
+  document.getElementById('usr-conselho').value = tipo === 'medico' ? 'CRM' : tipo === 'laboratorio' ? 'CRF' : '';
+}
 
 function alternarCampoDiasAtendimento(){
   const tipo = document.getElementById('usr-tipo').value;
@@ -4341,6 +4357,7 @@ function abrirNovoUsuario(){
   document.getElementById('usr-senha').placeholder = 'Defina uma senha';
   document.getElementById('usr-login').disabled = false;
   document.getElementById('usr-tipo').value = 'medico';
+  document.getElementById('usr-conselho').value = 'CRM';
   marcarDiasAtendimento([]);
   alternarCampoDiasAtendimento();
   openModal('modal-usuario');
@@ -4357,6 +4374,7 @@ function editarUsuario(id){
   document.getElementById('usr-login').disabled = true;
   document.getElementById('usr-tipo').value = u.tipo;
   document.getElementById('usr-crm').value = u.crm || '';
+  document.getElementById('usr-conselho').value = u.conselho !== null && u.conselho !== undefined ? u.conselho : (u.tipo === 'laboratorio' ? '' : 'CRM');
   document.getElementById('usr-senha').value = '';
   document.getElementById('usr-senha').placeholder = 'Deixe em branco para manter a senha atual';
   alternarCampoDiasAtendimento();
@@ -4392,13 +4410,14 @@ function salvarUsuario(){
   const senha = document.getElementById('usr-senha').value.trim();
   const tipo = document.getElementById('usr-tipo').value;
   const crm = document.getElementById('usr-crm').value.trim() || null;
+  const conselho = crm ? (document.getElementById('usr-conselho').value || null) : null;
   const dias = tipo === 'medico' ? coletarDiasAtendimento() : [];
   if(!nome || !login){ showToast('Preencha nome e login.'); return; }
   if(!editingUsuarioId && !senha){ showToast('Defina uma senha.'); return; }
   if(!supabaseConfigured){ showToast('Configure o Supabase primeiro.'); return; }
 
   if(editingUsuarioId){
-    const updates = {nome, tipo, crm};
+    const updates = {nome, tipo, crm, conselho};
     if(senha) updates.senha = senha;
     supabaseClient.from('usuarios').update(updates).eq('id', editingUsuarioId).select().then(async ({data, error})=>{
       if(error){ showToast('Erro ao salvar alterações.'); console.error(error); return; }
@@ -4410,7 +4429,7 @@ function salvarUsuario(){
       renderPage('usuarios');
     });
   } else {
-    supabaseClient.from('usuarios').insert({nome, login, senha, tipo, crm}).select().then(async ({data, error})=>{
+    supabaseClient.from('usuarios').insert({nome, login, senha, tipo, crm, conselho}).select().then(async ({data, error})=>{
       if(error){
         showToast(error.code === '23505' ? 'Esse login já existe — escolha outro.' : 'Erro ao salvar usuário.');
         console.error(error);
