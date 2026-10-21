@@ -1138,6 +1138,7 @@
     </div>
     <div class="modal-foot">
       <button class="btn-secondary" onclick="closeModal('modal-resultado')">Cancelar</button>
+      <button class="btn-secondary" id="resultado-btn-proximo" style="display:none;" onclick="salvarResultadoExame(true)">Salvar e ir para o próximo ›</button>
       <button class="btn-primary" onclick="salvarResultadoExame()">Salvar Resultado</button>
     </div>
   </div>
@@ -1608,7 +1609,7 @@ document.getElementById('login-form').addEventListener('submit', async function(
       document.getElementById('navgroup-laboratorio')?.classList.remove('collapsed');
       clickNav('filalab');
     } else {
-      renderPage('resumo');
+      clickNav('resumo');   // também realça "Resumo" no menu (útil quando troca de perfil sem recarregar)
     }
     initFromSupabase();
   } else {
@@ -1640,6 +1641,36 @@ function aplicarPermissoesUsuario(){
   document.querySelectorAll('.nav-item[data-page="usuarios"]').forEach(el=>{
     el.style.display = isGestor ? '' : 'none';
   });
+
+  aplicarMenuPorPerfil();
+}
+
+// Menu enxuto: o perfil Laboratório só vê o que usa no dia a dia.
+const MENU_LABORATORIO = ['filalab','laboratorios','dados'];
+function aplicarMenuPorPerfil(){
+  const ehLab = currentUser && currentUser.tipo === 'laboratorio';
+  // 1) limpa o que um login anterior possa ter escondido (sem mexer no item "Usuários")
+  document.querySelectorAll('.nav-item[data-page]:not([data-page="usuarios"]), .bottom-nav-item[data-page], .nav-group, .nav-divider').forEach(el=>{
+    if(el.dataset.escondidoPerfil){ el.style.display = ''; delete el.dataset.escondidoPerfil; }
+  });
+  // botão "Laboratório" do celular volta a apontar para a tela original
+  const bl = document.querySelector('.bottom-nav-item[data-labbtn]');
+  if(bl){ bl.dataset.page = 'laboratorios'; bl.setAttribute('onclick', "clickNav('laboratorios')"); delete bl.dataset.labbtn; }
+  if(!ehLab) return;
+
+  const esconder = el => { el.style.display = 'none'; el.dataset.escondidoPerfil = '1'; };
+  document.querySelectorAll('.nav-item[data-page], .bottom-nav-item[data-page]').forEach(el=>{
+    if(!MENU_LABORATORIO.includes(el.dataset.page)) esconder(el);
+  });
+  // no celular, o botão "Laboratório" passa a abrir a Fila
+  const blab = document.querySelector('.bottom-nav-item[data-page="laboratorios"]');
+  if(blab){ blab.dataset.labbtn = '1'; blab.dataset.page = 'filalab'; blab.setAttribute('onclick', "clickNav('filalab')"); }
+  // esconde grupos/divisórias que ficaram vazios
+  document.querySelectorAll('.nav-group').forEach(g=>{
+    const itens = [...g.querySelectorAll('.nav-item')];
+    if(itens.length && itens.every(i=>i.style.display === 'none')) esconder(g);
+  });
+  document.querySelectorAll('.nav-divider').forEach(esconder);
 }
 
 function logout(){
@@ -2934,6 +2965,8 @@ function alternarFormatoResultado(formato){
 }
 
 function abrirRegistrarResultado(i){
+  const btnProx = document.getElementById('resultado-btn-proximo');
+  if(btnProx) btnProx.style.display = 'none';   // só aparece quando aberto pela Fila do Laboratório
   const r = labs[i];
   editingResultadoIdx = i;
   document.getElementById('modal-resultado-title').textContent = r.resultado ? 'Editar Resultado do Exame' : 'Registrar Resultado do Exame';
@@ -2961,7 +2994,7 @@ function abrirRegistrarResultado(i){
   openModal('modal-resultado');
 }
 
-function salvarResultadoExame(){
+function salvarResultadoExame(proximo){
   if(editingResultadoIdx === null) return;
   const formato = document.getElementById('resultado-formato').value;
   const responsavel = document.getElementById('resultado-responsavel').value.trim();
@@ -2991,6 +3024,8 @@ function salvarResultadoExame(){
 
   const idx = editingResultadoIdx;
   const r = labs[idx];
+  // "Salvar e ir para o próximo": descobre ANTES de salvar qual é o próximo pendente da fila
+  const proximoDaFila = proximo ? filaLabProximoDe(r.id) : null;
   const hoje = dataLiberacao || new Date().toISOString().slice(0,10);
   Object.assign(r, {
     resultado: resultadoResumo, formato_resultado: formato,
@@ -3009,9 +3044,17 @@ function salvarResultadoExame(){
       data_resultado: hoje, situacao:'Concluído'
     }).eq('id', r.id).then(({error})=>{
       showToast(error ? 'Erro ao salvar resultado no Supabase.' : 'Resultado registrado e assinado com sucesso.');
-      // se a Fila do Laboratório estiver aberta, recarrega depois de gravar
-      if(!error && document.querySelector('.nav-item.active')?.dataset.page === 'filalab') renderPage('filalab');
-      if(error) console.error(error);
+      if(error){ console.error(error); return; }
+      // mantém a fila local coerente e segue para o próximo exame, se foi pedido
+      const naFila = filaLab.find(x=>x.id === r.id);
+      if(naFila){ naFila.situacao = 'Concluído'; naFila.registro_numero = registroNumero || null; }
+      const naFilaAberta = document.querySelector('.nav-item.active')?.dataset.page === 'filalab';
+      if(proximo){
+        if(proximoDaFila) filaLabRegistrar(proximoDaFila.id, proximoDaFila.paciente_id);
+        else { showToast('Fila concluída — não há mais exames pendentes. 🎉'); if(naFilaAberta) renderPage('filalab'); }
+      } else if(naFilaAberta){
+        renderPage('filalab');
+      }
     });
   } else {
     showToast('Resultado registrado nesta sessão.');
@@ -3418,10 +3461,31 @@ function excluirAnexo(i){
 /* ================= FILA DO LABORATÓRIO (todos os pacientes) ================= */
 let filaLab = [];
 let filaLabCarregada = false;
-let filaLabFiltro = 'Pendente';   // 'Pendente' | 'Concluído' | 'Todos'
+let filaLabFiltro = 'Pendente';    // 'Pendente' | 'Atrasado' | 'Concluído' | 'Todos'
 let filaLabBusca = '';
-let filaLabData = '';              // filtro por data da solicitação (ISO yyyy-mm-dd)
-const FILA_LAB_MAX_LINHAS = 300;     // evita tabela gigante; use os filtros para achar o resto
+let filaLabPeriodo = 'todos';      // 'todos' | 'hoje' | 'ontem' | '7d' | 'data'
+let filaLabData = '';              // usado quando filaLabPeriodo === 'data' (ISO yyyy-mm-dd)
+let filaLabOrdem = 'antigos';      // 'antigos' | 'recentes'
+const FILA_LAB_MAX_LINHAS = 300;   // evita tabela gigante; use os filtros para achar o resto
+const FILA_LAB_DIAS_ATRASO = 7;    // pendente há mais de N dias = atrasado
+
+function isoLocal(d){
+  const z = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`;
+}
+function isoDeslocado(dias){
+  const d = new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate() + dias);
+  return isoLocal(d);
+}
+function diasDesdeISO(iso){
+  if(!iso) return 0;
+  const [y,m,d] = iso.split('-').map(Number);
+  const a = new Date(y, m-1, d, 12), h = new Date(); h.setHours(12,0,0,0);
+  return Math.round((h - a) / 86400000);
+}
+function filaLabAtrasado(r){
+  return r.situacao === 'Pendente' && diasDesdeISO(r.data) > FILA_LAB_DIAS_ATRASO;
+}
 
 async function carregarFilaLab(){
   if(!supabaseConfigured) return;
@@ -3433,28 +3497,56 @@ async function carregarFilaLab(){
   filaLabCarregada = true;
 }
 
+function filaLabPassaPeriodo(r){
+  if(filaLabPeriodo === 'hoje')  return r.data === isoDeslocado(0);
+  if(filaLabPeriodo === 'ontem') return r.data === isoDeslocado(-1);
+  if(filaLabPeriodo === '7d')    return r.data >= isoDeslocado(-6) && r.data <= isoDeslocado(0);
+  if(filaLabPeriodo === 'data')  return !filaLabData || r.data === filaLabData;
+  return true;
+}
+
 function filaLabLinhas(){
   const t = normNome(filaLabBusca);
   let lista = filaLab.filter(r=>{
-    if(filaLabFiltro !== 'Todos' && r.situacao !== filaLabFiltro) return false;
-    if(filaLabData && r.data !== filaLabData) return false;
+    if(filaLabFiltro === 'Atrasado'){ if(!filaLabAtrasado(r)) return false; }
+    else if(filaLabFiltro !== 'Todos' && r.situacao !== filaLabFiltro) return false;
+    if(!filaLabPassaPeriodo(r)) return false;
     if(!t) return true;
     return normNome([r.paciente_nome, r.exame, r.medico, r.registro_numero].join(' ')).includes(t);
   });
-  lista = lista.slice().sort((a,b)=> filaLabFiltro === 'Concluído' ? (b.data||'').localeCompare(a.data||'') : (a.data||'').localeCompare(b.data||''));
-  return lista;
+  const dir = filaLabOrdem === 'recentes' ? -1 : 1;
+  return lista.slice().sort((a,b)=> dir * (a.data||'').localeCompare(b.data||''));
+}
+
+// Próximo exame PENDENTE depois do atual, na ordem em que a fila está sendo exibida
+function filaLabProximoDe(idAtual){
+  const lista = filaLabLinhas().filter(r=>r.situacao === 'Pendente' || r.id === idAtual);
+  const pos = lista.findIndex(r=>r.id === idAtual);
+  const depois = lista.slice(pos + 1).find(r=>r.id !== idAtual);
+  if(depois) return depois;
+  return pos > 0 ? lista.slice(0, pos).find(r=>r.id !== idAtual) || null : null;
+}
+
+function filaLabSeloAtraso(r){
+  if(!filaLabAtrasado(r)) return '';
+  const d = diasDesdeISO(r.data);
+  if(d > 1000) return `<br><span class="status urgente" title="Data muito antiga — provavelmente digitada errada. Edite a solicitação.">⚠ data suspeita</span>`;
+  return `<br><span class="status urgente">atrasado · ${d} dias</span>`;
 }
 
 function filaLabRows(){
   if(!filaLabCarregada) return `<tr class="empty-row"><td colspan="7">Carregando fila...</td></tr>`;
   const todas = filaLabLinhas();
-  if(!todas.length) return `<tr class="empty-row"><td colspan="7">${filaLabFiltro === 'Pendente' && !filaLabBusca && !filaLabData ? 'Nenhum exame pendente. 🎉' : 'Nenhuma solicitação encontrada.'}</td></tr>`;
+  if(!todas.length){
+    const limpo = filaLabFiltro === 'Pendente' && !filaLabBusca && filaLabPeriodo === 'todos';
+    return `<tr class="empty-row"><td colspan="7">${limpo ? 'Nenhum exame pendente. 🎉' : 'Nenhuma solicitação encontrada.'}</td></tr>`;
+  }
   const lista = todas.slice(0, FILA_LAB_MAX_LINHAS);
   const aviso = todas.length > lista.length
-    ? `<tr class="empty-row"><td colspan="7">Mostrando ${lista.length} de ${todas.length} — use a busca ou a data para achar os demais.</td></tr>` : '';
+    ? `<tr class="empty-row"><td colspan="7">Mostrando ${lista.length} de ${todas.length} — use a busca ou o período para achar os demais.</td></tr>` : '';
   return aviso + lista.map(r=>`
     <tr>
-      <td>${isoToBR(r.data)}</td>
+      <td>${isoToBR(r.data)}${filaLabSeloAtraso(r)}</td>
       <td><b>${r.paciente_nome || '—'}</b></td>
       <td>${r.exame}</td>
       <td>${r.medico || '—'}</td>
@@ -3471,16 +3563,21 @@ function filaLabTemplate(){
   if(!supabaseConfigured){
     return `<div class="placeholder"><div class="ic">📋</div><h3>Configure o Supabase primeiro</h3><p>A fila do laboratório precisa do banco conectado.</p></div>`;
   }
+  const c = filaLabCarregada;
   const nPend = filaLab.filter(r=>r.situacao === 'Pendente').length;
+  const nAtr  = filaLab.filter(filaLabAtrasado).length;
   const nConc = filaLab.filter(r=>r.situacao === 'Concluído').length;
-  const btn = (f, rotulo) => `<button class="btn-secondary" onclick="filaLabFiltrar('${f}')" style="${filaLabFiltro === f ? 'background:var(--red);color:#fff;' : ''}">${rotulo}</button>`;
+  const ativo = 'background:var(--red);color:#fff;';
+  const btn = (f, rotulo) => `<button class="btn-secondary" onclick="filaLabFiltrar('${f}')" style="${filaLabFiltro === f ? ativo : ''}">${rotulo}</button>`;
+  const chip = (id, rotulo) => `<button class="btn-secondary" onclick="filaLabPeriodoSet('${id}')" style="padding:7px 12px;font-size:12px;${filaLabPeriodo === id ? ativo : ''}">${rotulo}</button>`;
   return `
   <div class="panel" style="margin-top:4px;">
     <div class="panel-head">
       <h3>📋 FILA DO LABORATÓRIO — TODOS OS PACIENTES</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        ${btn('Pendente', `Pendentes${filaLabCarregada ? ' ('+nPend+')' : ''}`)}
-        ${btn('Concluído', `Concluídos${filaLabCarregada ? ' ('+nConc+')' : ''}`)}
+        ${btn('Pendente', `Pendentes${c ? ' ('+nPend+')' : ''}`)}
+        ${btn('Atrasado', `Atrasados${c ? ' ('+nAtr+')' : ''}`)}
+        ${btn('Concluído', `Concluídos${c ? ' ('+nConc+')' : ''}`)}
         ${btn('Todos', 'Todos')}
       </div>
     </div>
@@ -3488,11 +3585,20 @@ function filaLabTemplate(){
       <input type="text" placeholder="🔍 Filtrar por paciente, exame, médico ou nº da etiqueta..." value="${filaLabBusca.replace(/"/g,'&quot;')}"
         style="flex:1;min-width:240px;padding:10px 14px;border:1.5px solid var(--line);border-radius:9px;font-size:13.5px;outline:none;"
         oninput="filaLabBuscar(this.value)">
-      <input type="date" value="${filaLabData}" title="Filtrar pela data da solicitação"
-        style="padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;font-size:13.5px;outline:none;"
-        onchange="filaLabFiltrarData(this.value)">
+      <select onchange="filaLabOrdemSet(this.value)" title="Ordem da lista"
+        style="padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;font-size:13px;outline:none;background:#fff;">
+        <option value="antigos" ${filaLabOrdem === 'antigos' ? 'selected' : ''}>Mais antigos primeiro</option>
+        <option value="recentes" ${filaLabOrdem === 'recentes' ? 'selected' : ''}>Mais recentes primeiro</option>
+      </select>
     </div>
-    <div style="overflow-x:auto;">
+    <div style="padding:10px 18px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+      <span style="font-size:12px;color:var(--muted);font-weight:700;margin-right:2px;">Período:</span>
+      ${chip('todos','Todos')}${chip('hoje','Hoje')}${chip('ontem','Ontem')}${chip('7d','Últimos 7 dias')}
+      <input type="date" value="${filaLabPeriodo === 'data' ? filaLabData : ''}" title="Escolher uma data específica"
+        style="padding:6px 10px;border:1.5px solid ${filaLabPeriodo === 'data' ? 'var(--red)' : 'var(--line)'};border-radius:9px;font-size:12.5px;outline:none;"
+        onchange="filaLabDataSet(this.value)">
+    </div>
+    <div style="overflow-x:auto;margin-top:8px;">
       <table>
         <thead><tr><th>Data</th><th>Paciente</th><th>Exame(s)</th><th>Médico</th><th>Nº etiqueta</th><th>Situação</th><th>Ações</th></tr></thead>
         <tbody id="fila-lab-tbody">${filaLabRows()}</tbody>
@@ -3501,20 +3607,16 @@ function filaLabTemplate(){
   </div>`;
 }
 
+function filaLabRedesenhar(){ const m = document.getElementById('main-content'); if(m) m.innerHTML = filaLabTemplate(); }
 function filaLabBuscar(v){
   filaLabBusca = v;
   const tb = document.getElementById('fila-lab-tbody');
   if(tb) tb.innerHTML = filaLabRows();
 }
-function filaLabFiltrarData(v){
-  filaLabData = v || '';
-  const tb = document.getElementById('fila-lab-tbody');
-  if(tb) tb.innerHTML = filaLabRows();
-}
-function filaLabFiltrar(f){
-  filaLabFiltro = f;
-  document.getElementById('main-content').innerHTML = filaLabTemplate();
-}
+function filaLabFiltrar(f){ filaLabFiltro = f; filaLabRedesenhar(); }
+function filaLabPeriodoSet(p){ filaLabPeriodo = p; filaLabData = ''; filaLabRedesenhar(); }
+function filaLabDataSet(v){ filaLabData = v || ''; filaLabPeriodo = v ? 'data' : 'todos'; filaLabRedesenhar(); }
+function filaLabOrdemSet(v){ filaLabOrdem = v; filaLabRedesenhar(); }
 
 // Abre o registro de resultado de um exame de QUALQUER paciente: ativa o
 // paciente (carrega as solicitações dele) e abre o modal de resultado.
@@ -3524,9 +3626,16 @@ async function filaLabRegistrar(labId, pacId){
     if(!p){ showToast('Paciente não encontrado.'); return; }
     await ativarPaciente(p, false);
   }
-  const i = labs.findIndex(l=>l.id === labId);
+  let i = labs.findIndex(l=>l.id === labId);
+  if(i < 0){
+    // pedido criado depois que as solicitações deste paciente foram carregadas: recarrega
+    await loadDocumentosDoPaciente();
+    i = labs.findIndex(l=>l.id === labId);
+  }
   if(i < 0){ showToast('Solicitação não encontrada.'); return; }
   abrirRegistrarResultado(i);
+  const bp = document.getElementById('resultado-btn-proximo');   // só faz sentido vindo da fila
+  if(bp) bp.style.display = '';
 }
 
 function placeholderTemplate(page){
