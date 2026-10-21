@@ -703,6 +703,7 @@
 
       <div class="nav-group" id="navgroup-atendimento">
         <div class="nav-group-header" onclick="toggleNavGroup(this)">Atendimento <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></div>
+        <div class="nav-item" data-page="meudia"><svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg> Meu Dia</div>
         <div class="nav-item active" data-page="resumo"><svg class="nav-icon" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg> Resumo do Paciente</div>
         <div class="nav-item" data-page="dados"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Dados do Paciente</div>
         <div class="nav-item" data-page="agenda"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg> Agenda</div>
@@ -796,6 +797,7 @@
       <div class="nav-divider"></div>
       <div class="nav-group">
         <div class="nav-group-header">Clínico</div>
+        <div class="nav-item" data-page="meudia" onclick="fecharMenuMobile()"><svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg> Meu Dia</div>
         <div class="nav-item" data-page="agenda" onclick="fecharMenuMobile()"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg> Agenda</div>
         <div class="nav-item" data-page="filalab" onclick="fecharMenuMobile()"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg> Fila do Laboratório</div>
         <div class="nav-item" data-page="atendimentos" onclick="fecharMenuMobile()"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> Atendimentos</div>
@@ -1608,6 +1610,8 @@ document.getElementById('login-form').addEventListener('submit', async function(
       // Laboratório já entra na fila de exames de todos os pacientes
       document.getElementById('navgroup-laboratorio')?.classList.remove('collapsed');
       clickNav('filalab');
+    } else if(currentUser.tipo === 'medico'){
+      clickNav('meudia');   // médico já entra na agenda/pendências do dia
     } else {
       clickNav('resumo');   // também realça "Resumo" no menu (útil quando troca de perfil sem recarregar)
     }
@@ -1645,10 +1649,12 @@ function aplicarPermissoesUsuario(){
   aplicarMenuPorPerfil();
 }
 
-// Menu enxuto: o perfil Laboratório só vê o que usa no dia a dia.
+// Menu por perfil: o Laboratório só vê o que usa no dia a dia; "Meu Dia" é só do médico.
 const MENU_LABORATORIO = ['filalab','laboratorios','dados'];
 function aplicarMenuPorPerfil(){
-  const ehLab = currentUser && currentUser.tipo === 'laboratorio';
+  const tipo = currentUser && currentUser.tipo;
+  const ehLab = tipo === 'laboratorio';
+  const ehMedico = tipo === 'medico';
   // 1) limpa o que um login anterior possa ter escondido (sem mexer no item "Usuários")
   document.querySelectorAll('.nav-item[data-page]:not([data-page="usuarios"]), .bottom-nav-item[data-page], .nav-group, .nav-divider').forEach(el=>{
     if(el.dataset.escondidoPerfil){ el.style.display = ''; delete el.dataset.escondidoPerfil; }
@@ -1656,9 +1662,13 @@ function aplicarMenuPorPerfil(){
   // botão "Laboratório" do celular volta a apontar para a tela original
   const bl = document.querySelector('.bottom-nav-item[data-labbtn]');
   if(bl){ bl.dataset.page = 'laboratorios'; bl.setAttribute('onclick', "clickNav('laboratorios')"); delete bl.dataset.labbtn; }
-  if(!ehLab) return;
 
   const esconder = el => { el.style.display = 'none'; el.dataset.escondidoPerfil = '1'; };
+  // "Meu Dia" só faz sentido para o médico; a Fila do Laboratório não é do médico
+  document.querySelectorAll('.nav-item[data-page="meudia"]').forEach(el=>{ if(!ehMedico) esconder(el); });
+  if(ehMedico) document.querySelectorAll('.nav-item[data-page="filalab"]').forEach(esconder);
+  if(!ehLab) return;
+
   document.querySelectorAll('.nav-item[data-page], .bottom-nav-item[data-page]').forEach(el=>{
     if(!MENU_LABORATORIO.includes(el.dataset.page)) esconder(el);
   });
@@ -1784,7 +1794,7 @@ const NOMES_PAGINA = {
   atendimentos:'Atendimentos', historico:'Histórico Clínico', alergias:'Alergias e Reações',
   receitas:'Receitas Médicas', documentos:'Documentos', evolucoes:'Evoluções', anexos:'Anexos',
   medceaf:'Solicitação de Medicamentos (CEAF)', incidentes:'Incidentes Transfusionais',
-  filalab:'Fila do Laboratório',
+  meudia:'Meu Dia', filalab:'Fila do Laboratório',
   laboratorios:'Solicitações de Laboratórios', hemocomponentes:'Solicitações de Hemocomponentes',
   transfusoes:'Transfusões', exames:'Exames Realizados',
   usuarios:'Usuários', relatorios:'Relatórios', config:'Configurações'
@@ -1831,6 +1841,11 @@ function renderPage(page){
     main.innerHTML = fullListTemplate('Solicitações de Laboratórios','🧪', labsRows(), ['Data','Exame Solicitado','Situação','Médico','Ações'], "abrirNovaSolicitacaoLab()", '+ Nova Solicitação', 'laboratorios', podeCriarLaboratorio());
   } else if(page === 'hemocomponentes'){
     main.innerHTML = fullListTemplate('Solicitações de Hemocomponentes','🩸', hemosRows(), ['Data','Hemocomponente','Quantidade','Situação','Médico','Ações'], "abrirNovaSolicitacaoHemo()", '+ Nova Solicitação', 'hemocomponentes');
+  } else if(page === 'meudia'){
+    main.innerHTML = meuDiaTemplate();
+    carregarMeuDia().then(()=>{
+      if(document.querySelector('.nav-item.active')?.dataset.page === 'meudia') main.innerHTML = meuDiaTemplate();
+    });
   } else if(page === 'filalab'){
     main.innerHTML = filaLabTemplate();
     carregarFilaLab().then(()=>{
@@ -3490,7 +3505,7 @@ function filaLabAtrasado(r){
 async function carregarFilaLab(){
   if(!supabaseConfigured) return;
   const { data, error } = await supabaseClient.from('solicitacoes_exames')
-    .select('id, paciente_id, paciente_nome, data, exame, situacao, medico, registro_numero, data_resultado')
+    .select('id, paciente_id, paciente_nome, data, exame, situacao, medico, medico_crm, registro_numero, data_resultado')
     .order('data', {ascending:true}).limit(3000);
   if(error){ console.error(error); showToast('Erro ao carregar a fila do laboratório.'); return; }
   filaLab = data || [];
@@ -3636,6 +3651,149 @@ async function filaLabRegistrar(labId, pacId){
   abrirRegistrarResultado(i);
   const bp = document.getElementById('resultado-btn-proximo');   // só faz sentido vindo da fila
   if(bp) bp.style.display = '';
+}
+
+/* ================= MEU DIA (perfil Médico) ================= */
+let meuDiaData = null;      // dia da agenda exibida (ISO)
+let meuDiaAgenda = [];
+const MEU_DIA_MAX = 50;     // linhas por lista
+
+function meuDiaMeusPedidos(){
+  if(!currentUser) return [];
+  const nomeN = normNome(currentUser.nome);
+  const crm = (currentUser.crm || '').trim();
+  return filaLab.filter(r => (nomeN && normNome(r.medico) === nomeN) || (crm && (r.medico_crm || '').trim() === crm));
+}
+
+async function carregarMeuDia(){
+  if(!supabaseConfigured || !currentUser) return;
+  if(!meuDiaData) meuDiaData = isoLocal(new Date());
+  const consultaAgenda = currentUser.id
+    ? supabaseClient.from('agendamentos').select('*').eq('medico_id', currentUser.id).eq('data', meuDiaData).neq('status','Cancelado').order('horario', {ascending:true})
+    : Promise.resolve({data:[], error:null});
+  const [ag] = await Promise.all([consultaAgenda, carregarFilaLab()]);
+  if(ag.error){ console.error(ag.error); showToast('Erro ao carregar a agenda do dia.'); }
+  else meuDiaAgenda = ag.data || [];
+}
+
+function meuDiaRedesenhar(){ const m = document.getElementById('main-content'); if(m) m.innerHTML = meuDiaTemplate(); }
+async function meuDiaIr(delta){
+  const [y,m,d] = (meuDiaData || isoLocal(new Date())).split('-').map(Number);
+  const dt = new Date(y, m-1, d + delta, 12);
+  meuDiaData = isoLocal(dt);
+  await carregarMeuDia(); meuDiaRedesenhar();
+}
+async function meuDiaHoje(){ meuDiaData = isoLocal(new Date()); await carregarMeuDia(); meuDiaRedesenhar(); }
+async function meuDiaSetData(v){ if(!v) return; meuDiaData = v; await carregarMeuDia(); meuDiaRedesenhar(); }
+
+async function meuDiaMarcarAtendido(id){
+  const { error } = await supabaseClient.from('agendamentos').update({status:'Atendido'}).eq('id', id);
+  if(error){ console.error(error); showToast('Erro ao marcar como atendido.'); return; }
+  const a = meuDiaAgenda.find(x=>x.id === id); if(a) a.status = 'Atendido';
+  showToast('Paciente marcado como atendido.');
+  meuDiaRedesenhar();
+}
+
+// Abre o resultado (impressão) de um exame pronto, de qualquer paciente
+async function meuDiaVerResultado(labId, pacId){
+  if(pacId !== currentPacienteId){
+    const p = pacientesList.find(x=>x.id === pacId);
+    if(!p){ showToast('Paciente não encontrado.'); return; }
+    await ativarPaciente(p, false);
+  }
+  let i = labs.findIndex(l=>l.id === labId);
+  if(i < 0){ await loadDocumentosDoPaciente(); i = labs.findIndex(l=>l.id === labId); }
+  if(i < 0){ showToast('Solicitação não encontrada.'); return; }
+  imprimirResultadoExame(i);
+}
+
+function meuDiaTemplate(){
+  if(!supabaseConfigured){
+    return `<div class="placeholder"><div class="ic">☀️</div><h3>Configure o Supabase primeiro</h3><p>O Meu Dia precisa do banco conectado.</p></div>`;
+  }
+  const dia = meuDiaData || isoLocal(new Date());
+  const ehHoje = dia === isoLocal(new Date());
+  const meus = meuDiaMeusPedidos();
+  const pend = meus.filter(r=>r.situacao === 'Pendente').sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+  const prontos = meus.filter(r=>r.situacao === 'Concluído').sort((a,b)=>(b.data_resultado || b.data || '').localeCompare(a.data_resultado || a.data || ''));
+  const card = (n, rotulo, cor) => `<div class="stat-card"><div><div class="stat-value" style="color:${cor};">${n}</div><div class="stat-label">${rotulo}</div></div></div>`;
+  const semId = !currentUser || !currentUser.id;
+
+  const linhasAgenda = meuDiaAgenda.length ? meuDiaAgenda.map(a=>`
+    <tr>
+      <td><b>${a.horario}</b></td>
+      <td><b>${a.paciente_nome || '—'}</b></td>
+      <td><span class="status ${statusClass(a.status)}">${a.status}</span></td>
+      <td>${a.observacoes || '—'}</td>
+      <td class="row-actions">
+        ${a.paciente_id ? `<button title="Abrir paciente" onclick="selecionarPaciente('${a.paciente_id}')">${ico('ver')}</button>` : ''}
+        ${a.status !== 'Atendido' ? `<button title="Marcar como atendido" onclick="meuDiaMarcarAtendido('${a.id}')">${ico('ativar')}</button>` : ''}
+      </td>
+    </tr>`).join('') : `<tr class="empty-row"><td colspan="5">${semId ? 'Seu usuário não está ligado a uma agenda.' : 'Nenhum paciente agendado neste dia.'}</td></tr>`;
+
+  const linhasProntos = prontos.slice(0, MEU_DIA_MAX).map(r=>`
+    <tr>
+      <td>${r.data_resultado ? isoToBR(r.data_resultado) : isoToBR(r.data)}</td>
+      <td><b>${r.paciente_nome || '—'}</b></td>
+      <td>${r.exame}</td>
+      <td>${r.registro_numero ? `<b>${r.registro_numero}</b>` : '—'}</td>
+      <td class="row-actions">
+        <button title="Ver / imprimir resultado" onclick="meuDiaVerResultado('${r.id}','${r.paciente_id}')">${ico('verresultado')}</button>
+        <button title="Abrir paciente" onclick="selecionarPaciente('${r.paciente_id}')">${ico('ver')}</button>
+      </td>
+    </tr>`).join('') || `<tr class="empty-row"><td colspan="5">${filaLabCarregada ? 'Nenhum resultado pronto dos seus pedidos.' : 'Carregando...'}</td></tr>`;
+
+  const linhasPend = pend.slice(0, MEU_DIA_MAX).map(r=>{
+    const d = diasDesdeISO(r.data);
+    return `
+    <tr>
+      <td>${isoToBR(r.data)}${d > FILA_LAB_DIAS_ATRASO && d <= 1000 ? `<br><span class="status urgente">há ${d} dias</span>` : ''}</td>
+      <td><b>${r.paciente_nome || '—'}</b></td>
+      <td>${r.exame}</td>
+      <td class="row-actions"><button title="Abrir paciente" onclick="selecionarPaciente('${r.paciente_id}')">${ico('ver')}</button></td>
+    </tr>`;
+  }).join('') || `<tr class="empty-row"><td colspan="4">${filaLabCarregada ? 'Nenhum pedido seu aguardando o laboratório. 🎉' : 'Carregando...'}</td></tr>`;
+
+  const nota = (lista) => lista.length > MEU_DIA_MAX ? `<div class="panel-foot" style="color:var(--muted);cursor:default;">Mostrando ${MEU_DIA_MAX} de ${lista.length}.</div>` : '';
+
+  return `
+  <div class="stats-row" style="grid-template-columns:repeat(3,1fr);">
+    ${card(meuDiaAgenda.length, ehHoje ? 'Pacientes agendados hoje' : 'Pacientes agendados no dia', 'var(--navy)')}
+    ${card(filaLabCarregada ? pend.length : '…', 'Meus exames aguardando o laboratório', '#B4780A')}
+    ${card(filaLabCarregada ? prontos.length : '…', 'Resultados prontos dos meus pedidos', '#1C8A45')}
+  </div>
+
+  <div class="panel" style="margin-top:4px;">
+    <div class="panel-head">
+      <h3>☀️ MINHA AGENDA — ${ehHoje ? 'HOJE, ' : ''}${isoToBR(dia)}</h3>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        <button class="btn-secondary" onclick="meuDiaIr(-1)" title="Dia anterior">‹</button>
+        <button class="btn-secondary" onclick="meuDiaHoje()" style="${ehHoje ? 'background:var(--red);color:#fff;' : ''}">Hoje</button>
+        <button class="btn-secondary" onclick="meuDiaIr(1)" title="Próximo dia">›</button>
+        <input type="date" value="${dia}" onchange="meuDiaSetData(this.value)" style="padding:8px 10px;border:1.5px solid var(--line);border-radius:9px;font-size:12.5px;outline:none;">
+      </div>
+    </div>
+    <div style="overflow-x:auto;"><table>
+      <thead><tr><th>Horário</th><th>Paciente</th><th>Situação</th><th>Observações</th><th>Ações</th></tr></thead>
+      <tbody>${linhasAgenda}</tbody>
+    </table></div>
+  </div>
+
+  <div class="panel" style="margin-top:18px;">
+    <div class="panel-head"><h3>🧪 RESULTADOS PRONTOS DOS MEUS PEDIDOS</h3></div>
+    <div style="overflow-x:auto;"><table>
+      <thead><tr><th>Liberado em</th><th>Paciente</th><th>Exame(s)</th><th>Nº etiqueta</th><th>Ações</th></tr></thead>
+      <tbody>${linhasProntos}</tbody>
+    </table></div>${nota(prontos)}
+  </div>
+
+  <div class="panel" style="margin-top:18px;">
+    <div class="panel-head"><h3>⏳ MEUS EXAMES AGUARDANDO O LABORATÓRIO</h3></div>
+    <div style="overflow-x:auto;"><table>
+      <thead><tr><th>Pedido em</th><th>Paciente</th><th>Exame(s)</th><th>Ações</th></tr></thead>
+      <tbody>${linhasPend}</tbody>
+    </table></div>${nota(pend)}
+  </div>`;
 }
 
 function placeholderTemplate(page){
@@ -3804,6 +3962,11 @@ async function inicializarAgenda(){
   if(medicoSelect){
     medicoSelect.innerHTML = `<option value="">— Selecione o médico —</option>` +
       medicosAgendaList.map(m=>`<option value="${m.id}" ${m.id === agendaMedicoId ? 'selected' : ''}>${m.nome}${m.crm ? ' — ' + m.crm : ''}</option>`).join('');
+  }
+  if(currentUser && currentUser.tipo === 'medico' && currentUser.id){
+    // médico logado vê a própria agenda
+    agendaMedicoId = currentUser.id;
+    if(medicoSelect){ medicoSelect.value = agendaMedicoId; medicoSelect.disabled = true; }
   }
   if(agendaMedicoId){
     await renderizarGradeAgenda();
