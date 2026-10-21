@@ -727,6 +727,7 @@
 
       <div class="nav-group" id="navgroup-laboratorio">
         <div class="nav-group-header" onclick="toggleNavGroup(this)">Laboratório <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></div>
+        <div class="nav-item" data-page="filalab"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg> Fila do Laboratório</div>
         <div class="nav-item" data-page="laboratorios"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M9 2v6l-5.5 9.5A2 2 0 0 0 5.2 21h13.6a2 2 0 0 0 1.7-3.5L15 8V2"/><path d="M9 2h6M8.5 13h7"/></svg> Solicitações de Laboratórios</div>
         <div class="nav-item" data-page="hemocomponentes"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 2v6m0 0-3 4a5 5 0 1 0 6 0z"/></svg> Solicitações de Hemocomponentes</div>
         <div class="nav-item" data-page="transfusoes"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Transfusões</div>
@@ -796,6 +797,7 @@
       <div class="nav-group">
         <div class="nav-group-header">Clínico</div>
         <div class="nav-item" data-page="agenda" onclick="fecharMenuMobile()"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg> Agenda</div>
+        <div class="nav-item" data-page="filalab" onclick="fecharMenuMobile()"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg> Fila do Laboratório</div>
         <div class="nav-item" data-page="atendimentos" onclick="fecharMenuMobile()"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> Atendimentos</div>
         <div class="nav-item" data-page="historico" onclick="fecharMenuMobile()"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> Histórico Clínico</div>
         <div class="nav-item" data-page="evolucoes" onclick="fecharMenuMobile()"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg> Evoluções</div>
@@ -1601,7 +1603,13 @@ document.getElementById('login-form').addEventListener('submit', async function(
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     aplicarPermissoesUsuario();
-    renderPage('resumo');
+    if(currentUser.tipo === 'laboratorio'){
+      // Laboratório já entra na fila de exames de todos os pacientes
+      document.getElementById('navgroup-laboratorio')?.classList.remove('collapsed');
+      clickNav('filalab');
+    } else {
+      renderPage('resumo');
+    }
     initFromSupabase();
   } else {
     const rotulosPerfil = {gestor:'Gestor', medico:'Médico(a)', recepcao:'Recepção', laboratorio:'Laboratório'};
@@ -1745,6 +1753,7 @@ const NOMES_PAGINA = {
   atendimentos:'Atendimentos', historico:'Histórico Clínico', alergias:'Alergias e Reações',
   receitas:'Receitas Médicas', documentos:'Documentos', evolucoes:'Evoluções', anexos:'Anexos',
   medceaf:'Solicitação de Medicamentos (CEAF)', incidentes:'Incidentes Transfusionais',
+  filalab:'Fila do Laboratório',
   laboratorios:'Solicitações de Laboratórios', hemocomponentes:'Solicitações de Hemocomponentes',
   transfusoes:'Transfusões', exames:'Exames Realizados',
   usuarios:'Usuários', relatorios:'Relatórios', config:'Configurações'
@@ -1791,6 +1800,11 @@ function renderPage(page){
     main.innerHTML = fullListTemplate('Solicitações de Laboratórios','🧪', labsRows(), ['Data','Exame Solicitado','Situação','Médico','Ações'], "abrirNovaSolicitacaoLab()", '+ Nova Solicitação', 'laboratorios', podeCriarLaboratorio());
   } else if(page === 'hemocomponentes'){
     main.innerHTML = fullListTemplate('Solicitações de Hemocomponentes','🩸', hemosRows(), ['Data','Hemocomponente','Quantidade','Situação','Médico','Ações'], "abrirNovaSolicitacaoHemo()", '+ Nova Solicitação', 'hemocomponentes');
+  } else if(page === 'filalab'){
+    main.innerHTML = filaLabTemplate();
+    carregarFilaLab().then(()=>{
+      if(document.querySelector('.nav-item.active')?.dataset.page === 'filalab') main.innerHTML = filaLabTemplate();
+    });
   } else if(page === 'medceaf'){
     main.innerHTML = fullListTemplate('Solicitação de Medicamentos (CEAF)','💊', medsCeafRows(), ['Data','Medicamentos','CID-10','Médico','Ações'], "abrirNovaMedCeaf()", '+ Nova Solicitação', '', podeCriarDocumentos());
   } else if(page === 'incidentes'){
@@ -2995,6 +3009,8 @@ function salvarResultadoExame(){
       data_resultado: hoje, situacao:'Concluído'
     }).eq('id', r.id).then(({error})=>{
       showToast(error ? 'Erro ao salvar resultado no Supabase.' : 'Resultado registrado e assinado com sucesso.');
+      // se a Fila do Laboratório estiver aberta, recarrega depois de gravar
+      if(!error && document.querySelector('.nav-item.active')?.dataset.page === 'filalab') renderPage('filalab');
       if(error) console.error(error);
     });
   } else {
@@ -3397,6 +3413,120 @@ function excluirAnexo(i){
       renderPage('anexos');
     });
   });
+}
+
+/* ================= FILA DO LABORATÓRIO (todos os pacientes) ================= */
+let filaLab = [];
+let filaLabCarregada = false;
+let filaLabFiltro = 'Pendente';   // 'Pendente' | 'Concluído' | 'Todos'
+let filaLabBusca = '';
+let filaLabData = '';              // filtro por data da solicitação (ISO yyyy-mm-dd)
+const FILA_LAB_MAX_LINHAS = 300;     // evita tabela gigante; use os filtros para achar o resto
+
+async function carregarFilaLab(){
+  if(!supabaseConfigured) return;
+  const { data, error } = await supabaseClient.from('solicitacoes_exames')
+    .select('id, paciente_id, paciente_nome, data, exame, situacao, medico, registro_numero, data_resultado')
+    .order('data', {ascending:true}).limit(3000);
+  if(error){ console.error(error); showToast('Erro ao carregar a fila do laboratório.'); return; }
+  filaLab = data || [];
+  filaLabCarregada = true;
+}
+
+function filaLabLinhas(){
+  const t = normNome(filaLabBusca);
+  let lista = filaLab.filter(r=>{
+    if(filaLabFiltro !== 'Todos' && r.situacao !== filaLabFiltro) return false;
+    if(filaLabData && r.data !== filaLabData) return false;
+    if(!t) return true;
+    return normNome([r.paciente_nome, r.exame, r.medico, r.registro_numero].join(' ')).includes(t);
+  });
+  lista = lista.slice().sort((a,b)=> filaLabFiltro === 'Concluído' ? (b.data||'').localeCompare(a.data||'') : (a.data||'').localeCompare(b.data||''));
+  return lista;
+}
+
+function filaLabRows(){
+  if(!filaLabCarregada) return `<tr class="empty-row"><td colspan="7">Carregando fila...</td></tr>`;
+  const todas = filaLabLinhas();
+  if(!todas.length) return `<tr class="empty-row"><td colspan="7">${filaLabFiltro === 'Pendente' && !filaLabBusca && !filaLabData ? 'Nenhum exame pendente. 🎉' : 'Nenhuma solicitação encontrada.'}</td></tr>`;
+  const lista = todas.slice(0, FILA_LAB_MAX_LINHAS);
+  const aviso = todas.length > lista.length
+    ? `<tr class="empty-row"><td colspan="7">Mostrando ${lista.length} de ${todas.length} — use a busca ou a data para achar os demais.</td></tr>` : '';
+  return aviso + lista.map(r=>`
+    <tr>
+      <td>${isoToBR(r.data)}</td>
+      <td><b>${r.paciente_nome || '—'}</b></td>
+      <td>${r.exame}</td>
+      <td>${r.medico || '—'}</td>
+      <td>${r.registro_numero ? `<b>${r.registro_numero}</b>` : '—'}</td>
+      <td><span class="status ${statusClass(r.situacao)}">${r.situacao}</span></td>
+      <td class="row-actions">
+        ${podeRegistrarResultado() ? `<button title="${r.situacao === 'Concluído' ? 'Editar resultado' : 'Registrar resultado'}" onclick="filaLabRegistrar('${r.id}','${r.paciente_id}')">${ico('resultado')}</button>` : ''}
+        <button title="Abrir paciente" onclick="selecionarPaciente('${r.paciente_id}')">${ico('ver')}</button>
+      </td>
+    </tr>`).join('');
+}
+
+function filaLabTemplate(){
+  if(!supabaseConfigured){
+    return `<div class="placeholder"><div class="ic">📋</div><h3>Configure o Supabase primeiro</h3><p>A fila do laboratório precisa do banco conectado.</p></div>`;
+  }
+  const nPend = filaLab.filter(r=>r.situacao === 'Pendente').length;
+  const nConc = filaLab.filter(r=>r.situacao === 'Concluído').length;
+  const btn = (f, rotulo) => `<button class="btn-secondary" onclick="filaLabFiltrar('${f}')" style="${filaLabFiltro === f ? 'background:var(--red);color:#fff;' : ''}">${rotulo}</button>`;
+  return `
+  <div class="panel" style="margin-top:4px;">
+    <div class="panel-head">
+      <h3>📋 FILA DO LABORATÓRIO — TODOS OS PACIENTES</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        ${btn('Pendente', `Pendentes${filaLabCarregada ? ' ('+nPend+')' : ''}`)}
+        ${btn('Concluído', `Concluídos${filaLabCarregada ? ' ('+nConc+')' : ''}`)}
+        ${btn('Todos', 'Todos')}
+      </div>
+    </div>
+    <div style="padding:14px 18px 0;display:flex;gap:10px;flex-wrap:wrap;">
+      <input type="text" placeholder="🔍 Filtrar por paciente, exame, médico ou nº da etiqueta..." value="${filaLabBusca.replace(/"/g,'&quot;')}"
+        style="flex:1;min-width:240px;padding:10px 14px;border:1.5px solid var(--line);border-radius:9px;font-size:13.5px;outline:none;"
+        oninput="filaLabBuscar(this.value)">
+      <input type="date" value="${filaLabData}" title="Filtrar pela data da solicitação"
+        style="padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;font-size:13.5px;outline:none;"
+        onchange="filaLabFiltrarData(this.value)">
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>Data</th><th>Paciente</th><th>Exame(s)</th><th>Médico</th><th>Nº etiqueta</th><th>Situação</th><th>Ações</th></tr></thead>
+        <tbody id="fila-lab-tbody">${filaLabRows()}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function filaLabBuscar(v){
+  filaLabBusca = v;
+  const tb = document.getElementById('fila-lab-tbody');
+  if(tb) tb.innerHTML = filaLabRows();
+}
+function filaLabFiltrarData(v){
+  filaLabData = v || '';
+  const tb = document.getElementById('fila-lab-tbody');
+  if(tb) tb.innerHTML = filaLabRows();
+}
+function filaLabFiltrar(f){
+  filaLabFiltro = f;
+  document.getElementById('main-content').innerHTML = filaLabTemplate();
+}
+
+// Abre o registro de resultado de um exame de QUALQUER paciente: ativa o
+// paciente (carrega as solicitações dele) e abre o modal de resultado.
+async function filaLabRegistrar(labId, pacId){
+  if(pacId !== currentPacienteId){
+    const p = pacientesList.find(x=>x.id === pacId);
+    if(!p){ showToast('Paciente não encontrado.'); return; }
+    await ativarPaciente(p, false);
+  }
+  const i = labs.findIndex(l=>l.id === labId);
+  if(i < 0){ showToast('Solicitação não encontrada.'); return; }
+  abrirRegistrarResultado(i);
 }
 
 function placeholderTemplate(page){
