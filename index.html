@@ -3479,48 +3479,46 @@ function laudoLinhasPlanas(r){
 
 /* ---- impressão no modelo oficial ---- */
 const LAUDO_CSS = `<style>
-.laudo{font-family:'Times New Roman',Times,serif;color:#000;min-height:272mm;display:flex;flex-direction:column;font-size:13px;}
-.laudo .l-head{width:100%;border-collapse:collapse;margin-bottom:6px;}
-.laudo .l-head td{vertical-align:middle;padding:2px 4px;}
-.laudo .l-tit{text-align:center;font-style:italic;font-weight:700;font-size:20px;line-height:1.25;}
-.laudo .l-camp{width:100%;border-collapse:collapse;margin:4px 0 12px;font-size:15px;}
-.laudo .l-camp td{padding:1px 0;}
+.laudo{font-family:'Times New Roman',Times,serif;color:#000;min-height:258mm;display:flex;flex-direction:column;font-size:12px;page-break-inside:avoid;}
+.laudo .l-head{width:100%;border-collapse:collapse;margin-bottom:2px;}
+.laudo .l-head td{vertical-align:middle;padding:1px 4px;}
+.laudo .l-tit{text-align:center;font-style:italic;font-weight:700;font-size:17px;line-height:1.2;}
+.laudo .l-camp{width:100%;border-collapse:collapse;margin:2px 0 6px;font-size:13px;}
+.laudo .l-camp td{padding:0;}
 .laudo .l-camp td.k{text-align:right;width:34%;padding-right:6px;}
-.laudo .l-camp td.k2{text-align:right;width:auto;padding-right:6px;}
-.laudo .l-h2{text-align:center;font-weight:700;font-size:20px;margin:8px 0 4px;}
-.laudo .l-box{border:1px solid #000;margin-bottom:10px;}
-.laudo .l-g{width:100%;border-collapse:collapse;}
-.laudo .l-g td{padding:1.5px 6px;vertical-align:middle;}
-.laudo .l-n{text-align:right;width:36%;font-size:14px;}
-.laudo .l-c{text-align:left;width:28%;padding-left:12% !important;font-size:14px;white-space:nowrap;}
-.laudo .l-r{text-align:center;width:36%;font-size:14px;}
-.laudo .l-sec{font-weight:700;font-size:18px;text-align:left !important;}
-.laudo .l-obs{font-size:14px;padding:3px 8px;}
-.laudo .l-big{font-weight:700;font-size:23px;letter-spacing:.2px;}
-.laudo .l-small{font-size:9.5px;font-weight:400;line-height:1.3;text-transform:uppercase;}
-.laudo .l-sub{text-align:center;font-size:13px;}
-.laudo .l-val{font-weight:700;font-size:15px;}
-.laudo .l-line{border-top:1px solid #000;padding-top:2px;margin-top:10px;}
-.laudo .l-st{text-align:center;font-weight:700;font-size:18px;margin:6px 0 4px;}
+.laudo .l-h2{text-align:center;font-weight:700;font-size:17px;margin:4px 0 3px;}
+.laudo .l-box{border:1px solid #000;margin-bottom:6px;page-break-inside:avoid;}
+.laudo table.hg{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12px;}
+.laudo table.hg td{padding:0.5px 4px;vertical-align:middle;line-height:1.25;}
+.laudo .hn{text-align:right;padding-right:10px !important;}
+.laudo .hv{text-align:right;font-weight:700;font-size:13px;padding-right:6px !important;}
+.laudo .hu{text-align:left;font-weight:700;}
+.laudo .hr,.laudo .hs{text-align:center;}
+.laudo .l-sec{font-weight:700;font-size:15px;text-align:left;padding-top:3px !important;}
+.laudo .l-obs{font-size:12px;padding:1px 6px !important;}
+.laudo .l-big{font-weight:700;font-size:19px;letter-spacing:.2px;}
+.laudo .l-small{font-size:7.5px;font-weight:400;line-height:1.25;text-transform:uppercase;}
+.laudo .l-sub{text-align:center;font-size:11.5px;}
+.laudo .l-val{font-weight:700;font-size:13px;}
+.laudo .l-st{text-align:center;font-weight:700;font-size:16px;margin:4px 0 3px;}
 .laudo .l-sb{width:100%;border-collapse:collapse;border-bottom:1px solid #000;}
-.laudo .l-sb td{vertical-align:middle;padding:2px 6px;}
-.laudo .l-lab{font-size:10px;text-align:left;width:30%;line-height:1.3;}
-.laudo .l-rt{font-size:12px;text-align:center;}
-.laudo .l-notas{font-size:10px;line-height:1.35;padding:3px 4px 4px;}
-.laudo .l-ass{display:flex;gap:10px;margin-top:auto;padding-top:26px;}
-.laudo .l-ass>div{flex:1;text-align:center;font-size:9.5px;line-height:1.35;}
-.laudo .l-ext{font-size:10.5px;text-align:justify;line-height:1.35;margin:6px 4px 10px;}
-.laudo table.l-hist{width:60%;margin:6px auto;border-collapse:collapse;font-size:11px;text-align:center;}
-.laudo table.l-hist td,.laudo table.l-hist th{border:1px solid #666;padding:2px 6px;}
-.laudo .l-cod{text-align:right;font-size:9px;color:#444;margin-top:4px;}
+.laudo .l-sb td{vertical-align:middle;padding:1px 5px;}
+.laudo .l-lab{font-size:9px;text-align:left;width:30%;line-height:1.3;}
+.laudo .l-rt{font-size:11px;text-align:center;}
+.laudo .l-notas{font-size:9px;line-height:1.3;padding:2px 4px 3px;}
+.laudo .l-ass{display:flex;gap:8px;margin-top:auto;padding-top:14px;}
+.laudo .l-ass>div{flex:1;text-align:center;font-size:8.5px;line-height:1.3;}
+.laudo .l-ext{font-size:9.5px;text-align:justify;line-height:1.3;margin:4px 4px 8px;}
+.laudo table.l-hist{width:60%;margin:5px auto;border-collapse:collapse;font-size:10px;text-align:center;}
+.laudo table.l-hist td,.laudo table.l-hist th{border:1px solid #666;padding:1px 5px;}
 </style>`;
 
 function laudoCabecalho(r, pac, titulo){
   return `
   <table class="l-head"><tr>
-    <td style="width:28%;"><img src="${LOGO_HEMOCENTRO}" style="height:56px;"></td>
+    <td style="width:28%;"><img src="${LOGO_HEMOCENTRO}" style="height:46px;"></td>
     <td class="l-tit">${titulo}</td>
-    <td style="width:30%;text-align:right;"><img src="${LOGO_GOVERNO_PB}" style="height:52px;mix-blend-mode:multiply;"></td>
+    <td style="width:30%;text-align:right;"><img src="${LOGO_GOVERNO_PB}" style="height:44px;mix-blend-mode:multiply;"></td>
   </tr></table>
   <table class="l-camp">
     <tr><td class="k">Registro:</td><td colspan="2"><b>${escH(r.registro_numero || '')}</b></td></tr>
@@ -3548,54 +3546,52 @@ function laudoQuemLiberou(r){
 function laudoRodape(r){
   r = r || {};
   const idx = laudoQuemLiberou(r);
-  const quem = (r.responsavel_laboratorio || '').trim();
-  const carimbo = `<div style="font-style:italic;font-weight:700;font-size:13px;line-height:1.2;margin-bottom:2px;">${escH(quem)}</div><div style="font-size:8.5px;color:#333;margin-bottom:3px;">Assinado eletronicamente${r.data_resultado ? ' em ' + escH(r.data_resultado) : ''}</div>`;
-  const extra = (quem && idx < 0) ? `<div style="text-align:right;margin-top:auto;padding-top:20px;font-size:11px;">${carimbo}<span style="font-size:10px;">${escH(r.responsavel_registro || '')}</span></div>` : '';
-  return `${extra}<div class="l-ass" ${extra ? 'style="margin-top:6px;padding-top:6px;"' : ''}>${LAUDO_ASSINANTES.map((a,i)=>`<div style="display:flex;flex-direction:column;justify-content:flex-end;border-top:none;padding-top:0;">
-    <div style="min-height:34px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;">${i === idx ? carimbo : ''}</div>
+  const quem = idx >= 0 ? LAUDO_ASSINANTES[idx][0] : (r.responsavel_laboratorio || '').trim();
+  const carimbo = `<div style="font-style:italic;font-weight:700;font-size:11px;line-height:1.15;margin-bottom:1px;">${escH(quem)}</div><div style="font-size:7.5px;color:#333;margin-bottom:2px;">Assinado eletronicamente${r.data_resultado ? ' em ' + escH(r.data_resultado) : ''}</div>`;
+  const extra = (quem && idx < 0) ? `<div style="text-align:right;margin-top:auto;padding-top:10px;font-size:10px;">${carimbo}<span style="font-size:9px;">${escH(r.responsavel_registro || '')}</span></div>` : '';
+  return `${extra}<div class="l-ass" ${extra ? 'style="margin-top:4px;padding-top:4px;"' : ''}>${LAUDO_ASSINANTES.map((a,i)=>`<div style="display:flex;flex-direction:column;justify-content:flex-end;">
+    <div style="min-height:28px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;">${i === idx ? carimbo : ''}</div>
     <div style="border-top:1px solid #444;padding-top:2px;">${a[0]}<br>${a[1]}<br>${a[2]}</div></div>`).join('')}</div>`;
 }
 
 function laudoHemogramaHTML(m, r, pac){
   const v = m.valores || {}, ob = m.obs || {};
   const F = HEMO_FAIXAS[m.faixa] || HEMO_FAIXAS.mulher;
-  const val = x => x ? `<span class="l-val">${escH(x)}</span> ` : '';
-  const eritro = HEMO_ERITRO.map(([k,n,u])=>`<tr><td class="l-n">${n}</td><td class="l-c">${val(v[k])}<b>${u}</b></td><td class="l-r">${F[k]} ${u}</td></tr>`).join('');
-  const dif = HEMO_DIF.filter(([k])=>HEMO_REL[k] || v[k]).map(([k,n])=>{
-    const a = absLeuco(v,k);
-    return `<tr><td class="l-n">${n}</td><td style="text-align:center;font-size:14px;">${val(v[k])}${HEMO_REL[k] ? `<span style="margin-left:14px;">${HEMO_REL[k]}</span>` : ''}</td><td style="text-align:center;font-size:14px;">${val(a)}${(F.abs[k] || HEMO_ABS_COMUM[k]) ? `<span style="margin-left:14px;">${F.abs[k] || HEMO_ABS_COMUM[k]}</span>` : ''}</td></tr>`;
+  const x = t => t ? escH(t) : '';
+  const cols = '<colgroup><col style="width:33%"><col style="width:13%"><col style="width:17%"><col style="width:13%"><col style="width:24%"></colgroup>';
+  const eritro = HEMO_ERITRO.map(([k,n,u])=>`<tr><td class="hn">${n}</td><td class="hv">${x(v[k])}</td><td class="hu">${u}</td><td class="hr" colspan="2">${F[k]} ${u}</td></tr>`).join('');
+  const dif = HEMO_DIF.map(([k,n])=>{
+    const rel = HEMO_REL[k] || '', abs = F.abs[k] || HEMO_ABS_COMUM[k] || '';
+    return `<tr><td class="hn">${n}</td><td class="hv">${x(v[k])}</td><td class="hs">${rel}</td><td class="hv">${absLeuco(v,k)}</td><td class="hr">${abs}</td></tr>`;
   }).join('');
   const retic = v.reticulocitos ? `
-    <div class="l-box"><table class="l-g"><tr>
-      <td style="width:36%;"><span class="l-big">RETICULÓCITOS</span><div class="l-small" style="margin-top:4px;">AMOSTRA: SANGUE TOTAL<br>MÉTODO: MICROSCOPIA</div></td>
-      <td style="text-align:center;width:28%;"><b>RESULTADO</b><div style="margin-top:6px;"><span class="l-val">${escH(v.reticulocitos)}</span> <b>%</b></div></td>
-      <td style="text-align:center;width:36%;"><b>VALORES DE REFERÊNCIA</b><div style="font-size:12px;margin-top:4px;">${HEMO_RETIC_REF.join('<br>')}</div></td>
-    </tr></table></div>` : '';
+    <div class="l-box"><table class="hg">
+      <colgroup><col style="width:33%"><col style="width:30%"><col style="width:37%"></colgroup>
+      <tr><td><span class="l-big">RETICULÓCITOS</span><div class="l-small" style="margin-top:2px;">AMOSTRA: SANGUE TOTAL<br>MÉTODO: MICROSCOPIA</div></td>
+      <td class="hr"><b>RESULTADO</b><div style="margin-top:3px;"><span class="l-val">${x(v.reticulocitos)}</span> <b>%</b></div></td>
+      <td class="hr"><b>VALORES DE REFERÊNCIA</b><div style="font-size:10.5px;margin-top:2px;">${HEMO_RETIC_REF.join('<br>')}</div></td></tr>
+    </table></div>` : '';
   return `
   <div class="laudo">
     ${laudoCabecalho(r, pac, 'LABORATÓRIO DE<br>CITOHEMATOLOGIA')}
     <div class="l-h2">RESULTADO DE EXAMES</div>
     <div class="l-box">
-      <table class="l-g">
-        <tr><td style="width:36%;"><span class="l-big">HEMOGRAMA</span><div class="l-small" style="margin-top:2px;">AMOSTRA: SANGUE TOTAL<br>MÉTODO: AUTOMAÇÃO COM REVISÃO EM MICROSCOPIA CONVENCIONAL</div></td>
-            <td style="text-align:center;width:28%;"><b style="font-size:15px;">RESULTADOS</b></td>
-            <td style="text-align:center;width:36%;"><b style="font-size:15px;">VALORES DE REFERÊNCIA<br>(${F.rotulo})</b></td></tr>
-        <tr><td colspan="3" class="l-sec">ERITROGRAMA</td></tr>
+      <table class="hg">${cols}
+        <tr><td><span class="l-big">HEMOGRAMA</span><div class="l-small" style="margin-top:2px;">AMOSTRA: SANGUE TOTAL<br>MÉTODO: AUTOMAÇÃO COM REVISÃO EM MICROSCOPIA CONVENCIONAL</div></td>
+            <td class="hr" colspan="2"><b style="font-size:13px;">RESULTADOS</b></td>
+            <td class="hr" colspan="2"><b style="font-size:13px;">VALORES DE REFERÊNCIA<br>(${F.rotulo})</b></td></tr>
+        <tr><td colspan="5" class="l-sec">ERITROGRAMA</td></tr>
         ${eritro}
-      </table>
-      ${ob.eritro ? `<div class="l-obs">Obs.: ${escH(ob.eritro)}</div>` : ''}
-      <table class="l-g">
-        <tr><td colspan="3" class="l-sec">LEUCOGRAMA</td></tr>
-        <tr><td class="l-n">Leucócitos totais</td><td class="l-c">${val(v.leucocitos)}<b>/mm3</b></td><td class="l-r">${F.leucocitos} /mm³</td></tr>
-        <tr><td></td><td class="l-sub">Valores relativos (%)</td><td class="l-sub">Valores absolutos (/mm³)</td></tr>
+        <tr><td colspan="5" class="l-obs">${ob.eritro ? 'Obs.: ' + escH(ob.eritro) : '&nbsp;'}</td></tr>
+        <tr><td colspan="5" class="l-sec">LEUCOGRAMA</td></tr>
+        <tr><td class="hn">Leucócitos totais</td><td class="hv">${x(v.leucocitos)}</td><td class="hu">/mm3</td><td class="hr" colspan="2">${F.leucocitos} /mm³</td></tr>
+        <tr><td></td><td class="l-sub" colspan="2">Valores relativos (%)</td><td class="l-sub" colspan="2">Valores absolutos (/mm³)</td></tr>
         ${dif}
+        <tr><td colspan="5" class="l-obs">${ob.leuco ? 'Obs.: ' + escH(ob.leuco) : '&nbsp;'}</td></tr>
+        <tr><td colspan="5" class="l-sec">PLAQUETOGRAMA</td></tr>
+        <tr><td class="hn">Plaquetas</td><td class="hv">${x(v.plaquetas)}</td><td class="hu">x10³/mm³</td><td class="hr" colspan="2">${F.plaquetas} x10³/mm³</td></tr>
+        <tr><td colspan="5" class="l-obs">${ob.plaq ? 'Obs.: ' + escH(ob.plaq) : '&nbsp;'}</td></tr>
       </table>
-      ${ob.leuco ? `<div class="l-obs">Obs.: ${escH(ob.leuco)}</div>` : ''}
-      <table class="l-g">
-        <tr><td colspan="3" class="l-sec">PLAQUETOGRAMA</td></tr>
-        <tr><td class="l-n">Plaquetas</td><td class="l-c">${val(v.plaquetas)}<b>x10³/mm³</b></td><td class="l-r">${F.plaquetas} x10³/mm³</td></tr>
-      </table>
-      ${ob.plaq ? `<div class="l-obs">Obs.: ${escH(ob.plaq)}</div>` : ''}
     </div>
     ${retic}
     ${r.observacoes_resultado ? `<div class="l-obs"><b>Obs.:</b> ${escH(r.observacoes_resultado)}</div>` : ''}
