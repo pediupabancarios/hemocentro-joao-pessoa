@@ -4408,6 +4408,47 @@ async function filaLabRegistrar(labId, pacId){
   if(bp) bp.style.display = '';
 }
 
+/* ================= AVISO DE VERSÃO NOVA =================
+   O app é uma página única: quem deixa a aba aberta continua com o código antigo depois de uma atualização.
+   De tempos em tempos compara o código em uso com o publicado e avisa, sem recarregar sozinho (para não perder o que está sendo digitado). */
+function hashTextoSimples(t){ let h = 5381; for(let i = 0; i < t.length; i++){ h = ((h << 5) + h + t.charCodeAt(i)) | 0; } return h; }
+function scriptPrincipalDe(doc){
+  const lista = [...doc.scripts].filter(sc=>!sc.src).map(sc=>sc.textContent);
+  return lista.sort((a,b)=>b.length - a.length)[0] || '';
+}
+let _versaoEmUso = null, _avisoVersaoAte = 0;
+async function verificarVersaoNova(){
+  try{
+    if(_versaoEmUso === null) _versaoEmUso = hashTextoSimples(scriptPrincipalDe(document));
+    if(Date.now() < _avisoVersaoAte || document.getElementById('aviso-versao')) return;
+    const resp = await fetch(location.pathname + location.search, {cache:'no-cache'});
+    if(!resp.ok) return;
+    const doc = new DOMParser().parseFromString(await resp.text(), 'text/html');
+    if(hashTextoSimples(scriptPrincipalDe(doc)) !== _versaoEmUso) mostrarAvisoVersao();
+  }catch(e){ /* sem internet: tenta de novo depois */ }
+}
+function mostrarAvisoVersao(){
+  if(document.getElementById('aviso-versao')) return;
+  const d = document.createElement('div');
+  d.id = 'aviso-versao';
+  d.style.cssText = 'position:fixed;left:50%;bottom:78px;transform:translateX(-50%);z-index:99999;background:#132A4C;color:#fff;padding:12px 16px;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.28);display:flex;gap:12px;align-items:center;flex-wrap:wrap;max-width:92vw;font-size:13.5px;';
+  d.innerHTML = `<span><b>Há uma versão nova do sistema.</b> Salve o que está fazendo e atualize.</span>
+    <button onclick="atualizarAgora()" style="background:#fff;color:#132A4C;border:none;border-radius:8px;padding:7px 14px;font-weight:700;cursor:pointer;">Atualizar agora</button>
+    <button onclick="adiarAvisoVersao()" style="background:transparent;color:#cfd8ea;border:1px solid #5b7099;border-radius:8px;padding:7px 12px;cursor:pointer;">Depois</button>`;
+  document.body.appendChild(d);
+}
+function adiarAvisoVersao(){ _avisoVersaoAte = Date.now() + 30 * 60 * 1000; document.getElementById('aviso-versao')?.remove(); }
+async function atualizarAgora(){
+  try{ await fetch(location.pathname + location.search, {cache:'reload'}); }catch(e){}
+  location.reload();
+}
+window.addEventListener('load', ()=>{
+  _versaoEmUso = hashTextoSimples(scriptPrincipalDe(document));
+  setTimeout(verificarVersaoNova, 45 * 1000);
+  setInterval(verificarVersaoNova, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'visible') verificarVersaoNova(); });
+});
+
 /* ================= RECEPÇÃO (abas de atendimento) ================= */
 let recepAba = 0;            // 0 paciente novo | 1 já cadastrado | 2 solicitar laboratório | 3 imprimir resultados
 let recepBusca = '';
