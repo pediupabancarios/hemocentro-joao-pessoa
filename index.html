@@ -1346,8 +1346,10 @@
           <label>Conselho profissional</label>
           <select id="usr-conselho">
             <option value="CRM">CRM — Médico(a)</option>
-            <option value="CRF">CRF — Farmacêutico(a)</option>
-            <option value="CRBM">CRBM — Biomédico(a)</option>
+            <option value="CRF-PB">CRF-PB — Farmacêutico(a)</option>
+            <option value="CRBM-2">CRBM-2 — Biomédico(a)</option>
+            <option value="CRF">CRF — Farmacêutico(a) (outro estado)</option>
+            <option value="CRBM">CRBM — Biomédico(a) (outra região)</option>
             <option value="COREN">COREN — Enfermagem</option>
             <option value="">Nenhum</option>
           </select>
@@ -3075,7 +3077,7 @@ function abrirRegistrarResultado(i){
   document.getElementById('resultado-data-liberacao').value = r.data_resultado ? brToISO(r.data_resultado) : '';
   document.getElementById('resultado-observacoes').value = r.observacoes_resultado || '';
   document.getElementById('resultado-responsavel').value = r.responsavel_laboratorio || (currentUser ? currentUser.nome : '');
-  document.getElementById('resultado-registro-profissional').value = r.responsavel_registro || ((currentUser && currentUser.tipo === 'laboratorio' && currentUser.crm) ? ((currentUser.conselho || 'CRF') + ' ' + currentUser.crm) : '');
+  document.getElementById('resultado-registro-profissional').value = r.responsavel_registro || ((currentUser && currentUser.tipo === 'laboratorio' && currentUser.crm) ? ((currentUser.conselho || 'CRF-PB') + ' ' + currentUser.crm) : '');
 
   const body = document.getElementById('resultado-parametros-body');
   body.innerHTML = '';
@@ -5057,7 +5059,7 @@ let editingUsuarioId = null;
 // ao trocar o perfil, sugere o conselho típico (o laboratório pode ser CRF ou CRBM — ajuste na lista)
 function sugerirConselho(){
   const tipo = document.getElementById('usr-tipo').value;
-  document.getElementById('usr-conselho').value = tipo === 'medico' ? 'CRM' : tipo === 'laboratorio' ? 'CRF' : '';
+  document.getElementById('usr-conselho').value = tipo === 'medico' ? 'CRM' : tipo === 'laboratorio' ? 'CRF-PB' : '';
 }
 
 function alternarCampoDiasAtendimento(){
