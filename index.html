@@ -4424,7 +4424,10 @@ async function verificarVersaoNova(){
     const resp = await fetch(location.pathname + location.search, {cache:'no-cache'});
     if(!resp.ok) return;
     const doc = new DOMParser().parseFromString(await resp.text(), 'text/html');
-    if(hashTextoSimples(scriptPrincipalDe(doc)) !== _versaoEmUso) mostrarAvisoVersao();
+    if(hashTextoSimples(scriptPrincipalDe(doc)) !== _versaoEmUso){
+      // na tela de login não há nada a perder: atualiza sozinho; logado, só avisa
+      if(!currentUser) atualizarAgora(); else mostrarAvisoVersao();
+    }
   }catch(e){ /* sem internet: tenta de novo depois */ }
 }
 function mostrarAvisoVersao(){
