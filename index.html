@@ -3448,7 +3448,7 @@ const LAUDO_CSS = `<style>
 .laudo .l-rt{font-size:12px;text-align:center;}
 .laudo .l-notas{font-size:10px;line-height:1.35;padding:3px 4px 4px;}
 .laudo .l-ass{display:flex;gap:10px;margin-top:auto;padding-top:26px;}
-.laudo .l-ass div{flex:1;text-align:center;font-size:9.5px;line-height:1.35;border-top:1px solid #444;padding-top:2px;}
+.laudo .l-ass>div{flex:1;text-align:center;font-size:9.5px;line-height:1.35;}
 .laudo .l-ext{font-size:10.5px;text-align:justify;line-height:1.35;margin:6px 4px 10px;}
 .laudo table.l-hist{width:60%;margin:6px auto;border-collapse:collapse;font-size:11px;text-align:center;}
 .laudo table.l-hist td,.laudo table.l-hist th{border:1px solid #666;padding:2px 6px;}
@@ -3470,8 +3470,30 @@ function laudoCabecalho(r, pac, titulo){
     <tr><td class="k">Data da coleta:</td><td style="width:26%;"><b>${escH(r.data || '')}</b></td><td>Data da liberação: <b>${escH(r.data_resultado || '')}</b></td></tr>
   </table>`;
 }
-function laudoRodape(){
-  return `<div class="l-ass">${LAUDO_ASSINANTES.map(a=>`<div>${a[0]}<br>${a[1]}<br>${a[2]}</div>`).join('')}</div>`;
+// Rodapé com as assinaturas do laboratório. Quem liberou o resultado aparece "assinado" (nome + registro + data)
+// acima da própria linha; os demais ficam só com a linha. Se quem liberou não está na lista, sai uma linha extra.
+function laudoRegNum(t){ const m = String(t || '').match(/(\d+)\s*$/); return m ? m[1].replace(/^0+/,'') : ''; }
+function laudoQuemLiberou(r){
+  const reg = laudoRegNum(r.responsavel_registro);
+  let idx = reg ? LAUDO_ASSINANTES.findIndex(a=>laudoRegNum(a[2]) === reg) : -1;
+  if(idx < 0 && r.responsavel_laboratorio){
+    const toks = normNome(r.responsavel_laboratorio).split(' ').filter(t=>t.length > 2);
+    idx = LAUDO_ASSINANTES.findIndex(a=>{
+      const an = normNome(a[0]).split(' ').filter(t=>t.length > 2);
+      return toks[0] && an[0] === toks[0] && toks.filter(t=>an.includes(t)).length >= 2;
+    });
+  }
+  return idx;
+}
+function laudoRodape(r){
+  r = r || {};
+  const idx = laudoQuemLiberou(r);
+  const quem = (r.responsavel_laboratorio || '').trim();
+  const carimbo = `<div style="font-style:italic;font-weight:700;font-size:13px;line-height:1.2;margin-bottom:2px;">${escH(quem)}</div><div style="font-size:8.5px;color:#333;margin-bottom:3px;">Assinado eletronicamente${r.data_resultado ? ' em ' + escH(r.data_resultado) : ''}</div>`;
+  const extra = (quem && idx < 0) ? `<div style="text-align:right;margin-top:auto;padding-top:20px;font-size:11px;">${carimbo}<span style="font-size:10px;">${escH(r.responsavel_registro || '')}</span></div>` : '';
+  return `${extra}<div class="l-ass" ${extra ? 'style="margin-top:6px;padding-top:6px;"' : ''}>${LAUDO_ASSINANTES.map((a,i)=>`<div style="display:flex;flex-direction:column;justify-content:flex-end;border-top:none;padding-top:0;">
+    <div style="min-height:34px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;">${i === idx ? carimbo : ''}</div>
+    <div style="border-top:1px solid #444;padding-top:2px;">${a[0]}<br>${a[1]}<br>${a[2]}</div></div>`).join('')}</div>`;
 }
 
 function laudoHemogramaHTML(m, r, pac){
@@ -3517,7 +3539,7 @@ function laudoHemogramaHTML(m, r, pac){
     </div>
     ${retic}
     ${r.observacoes_resultado ? `<div class="l-obs"><b>Obs.:</b> ${escH(r.observacoes_resultado)}</div>` : ''}
-    ${laudoRodape()}
+    ${laudoRodape(r)}
   </div>`;
 }
 
@@ -3559,7 +3581,7 @@ function laudoCoaguloHTML(m, r, pac){
     ${m.amostraExterna && i === 0 ? `<div class="l-ext">${escH(LAUDO_NOTA_EXTERNA)}</div>` : ''}
     ${paginas[n].map(s=>laudoSecaoHTML(s, v)).join('')}
     ${r.observacoes_resultado && i === nums.length - 1 ? `<div class="l-obs" style="margin-top:8px;"><b>Obs.:</b> ${escH(r.observacoes_resultado)}</div>` : ''}
-    ${laudoRodape()}
+    ${laudoRodape(r)}
   </div>`).join('');
 }
 
