@@ -3936,8 +3936,8 @@ function imprimirResultadoExame(i){
 const HEMO_HEMACIAS_VARIANTES = [['Concentrado de Hemácias Filtradas','F','Filtradas'],['Concentrado de Hemácias Lavadas','L','Lavadas'],['Concentrado de Hemácias Irradiadas','I','Irradiadas'],['Concentrado de Hemácias Fenotipadas','Fen','Fenotipadas']];
 const HEMO_COMPONENTES = [
   { match:["Concentrado de Hemácias", ...HEMO_HEMACIAS_VARIANTES.map(v=>v[0])],
-    // as variantes escolhidas saem marcadas com X dentro dos parênteses
-    labelFn:(sel)=>"mL ou Unid. de Concentrado de Hemácias<br>" + HEMO_HEMACIAS_VARIANTES.map(v=>`( ${sel.includes(v[0]) ? '<b>X</b>' : v[1]} ) ${v[2]}`).join(' &nbsp; ') },
+    // parênteses em branco; só as variantes pedidas pelo médico saem com X
+    labelFn:(sel)=>"mL ou Unid. de Concentrado de Hemácias<br>" + HEMO_HEMACIAS_VARIANTES.map(v=>`( ${sel.includes(v[0]) ? '<b>X</b>' : '&nbsp;&nbsp;&nbsp;'} ) ${v[2]}`).join(' &nbsp; ') },
   { match:["Plasma Fresco Congelado"], label:"mL de Plasma Fresco Congelado" },
   { match:["Concentrado de Plaquetas"], label:"Unid. de Concentrado de Plaquetas" },
   { match:["Crioprecipitado"], label:"Unid. de Crioprecipitado" },
