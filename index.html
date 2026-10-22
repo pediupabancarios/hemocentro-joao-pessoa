@@ -1128,6 +1128,7 @@
           <select id="resultado-formato" onchange="alternarFormatoResultado(this.value)">
             <option value="tabela">Tabela de parâmetros (com valores de referência)</option>
             <option value="texto">Texto livre (resultado simples — ex.: Coombs, Classificação, Fenotipagem)</option>
+            <option value="modelo">Modelo oficial do laboratório (Hemograma por faixa etária / Coagulopatias)</option>
           </select>
         </div>
       </div>
@@ -1141,6 +1142,17 @@
           <tbody id="resultado-parametros-body"></tbody>
         </table>
         <button type="button" class="btn-secondary" style="margin-top:8px;" onclick="adicionarLinhaParametro()">+ Adicionar linha</button>
+      </div>
+
+      <div id="resultado-modo-modelo" style="display:none;">
+        <div class="form-field full" style="margin-top:14px;">
+          <label>Modelo</label>
+          <select id="resultado-modelo-tipo" onchange="modeloTrocarTipo(this.value)">
+            <option value="hemograma">Hemograma (faixa etária automática)</option>
+            <option value="coagulo">Hemoglobinopatias e Coagulopatias (ferritina, TP, TTPa, fatores...)</option>
+          </select>
+        </div>
+        <div id="resultado-modelo-corpo"></div>
       </div>
 
       <div id="resultado-modo-texto" style="display:none;">
@@ -3044,8 +3056,10 @@ function exameSugereTextoLivre(nomeExame){
 
 function alternarFormatoResultado(formato){
   document.getElementById('resultado-formato').value = formato;
-  document.getElementById('resultado-modo-tabela').style.display = formato === 'texto' ? 'none' : 'block';
+  document.getElementById('resultado-modo-tabela').style.display = formato === 'tabela' ? 'block' : 'none';
   document.getElementById('resultado-modo-texto').style.display = formato === 'texto' ? 'block' : 'none';
+  document.getElementById('resultado-modo-modelo').style.display = formato === 'modelo' ? 'block' : 'none';
+  if(formato === 'modelo' && !document.getElementById('resultado-modelo-corpo').innerHTML.trim()) renderModeloResultado(document.getElementById('resultado-modelo-tipo').value || 'hemograma', null);
 }
 
 function abrirRegistrarResultado(i){
@@ -3071,7 +3085,17 @@ function abrirRegistrarResultado(i){
     parametros.forEach(p=>adicionarLinhaParametro(p.parametro, p.resultado, p.unidade, p.referencia));
   }
 
-  const formatoInicial = r.formato_resultado || (exameSugereTextoLivre(r.exame) ? 'texto' : 'tabela');
+  document.getElementById('resultado-modelo-corpo').innerHTML = '';
+  let formatoInicial = r.formato_resultado || (exameSugereTextoLivre(r.exame) ? 'texto' : 'tabela');
+  const salvoModelo = r.formato_resultado === 'modelo' ? laudoParse(r) : null;
+  if(salvoModelo){
+    renderModeloResultado(salvoModelo.modelo, salvoModelo);
+  } else if(!r.resultado){
+    // resultado novo: sugere o modelo oficial quando o exame é hemograma ou coagulopatia
+    const ex = normExame(r.exame);
+    if(/hemograma/.test(ex)){ formatoInicial = 'modelo'; document.getElementById('resultado-modelo-tipo').value = 'hemograma'; }
+    else if(/(ferritina|folato|vitamina b12|homocist|coagulograma|fator|d dimero|antitrombina|proteina c|proteina s|anticoagulante lupico|inibidor|ristocetina|von willebrand|resistencia a proteina)/.test(ex)){ formatoInicial = 'modelo'; document.getElementById('resultado-modelo-tipo').value = 'coagulo'; }
+  }
   document.getElementById('resultado-texto-simples').value = formatoInicial === 'texto' ? (r.resultado || '') : '';
   alternarFormatoResultado(formatoInicial);
 
@@ -3095,7 +3119,12 @@ function salvarResultadoExame(proximo){
   let parametrosJson = null;
   let textoSimples = null;
 
-  if(formato === 'texto'){
+  if(formato === 'modelo'){
+    const m = modeloColetar();
+    if(!Object.keys(m.valores).length){ showToast('Preencha ao menos um resultado do modelo.'); return; }
+    parametrosJson = JSON.stringify(m);
+    resultadoResumo = laudoResumo(m);
+  } else if(formato === 'texto'){
     textoSimples = document.getElementById('resultado-texto-simples').value.trim();
     if(!textoSimples){ showToast('Escreva o resultado antes de salvar.'); return; }
     resultadoResumo = textoSimples;
@@ -3110,7 +3139,7 @@ function salvarResultadoExame(proximo){
   const r = labs[idx];
   // "Salvar e ir para o próximo": descobre ANTES de salvar qual é o próximo pendente da fila
   const proximoDaFila = proximo ? filaLabProximoDe(r.id) : null;
-  const hoje = dataLiberacao || new Date().toISOString().slice(0,10);
+  const hoje = dataLiberacao || isoLocal(new Date());
   Object.assign(r, {
     resultado: resultadoResumo, formato_resultado: formato,
     parametros_json: parametrosJson, categoria_laboratorio: categoria, registro_numero: registroNumero || null,
@@ -3147,6 +3176,7 @@ function salvarResultadoExame(proximo){
 
 function templateResultadoExame(r, pac){
   pac = pac || paciente;
+  if(r.formato_resultado === 'modelo') return templateResultadoModelo(r, pac);
   let parametros = [];
   try{ parametros = r.parametros_json ? JSON.parse(r.parametros_json) : []; }catch(e){ parametros = []; }
   const linhasTabela = parametros.map(p=>`
@@ -3197,6 +3227,345 @@ function templateResultadoExame(r, pac){
     </div>
     <div class="doc-code">F.CP.107.02.06</div>
   </div>`;
+}
+
+/* ---------- Laudos no modelo oficial (esqueletos do laboratório) ----------
+   Hemograma com faixa etária (mulher, homem, até 1 ano, até 12 anos) e
+   Hemoglobinopatias/Coagulopatias. Guardado em parametros_json como
+   {v:2, modelo:'hemograma'|'coagulo', faixa, valores:{}, obs:{}, amostraExterna} com formato_resultado='modelo'. */
+const LAUDO_ASSINANTES = [
+  ['Maria Bernadete L.S Miranda','Farmacêutica-Bioquímica','CRF-PB: 01103'],
+  ['Micael Luís M. de Queiroz','Biomédico','CRBM-2: 20690'],
+  ['Maria Daluz Castro Tenório','Farmacêutica-Bioquímica','CRF-PB: 00739'],
+  ['Sandra Sobreira Santos','Farmacêutica-Bioquímica','CRF-PB: 01309'],
+  ['Mariana Nóbrega Santos','Farmacêutica-Bioquímica','CRF-PB: 03408']
+];
+const HEMO_ERITRO = [['hemacias','Hemácias','x10⁶/mm³'],['hemoglobina','Hemoglobina','g/dL'],['hematocrito','Hematócrito','%'],['vcm','VCM','µm³'],['hcm','HCM','pg'],['chcm','CHCM','g/dL'],['rdw','RDW','%']];
+const HEMO_DIF = [['blastos','Blastos'],['promielocitos','Promielócitos'],['mielocitos','Mielócitos'],['metamielocitos','Metamielócitos'],['bastoes','Bastões'],['segmentados','Segmentados'],['linfocitos','Linfócitos'],['linf_atipicos','Linfócitos atípicos'],['monocitos','Monócitos'],['eosinofilos','Eosinófilos'],['basofilos','Basófilos']];
+const HEMO_REL = {bastoes:'01 a 04', segmentados:'40 a 70', linfocitos:'18 a 48', monocitos:'03 a 10', eosinofilos:'01 a 04', basofilos:'0 a 02'};
+const HEMO_ABS_COMUM = {bastoes:'40 a 400', monocitos:'200 a 1000', basofilos:'0 a 100'};
+const HEMO_FAIXAS = {
+  mulher:{rotulo:'MULHER', hemacias:'3.80 a 4.80', hemoglobina:'12.0 a 15.0', hematocrito:'36.0 a 46.0', vcm:'83.0 a 101.0', hcm:'27.0 a 32.0', chcm:'31.5 a 34.5', rdw:'11.6 a 14.0', leucocitos:'4.000 a 10.000', plaquetas:'150 a 400', abs:{segmentados:'2.000 a 7.000', linfocitos:'1000 a 3.000', eosinofilos:'20 a 500'}},
+  homem:{rotulo:'HOMEM', hemacias:'4.50 a 5.50', hemoglobina:'13.0 a 17.0', hematocrito:'40.0 a 50.0', vcm:'83.0 a 101.0', hcm:'27.0 a 32.0', chcm:'31.5 a 34.5', rdw:'11.6 a 14.0', leucocitos:'4.000 a 10.000', plaquetas:'150 a 400', abs:{segmentados:'2.000 a 7.000', linfocitos:'1000 a 3.000', eosinofilos:'20 a 500'}},
+  ate1:{rotulo:'ATÉ 1 ANO', hemacias:'3.90 a 5.10', hemoglobina:'11.1 a 14.1', hematocrito:'30.0 a 38.0', vcm:'72.0 a 84.0', hcm:'25.0 a 29.0', chcm:'32.0 a 36.0', rdw:'11.5 a 17.3', leucocitos:'6.000 a 16.000', plaquetas:'200 a 550', abs:{segmentados:'1.000 a 7.000', linfocitos:'3.500 a 11.000', eosinofilos:'100 a 1000'}},
+  ate12:{rotulo:'ATÉ 12 ANOS', hemacias:'3.90 a 5.10', hemoglobina:'11.0 a 14.0', hematocrito:'35.0 a 45.0', vcm:'77.0 a 95.0', hcm:'25.0 a 33.0', chcm:'31.0 a 37.0', rdw:'11.0 a 15.0', leucocitos:'5.000 a 13.000', plaquetas:'180 a 400', abs:{segmentados:'2.000 a 8.000', linfocitos:'1.000 a 5.000', eosinofilos:'100 a 1000'}}
+};
+const HEMO_OBS_PADRAO = {eritro:'Normocrômica, Normocítica.', leuco:'Leucócitos bem conservados.', plaq:'Plaquetas normais em número e morfologia.'};
+const HEMO_RETIC_REF = ['Recém Nascido até 10%','Adulto 0.5 a 2.0 %','Na gravidez encontra-se aumentado.'];
+const LAUDO_NOTA_EXTERNA = '*Observação sobre a amostra: a amostra utilizada para realização deste(s) exame(s) foi coletada por outro órgão de saúde (hospital ou laboratório) e encaminhada ao Laboratório de Coagulopatias e Hemoglobinopatias do Hemocentro da Paraíba para processamento e análise. O laboratório responsabiliza-se exclusivamente pela execução técnica e liberação dos resultados analíticos, não se responsabilizando pelas condições de coleta, transporte e armazenamento pré-analítico da amostra.';
+
+const LAUDO_COAG = [
+  {id:'ferritina',pag:1,titulo:'FERRITINA',amostra:'SORO',metodo:'QUIMIOLUMINESCÊNCIA',tipo:'simples',unid:'ng/mL',refs:['RECÉM-NASCIDOS: 25 - 200 ng/mL','7 dias a um mês: 200 - 600 ng/mL','2 a 5 meses: 50 - 200 ng/mL','6 meses a 15 anos: 10 - 150 ng/mL','HOMENS: 30 – 300 ng/mL','MULHERES: 20 – 200 ng/mL']},
+  {id:'folato',pag:1,titulo:'FOLATO',amostra:'SORO',metodo:'QUIMIOLUMINESCÊNCIA',tipo:'simples',unid:'ng/mL',refs:['3,1 – 20,5 ng/mL']},
+  {id:'b12',pag:1,titulo:'VITAMINA B12',amostra:'SORO',metodo:'QUIMIOLUMINESCÊNCIA',tipo:'simples',unid:'pg/mL',refs:['187 - 883 pg/mL']},
+  {id:'homocisteina',pag:1,titulo:'HOMOCISTEÍNA',amostra:'SORO',metodo:'QUIMIOLUMINESCÊNCIA',tipo:'simples',unid:'µmol/L',refs:['HOMENS: 5,46 – 16,20 µmol/L','MULHERES: 4,44 – 13,56 µmol/L']},
+  {id:'perfilhb',pag:1,titulo:'PERFIL HEMOGLOBÍNICO',amostra:'SANGUE TOTAL',metodo:'HPLC',tipo:'multi',linhas:[['a','A','%',''],['a2','A₂','%',''],['f','F','%','']],refBloco:['ADULTOS:','Hemoglobina A: 94.0 - 96.5%','Hemoglobina A2: 2.2 - 3.5%','Hemoglobina F: até 2%','NEONATOS:','Hemoglobina A: até 20%','Hemoglobina F: até 80%']},
+  {id:'tp',pag:2,titulo:'TEMPO DE PROTROMBINA (TP)',amostra:'PLASMA CITRATADO',metodo:'COAGULOMÉTRICO',tipo:'multi',linhas:[['paciente','PLASMA PACIENTE','s','12,0 – 15,0 segundos'],['controle','PLASMA CONTROLE','s','-----'],['atividade','ATIVIDADE ENZIMÁTICA','%','> 70%'],['inr','INR','','Até 1,20']],notas:['ISI (ÍNDICE DE SENSIBILIDADE INTERNACIONAL) da tromboplastina: 1,01','NOTA 1: Recomenda-se o uso do INR (International Normalizes Ratio) para monitorização de paciente em anticoagulação oral com antagonistas de vitamina K (AVKs). Para as demais situações clínicas, sugere-se o acompanhamento dos resultados expressos em segundos.','NOTA 2: Para maior parte das indicações de anticoagulação com AVKs, o intervalo terapêutico recomendado do INR é de 2,0 a 3,0.']},
+  {id:'ttpa',pag:2,titulo:'TEMPO DE TROMBOPLASTINA PARCIAL ATIVADO (TTPa)',amostra:'PLASMA CITRATADO',metodo:'COAGULOMÉTRICO',tipo:'multi',linhas:[['paciente','PLASMA PACIENTE','s','25,0 – 34,0 segundos'],['controle','PLASMA CONTROLE','s','-----'],['relacao','RELAÇÃO TTPa paciente/TTPa controle','','0,90 – 1,20 segundos']],notas:['NOTA 1: O Tempo de Tromboplastina Parcial ativado (TTPa) permite avaliar alterações hereditárias ou adquiridas nos fatores da coagulação que compõem a via intrínseca. Dentre as condições adquiridas, encontra-e a terapia com drogas anticoagulantes tais como a heparina não fracionada, o argatroban e a leperudina, sendo este teste utilizado para o monitoramento destes medicamentos.']},
+  {id:'tt',pag:2,titulo:'TEMPO DE TROMBINA (TT)',amostra:'PLASMA CITRATADO',metodo:'COAGULOMÉTRICO',tipo:'multi',linhas:[['paciente','PLASMA PACIENTE','s','16,0 – 19,0 segundos'],['controle','PLASMA CONTROLE','s','-----'],['relacao','RELAÇÃO TT paciente/TT controle','','0,90 – 1,20 segundos']]},
+  {id:'f1',pag:2,titulo:'FATOR I (FIBRINOGÊNIO)',amostra:'PLASMA CITRATADO',metodo:'CLAUSS',tipo:'simples',unid:'mg/dL',refs:['200 – 400 mg/dL']},
+  {id:'f2',pag:2,titulo:'FATOR II',amostra:'PLASMA CITRATADO',metodo:'COAGULOMÉTRICO',tipo:'simples',unid:'%',refs:['50 – 150 %']},
+  {id:'f5',pag:3,titulo:'FATOR V',amostra:'PLASMA CITRATADO',metodo:'COAGULOMÉTRICO',tipo:'simples',unid:'%',refs:['50 – 150 %']},
+  {id:'f7',pag:3,titulo:'FATOR VII',amostra:'PLASMA CITRATADO',metodo:'COAGULOMÉTRICO',tipo:'simples',unid:'%',refs:['50 – 150 %']},
+  {id:'f8c',pag:3,titulo:'FATOR VIII - COAGULOMÉTRICO',amostra:'PLASMA CITRATADO',metodo:'COAGULOMÉTRICO',tipo:'simples',unid:'%',refs:['50 – 150 %']},
+  {id:'f8x',pag:3,titulo:'FATOR VIII – CROMOGÊNICO',amostra:'PLASMA CITRATADO',metodo:'CROMOGÊNICO',tipo:'simples',unid:'%',refs:['50 – 150 %']},
+  {id:'f9',pag:3,titulo:'FATOR IX',amostra:'PLASMA CITRATADO',metodo:'COAGULOMÉTRICO',tipo:'simples',unid:'%',refs:['50 – 150 %']},
+  {id:'f10',pag:3,titulo:'FATOR X',amostra:'PLASMA CITRATADO',metodo:'COAGULOMÉTRICO',tipo:'simples',unid:'%',refs:['Adulto: 50 – 150 %','Recém nascido: 30 – 50%']},
+  {id:'f11',pag:3,titulo:'FATOR XI',amostra:'PLASMA CITRATADO',metodo:'COAGULOMÉTRICO',tipo:'simples',unid:'%',refs:['Adulto: 50 – 150 %','Recém nascido: 30 – 50%']},
+  {id:'f12',pag:4,titulo:'FATOR XII',amostra:'PLASMA CITRATADO',metodo:'COAGULOMÉTRICO',tipo:'simples',unid:'%',refs:['50 – 150 %']},
+  {id:'f13',pag:4,titulo:'FATOR XIII (QUANTITATIVO)',amostra:'PLASMA CITRATADO',metodo:'IMUNOCOMPLEXAÇÃO EM 2 PONTOS',tipo:'simples',unid:'%',refs:['50 – 180 %']},
+  {id:'vwf',pag:4,titulo:'FATOR DE VON WILLEBRAND (ANTÍGENO)',amostra:'PLASMA CITRATADO',metodo:'IMUNOTURBIDIMÉTRICO',tipo:'simples',unid:'%',refs:['Grupo sanguíneo O: 44 – 120 %','Grupo sanguíneo não O: 50 – 160 %']},
+  {id:'ristocetina',pag:4,titulo:'COFATOR DE RISTOCETINA (ATIVIDADE)',amostra:'PLASMA CITRATADO',metodo:'IMUNOTURBIDIMÉTRICO',tipo:'simples',unid:'%',refs:['Grupo sanguíneo O: 48 – 120 %','Grupo sanguíneo não O: 50 – 240%']},
+  {id:'at',pag:4,titulo:'ANTITROMBINA (AT)',amostra:'PLASMA CITRATADO',metodo:'CROMOGÊNICO',tipo:'simples',unid:'%',refs:['80 – 120 %']},
+  {id:'pc',pag:4,titulo:'PROTEÍNA C (PC)',amostra:'PLASMA CITRATADO',metodo:'CROMOGÊNICO',tipo:'simples',unid:'%',refs:['70 - 130%']},
+  {id:'ps',pag:4,titulo:'PROTEÍNA S – LIVRE (PS)',amostra:'PLASMA CITRATADO',metodo:'IMUNOTURBIDIMÉTRICO',tipo:'simples',unid:'%',refs:['Homens: 70 – 148 %','Mulheres: 50 – 134 %']},
+  {id:'rpca',pag:5,titulo:'RESISTÊNCIA a PROTEÍNA C ATIVADA',amostra:'PLASMA CITRATADO',metodo:'IMUNOTURBIDIMÉTRICO',tipo:'texto',refs:['NEGATIVO']},
+  {id:'ddimero',pag:5,titulo:'D-DÍMERO',amostra:'PLASMA CITRATADO',metodo:'IMUNOTURBIDIMÉTRICO',tipo:'simples',unid:'ng/mL',refs:['Até 500 ng/mL']},
+  {id:'lupico',pag:5,titulo:'PESQUISA DE ANTICOAGULANTE LÚPICO CIRCULANTE',amostra:'PLASMA CITRATADO',metodo:'dRVVt (Tempo de Veneno de Víbora Russel diluído)',tipo:'texto',refs:['NEGATIVO'],notas:['Legenda:','TTPa: tempo de tromboplastina parcial ativada.','dRVVT: tempo com veneno de víbora de Russel diluído.','NOTA 1: Os anticorpos antifosfolípides incluem o anticoagulante lúpico, anticorpo cardiolipina e anti-beta2-glicoproteína I. Para que o critério laboratorial de anticorpo antifosfolípide seja atendido, é necessário caracterizar a positividade de pelo menos um destes anticorpos em duas ou mais ocasiões, com intervalo mínimo de 12 semanas entre as coletas.','NOTA 2: O uso de anticoagulantes orais diretos (ex. Dabigatrana, rivaroxabana, apixabana, edoxabana) pode interferir na pesquisa de anticoagulante lúpico. Os antagonistas de vitamina K (warfarina, marevan, marcoumar, coumadin) podem resultar em falsos positivos, a depender dos níveis de anticoagulação. Sugere-se, a critério médico, repetição do exame após suspensão do tratamento.','NOTA 3: A pesquisa de anticoagulante lúpico em pacientes gestantes, na fase aguda do evento trombótico ou na vigência de processos inflamatórios/infecciosos deve ser interpretada com cautela, pela possibilidade de falso positivos ou falso negativos.']},
+  {id:'inibidores',pag:5,titulo:'TITULAÇÃO DE INIBIDORES',amostra:'PLASMA CITRATADO',metodo:'COAGULOMÉTRICO',tipo:'simples',unid:'UB/mL',refs:['< 0,6 UB: NEGATIVO','0,6 OU MAIOR: POSITIVO'],historico:true,notas:['NOTA 1: A presença de inibidores neutralizantes contra os fatores de coagulação pode comprometer a eficácia do tratamento de reposição. Valores elevados estão associados a maior dificuldade no controle de sangramentos e podem demandar terapias alternativas.','NOTA 2: Os resultados devem ser interpretados em conjunto com o quadro clínico e histórico terapêutico do paciente.','NOTA 3: Este laudo é válido somente para a amostra analisada.']}
+];
+
+function escH(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function numBR(v){   // "7.800" / "7800" / "5,5" -> número
+  if(v == null) return NaN;
+  let t = String(v).trim().replace(/\s/g,'');
+  if(/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g,'');
+  return parseFloat(t.replace(',','.'));
+}
+function milhar(n){ return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
+function absLeuco(valores, key){
+  const tot = numBR(valores.leucocitos), p = numBR(valores[key]);
+  return (isNaN(tot) || isNaN(p)) ? '' : milhar(tot * p / 100);
+}
+
+// Faixa sugerida: até 1 ano | até 12 anos | adulto por sexo
+function laudoFaixaSugerida(nascBR, sexo, coletaBR){
+  const n = brToISO(nascBR && nascBR !== '—' ? nascBR : null);
+  if(!n) return (sexo === 'Masculino') ? 'homem' : 'mulher';
+  const ref = coletaBR && coletaBR.includes('/') ? brToISO(coletaBR) : isoLocal(new Date());
+  const [y1,m1,d1] = n.split('-').map(Number), [y2,m2,d2] = ref.split('-').map(Number);
+  let meses = (y2 - y1) * 12 + (m2 - m1) - (d2 < d1 ? 1 : 0);
+  if(meses <= 12) return 'ate1';
+  if(meses < 13 * 12) return 'ate12';
+  return sexo === 'Masculino' ? 'homem' : 'mulher';
+}
+
+/* ---- tela de preenchimento ---- */
+function modeloInput(k, valor, extra){ return `<input type="text" data-k="${k}" value="${escH(valor)}" ${extra || ''} style="width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px;">`; }
+
+function renderModeloHemograma(d){
+  d = d || {}; const v = d.valores || {}, ob = d.obs || {};
+  const fx = d.faixa || laudoFaixaSugerida(paciente.nascimento, paciente.sexo, editingResultadoIdx !== null && labs[editingResultadoIdx] ? labs[editingResultadoIdx].data : null);
+  const F = HEMO_FAIXAS[fx];
+  const opt = Object.keys(HEMO_FAIXAS).map(k=>`<option value="${k}" ${k === fx ? 'selected' : ''}>${HEMO_FAIXAS[k].rotulo}</option>`).join('');
+  const sug = laudoFaixaSugerida(paciente.nascimento, paciente.sexo, editingResultadoIdx !== null && labs[editingResultadoIdx] ? labs[editingResultadoIdx].data : null);
+  const linhaE = ([k,nome,un])=>`<tr><td>${nome}</td><td>${modeloInput(k, v[k])}</td><td>${un}</td><td style="color:var(--muted);">${F[k]} ${un}</td></tr>`;
+  const leuco = HEMO_DIF.map(([k,nome])=>{
+    const ref = HEMO_REL[k], abs = F.abs[k] || HEMO_ABS_COMUM[k] || '';
+    return `<tr><td>${nome}</td><td>${modeloInput(k, v[k], 'oninput="modeloAtualizarAbs()"')}</td><td style="color:var(--muted);">${ref ? ref + ' %' : ''}</td><td><b data-abs="${k}">${absLeuco(v,k)}</b></td><td style="color:var(--muted);">${abs ? abs + ' /mm³' : ''}</td></tr>`;
+  }).join('');
+  return `
+  <div class="form-grid" style="margin-top:14px;">
+    <div class="form-field"><label>Faixa de referência (idade / sexo)</label>
+      <select id="mod-faixa" onchange="modeloTrocarFaixa()">${opt}</select>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:3px;">Sugerida pela idade e sexo do paciente: <b>${HEMO_FAIXAS[sug].rotulo}</b></div></div>
+  </div>
+  <div class="form-section-title" style="margin-top:14px;">Eritrograma</div>
+  <table class="param-table"><thead><tr><th>Parâmetro</th><th style="width:140px;">Resultado</th><th>Un.</th><th>Referência (${F.rotulo})</th></tr></thead><tbody>${HEMO_ERITRO.map(linhaE).join('')}</tbody></table>
+  <div class="form-field full" style="margin-top:6px;"><label>Obs. eritrograma</label>${modeloInput('obs.eritro', ob.eritro != null ? ob.eritro : HEMO_OBS_PADRAO.eritro)}</div>
+  <div class="form-section-title" style="margin-top:14px;">Leucograma</div>
+  <table class="param-table"><thead><tr><th>Parâmetro</th><th style="width:120px;">Relativo (%)</th><th>Ref. %</th><th>Absoluto (/mm³)</th><th>Ref. absoluta</th></tr></thead><tbody>
+    <tr><td><b>Leucócitos totais</b></td><td>${modeloInput('leucocitos', v.leucocitos, 'oninput="modeloAtualizarAbs()"')}</td><td colspan="3" style="color:var(--muted);">${F.leucocitos} /mm³</td></tr>
+    ${leuco}</tbody></table>
+  <div style="font-size:11.5px;color:var(--muted);margin-top:4px;">O absoluto é calculado: leucócitos totais × % ÷ 100. Linhas sem referência (blastos, promielócitos, mielócitos, metamielócitos, atípicos) só saem no laudo se preenchidas.</div>
+  <div class="form-field full" style="margin-top:6px;"><label>Obs. leucograma</label>${modeloInput('obs.leuco', ob.leuco != null ? ob.leuco : HEMO_OBS_PADRAO.leuco)}</div>
+  <div class="form-section-title" style="margin-top:14px;">Plaquetograma</div>
+  <table class="param-table"><tbody><tr><td>Plaquetas</td><td style="width:140px;">${modeloInput('plaquetas', v.plaquetas)}</td><td>x10³/mm³</td><td style="color:var(--muted);">${F.plaquetas} x10³/mm³</td></tr></tbody></table>
+  <div class="form-field full" style="margin-top:6px;"><label>Obs. plaquetas</label>${modeloInput('obs.plaq', ob.plaq != null ? ob.plaq : HEMO_OBS_PADRAO.plaq)}</div>
+  <div class="form-section-title" style="margin-top:14px;">Reticulócitos (opcional)</div>
+  <table class="param-table"><tbody><tr><td>Reticulócitos</td><td style="width:140px;">${modeloInput('reticulocitos', v.reticulocitos)}</td><td>%</td><td style="color:var(--muted);">${HEMO_RETIC_REF.join(' · ')}</td></tr></tbody></table>`;
+}
+
+function renderModeloCoagulo(d){
+  d = d || {}; const v = d.valores || {};
+  const secs = LAUDO_COAG.map(s=>{
+    const campos = s.tipo === 'multi' ? s.linhas.map(([k,nome,un,ref])=>`<tr><td>${nome}</td><td style="width:150px;">${modeloInput(s.id + '.' + k, v[s.id + '.' + k])}</td><td>${un}</td><td style="color:var(--muted);">${escH(ref || '')}</td></tr>`).join('')
+      : `<tr><td>Resultado</td><td style="width:150px;">${modeloInput(s.id + '.valor', v[s.id + '.valor'])}</td><td>${s.unid || ''}</td><td style="color:var(--muted);">${s.refs.map(escH).join(' · ')}</td></tr>`;
+    const hist = s.historico ? `<tr><td colspan="4" style="padding-top:8px;font-size:12px;color:var(--muted);">Histórico de titulações anteriores (opcional):</td></tr>` + [1,2,3].map(i=>`<tr><td>${modeloInput(s.id + '.h' + i + 'd', v[s.id + '.h' + i + 'd'], 'placeholder="Data"')}</td><td>${modeloInput(s.id + '.h' + i + 'r', v[s.id + '.h' + i + 'r'], 'placeholder="UB/mL"')}</td><td colspan="2">${modeloInput(s.id + '.h' + i + 'i', v[s.id + '.h' + i + 'i'], 'placeholder="Interpretação"')}</td></tr>`).join('') : '';
+    const preenchido = Object.keys(v).some(k=>k.startsWith(s.id + '.') && String(v[k] || '').trim());
+    return `<details class="mod-sec" ${preenchido ? 'open' : ''} style="border:1px solid var(--line);border-radius:8px;margin-bottom:6px;padding:6px 10px;"><summary style="cursor:pointer;font-weight:700;font-size:13px;">${s.titulo}</summary><table class="param-table" style="margin-top:6px;"><tbody>${campos}${hist}</tbody></table></details>`;
+  }).join('');
+  return `
+  <div style="font-size:12px;color:var(--muted);margin:12px 0 8px;">Abra só os exames realizados e preencha o resultado. No laudo saem apenas os preenchidos.</div>
+  ${secs}
+  <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;"><input type="checkbox" id="mod-externa" ${d.amostraExterna ? 'checked' : ''}> Amostra coletada por outro órgão de saúde (imprime a observação sobre a amostra)</label>`;
+}
+
+function renderModeloResultado(tipo, dados){
+  const box = document.getElementById('resultado-modo-modelo'); if(!box) return;
+  document.getElementById('resultado-modelo-tipo').value = tipo;
+  document.getElementById('resultado-modelo-corpo').innerHTML = tipo === 'coagulo' ? renderModeloCoagulo(dados) : renderModeloHemograma(dados);
+  document.getElementById('resultado-categoria').value = tipo === 'coagulo' ? 'Hemoglobinopatias e Coagulopatias' : 'Citohematologia';
+}
+function modeloColetar(){
+  const tipo = document.getElementById('resultado-modelo-tipo').value;
+  const valores = {}, obs = {};
+  document.querySelectorAll('#resultado-modelo-corpo [data-k]').forEach(i=>{
+    const k = i.dataset.k, val = i.value.trim();
+    if(k.startsWith('obs.')) obs[k.slice(4)] = val; else if(val) valores[k] = val;
+  });
+  return {v:2, modelo:tipo, faixa: tipo === 'hemograma' ? document.getElementById('mod-faixa').value : null, valores, obs, amostraExterna: !!document.getElementById('mod-externa')?.checked};
+}
+function modeloTrocarFaixa(){ renderModeloResultado('hemograma', modeloColetar()); }
+function modeloTrocarTipo(t){ renderModeloResultado(t, null); }
+function modeloAtualizarAbs(){
+  const v = {}; document.querySelectorAll('#resultado-modelo-corpo [data-k]').forEach(i=>{ v[i.dataset.k] = i.value; });
+  document.querySelectorAll('#resultado-modelo-corpo [data-abs]').forEach(b=>{ b.textContent = absLeuco(v, b.dataset.abs); });
+}
+function laudoResumo(m){
+  const v = m.valores || {};
+  if(m.modelo === 'coagulo'){
+    const feitos = LAUDO_COAG.filter(s=>Object.keys(v).some(k=>k.startsWith(s.id + '.') && v[k])).map(s=>s.titulo.replace(/\s*\(.*\)/,''));
+    return 'Hemoglobinopatias/Coagulopatias: ' + feitos.join('; ');
+  }
+  const p = [];
+  if(v.hemoglobina) p.push(`Hb ${v.hemoglobina} g/dL`); if(v.hematocrito) p.push(`Ht ${v.hematocrito} %`);
+  if(v.leucocitos) p.push(`Leucócitos ${v.leucocitos} /mm3`); if(v.plaquetas) p.push(`Plaquetas ${v.plaquetas} x10³/mm³`);
+  return `Hemograma (${HEMO_FAIXAS[m.faixa] ? HEMO_FAIXAS[m.faixa].rotulo.toLowerCase() : ''}): ` + p.join('; ');
+}
+function laudoParse(r){ try{ const m = JSON.parse(r.parametros_json); return (m && m.v === 2) ? m : null; }catch(e){ return null; } }
+
+// Linhas "planas" (parâmetro/resultado/unidade/referência) para Excel
+function laudoLinhasPlanas(r){
+  const m = laudoParse(r); if(!m) return [];
+  const v = m.valores || {}, out = [];
+  if(m.modelo === 'hemograma'){
+    const F = HEMO_FAIXAS[m.faixa] || HEMO_FAIXAS.mulher;
+    HEMO_ERITRO.forEach(([k,n,u])=>{ if(v[k]) out.push({parametro:n,resultado:v[k],unidade:u,referencia:F[k] + ' ' + u}); });
+    if(v.leucocitos) out.push({parametro:'Leucócitos totais',resultado:v.leucocitos,unidade:'/mm³',referencia:F.leucocitos});
+    HEMO_DIF.forEach(([k,n])=>{ if(v[k]){ out.push({parametro:n + ' (%)',resultado:v[k],unidade:'%',referencia:HEMO_REL[k] || ''}); const a = absLeuco(v,k); if(a) out.push({parametro:n + ' (abs)',resultado:a,unidade:'/mm³',referencia:F.abs[k] || HEMO_ABS_COMUM[k] || ''}); } });
+    if(v.plaquetas) out.push({parametro:'Plaquetas',resultado:v.plaquetas,unidade:'x10³/mm³',referencia:F.plaquetas});
+    if(v.reticulocitos) out.push({parametro:'Reticulócitos',resultado:v.reticulocitos,unidade:'%',referencia:HEMO_RETIC_REF.join(' / ')});
+  } else {
+    LAUDO_COAG.forEach(s=>{
+      if(s.tipo === 'multi') s.linhas.forEach(([k,n,u,ref])=>{ const x = v[s.id + '.' + k]; if(x) out.push({parametro:s.titulo + ' — ' + n,resultado:x,unidade:u,referencia:ref || (s.refBloco || []).join(' ')}); });
+      else { const x = v[s.id + '.valor']; if(x) out.push({parametro:s.titulo,resultado:x,unidade:s.unid || '',referencia:s.refs.join(' / ')}); }
+    });
+  }
+  return out;
+}
+
+/* ---- impressão no modelo oficial ---- */
+const LAUDO_CSS = `<style>
+.laudo{font-family:'Times New Roman',Times,serif;color:#000;min-height:272mm;display:flex;flex-direction:column;font-size:13px;}
+.laudo .l-head{width:100%;border-collapse:collapse;margin-bottom:6px;}
+.laudo .l-head td{vertical-align:middle;padding:2px 4px;}
+.laudo .l-tit{text-align:center;font-style:italic;font-weight:700;font-size:20px;line-height:1.25;}
+.laudo .l-camp{width:100%;border-collapse:collapse;margin:4px 0 12px;font-size:15px;}
+.laudo .l-camp td{padding:1px 0;}
+.laudo .l-camp td.k{text-align:right;width:34%;padding-right:6px;}
+.laudo .l-camp td.k2{text-align:right;width:auto;padding-right:6px;}
+.laudo .l-h2{text-align:center;font-weight:700;font-size:20px;margin:8px 0 4px;}
+.laudo .l-box{border:1px solid #000;margin-bottom:10px;}
+.laudo .l-g{width:100%;border-collapse:collapse;}
+.laudo .l-g td{padding:1.5px 6px;vertical-align:middle;}
+.laudo .l-n{text-align:right;width:36%;font-size:14px;}
+.laudo .l-c{text-align:left;width:28%;padding-left:12% !important;font-size:14px;white-space:nowrap;}
+.laudo .l-r{text-align:center;width:36%;font-size:14px;}
+.laudo .l-sec{font-weight:700;font-size:18px;text-align:left !important;}
+.laudo .l-obs{font-size:14px;padding:3px 8px;}
+.laudo .l-big{font-weight:700;font-size:23px;letter-spacing:.2px;}
+.laudo .l-small{font-size:9.5px;font-weight:400;line-height:1.3;text-transform:uppercase;}
+.laudo .l-sub{text-align:center;font-size:13px;}
+.laudo .l-val{font-weight:700;font-size:15px;}
+.laudo .l-line{border-top:1px solid #000;padding-top:2px;margin-top:10px;}
+.laudo .l-st{text-align:center;font-weight:700;font-size:18px;margin:6px 0 4px;}
+.laudo .l-sb{width:100%;border-collapse:collapse;border-bottom:1px solid #000;}
+.laudo .l-sb td{vertical-align:middle;padding:2px 6px;}
+.laudo .l-lab{font-size:10px;text-align:left;width:30%;line-height:1.3;}
+.laudo .l-rt{font-size:12px;text-align:center;}
+.laudo .l-notas{font-size:10px;line-height:1.35;padding:3px 4px 4px;}
+.laudo .l-ass{display:flex;gap:10px;margin-top:auto;padding-top:26px;}
+.laudo .l-ass div{flex:1;text-align:center;font-size:9.5px;line-height:1.35;border-top:1px solid #444;padding-top:2px;}
+.laudo .l-ext{font-size:10.5px;text-align:justify;line-height:1.35;margin:6px 4px 10px;}
+.laudo table.l-hist{width:60%;margin:6px auto;border-collapse:collapse;font-size:11px;text-align:center;}
+.laudo table.l-hist td,.laudo table.l-hist th{border:1px solid #666;padding:2px 6px;}
+.laudo .l-cod{text-align:right;font-size:9px;color:#444;margin-top:4px;}
+</style>`;
+
+function laudoCabecalho(r, pac, titulo){
+  return `
+  <table class="l-head"><tr>
+    <td style="width:28%;"><img src="${LOGO_HEMOCENTRO}" style="height:56px;"></td>
+    <td class="l-tit">${titulo}</td>
+    <td style="width:30%;text-align:right;"><img src="${LOGO_GOVERNO_PB}" style="height:52px;mix-blend-mode:multiply;"></td>
+  </tr></table>
+  <table class="l-camp">
+    <tr><td class="k">Registro:</td><td colspan="2"><b>${escH(r.registro_numero || '')}</b></td></tr>
+    <tr><td class="k">Nome:</td><td colspan="2"><b>${escH(pac.nome)}</b></td></tr>
+    <tr><td class="k">Data de nascimento:</td><td colspan="2"><b>${escH(pac.nascimento)}</b></td></tr>
+    <tr><td class="k">Solicitante Dr(a):</td><td colspan="2"><b>${escH(r.medico || '')}</b></td></tr>
+    <tr><td class="k">Data da coleta:</td><td style="width:26%;"><b>${escH(r.data || '')}</b></td><td>Data da liberação: <b>${escH(r.data_resultado || '')}</b></td></tr>
+  </table>`;
+}
+function laudoRodape(){
+  return `<div class="l-ass">${LAUDO_ASSINANTES.map(a=>`<div>${a[0]}<br>${a[1]}<br>${a[2]}</div>`).join('')}</div>`;
+}
+
+function laudoHemogramaHTML(m, r, pac){
+  const v = m.valores || {}, ob = m.obs || {};
+  const F = HEMO_FAIXAS[m.faixa] || HEMO_FAIXAS.mulher;
+  const val = x => x ? `<span class="l-val">${escH(x)}</span> ` : '';
+  const eritro = HEMO_ERITRO.map(([k,n,u])=>`<tr><td class="l-n">${n}</td><td class="l-c">${val(v[k])}<b>${u}</b></td><td class="l-r">${F[k]} ${u}</td></tr>`).join('');
+  const dif = HEMO_DIF.filter(([k])=>HEMO_REL[k] || v[k]).map(([k,n])=>{
+    const a = absLeuco(v,k);
+    return `<tr><td class="l-n">${n}</td><td style="text-align:center;font-size:14px;">${val(v[k])}${HEMO_REL[k] ? `<span style="margin-left:14px;">${HEMO_REL[k]}</span>` : ''}</td><td style="text-align:center;font-size:14px;">${val(a)}${(F.abs[k] || HEMO_ABS_COMUM[k]) ? `<span style="margin-left:14px;">${F.abs[k] || HEMO_ABS_COMUM[k]}</span>` : ''}</td></tr>`;
+  }).join('');
+  const retic = v.reticulocitos ? `
+    <div class="l-box"><table class="l-g"><tr>
+      <td style="width:36%;"><span class="l-big">RETICULÓCITOS</span><div class="l-small" style="margin-top:4px;">AMOSTRA: SANGUE TOTAL<br>MÉTODO: MICROSCOPIA</div></td>
+      <td style="text-align:center;width:28%;"><b>RESULTADO</b><div style="margin-top:6px;"><span class="l-val">${escH(v.reticulocitos)}</span> <b>%</b></div></td>
+      <td style="text-align:center;width:36%;"><b>VALORES DE REFERÊNCIA</b><div style="font-size:12px;margin-top:4px;">${HEMO_RETIC_REF.join('<br>')}</div></td>
+    </tr></table></div>` : '';
+  return `
+  <div class="laudo">
+    ${laudoCabecalho(r, pac, 'LABORATÓRIO DE<br>CITOHEMATOLOGIA')}
+    <div class="l-h2">RESULTADO DE EXAMES</div>
+    <div class="l-box">
+      <table class="l-g">
+        <tr><td style="width:36%;"><span class="l-big">HEMOGRAMA</span><div class="l-small" style="margin-top:2px;">AMOSTRA: SANGUE TOTAL<br>MÉTODO: AUTOMAÇÃO COM REVISÃO EM MICROSCOPIA CONVENCIONAL</div></td>
+            <td style="text-align:center;width:28%;"><b style="font-size:15px;">RESULTADOS</b></td>
+            <td style="text-align:center;width:36%;"><b style="font-size:15px;">VALORES DE REFERÊNCIA<br>(${F.rotulo})</b></td></tr>
+        <tr><td colspan="3" class="l-sec">ERITROGRAMA</td></tr>
+        ${eritro}
+      </table>
+      ${ob.eritro ? `<div class="l-obs">Obs.: ${escH(ob.eritro)}</div>` : ''}
+      <table class="l-g">
+        <tr><td colspan="3" class="l-sec">LEUCOGRAMA</td></tr>
+        <tr><td class="l-n">Leucócitos totais</td><td class="l-c">${val(v.leucocitos)}<b>/mm3</b></td><td class="l-r">${F.leucocitos} /mm³</td></tr>
+        <tr><td></td><td class="l-sub">Valores relativos (%)</td><td class="l-sub">Valores absolutos (/mm³)</td></tr>
+        ${dif}
+      </table>
+      ${ob.leuco ? `<div class="l-obs">Obs.: ${escH(ob.leuco)}</div>` : ''}
+      <table class="l-g">
+        <tr><td colspan="3" class="l-sec">PLAQUETOGRAMA</td></tr>
+        <tr><td class="l-n">Plaquetas</td><td class="l-c">${val(v.plaquetas)}<b>x10³/mm³</b></td><td class="l-r">${F.plaquetas} x10³/mm³</td></tr>
+      </table>
+      ${ob.plaq ? `<div class="l-obs">Obs.: ${escH(ob.plaq)}</div>` : ''}
+    </div>
+    ${retic}
+    ${r.observacoes_resultado ? `<div class="l-obs"><b>Obs.:</b> ${escH(r.observacoes_resultado)}</div>` : ''}
+    ${laudoRodape()}
+  </div>`;
+}
+
+function laudoSecaoHTML(s, v){
+  const g = k => v[s.id + '.' + k];
+  let corpo;
+  if(s.tipo === 'multi'){
+    const N = s.linhas.length;
+    const linhas = s.linhas.map(([k,n,u,ref])=>`<tr><td style="text-align:right;font-size:12px;width:27%;">${n}</td><td style="text-align:center;white-space:nowrap;width:15%;"><span class="l-val" style="font-size:17px;">${escH(g(k) || '')}</span> <b>${u}</b></td><td class="l-rt" style="width:28%;">${escH(ref || '')}</td></tr>`).join('');
+    const bloco = `<td class="l-rt" rowspan="${N}" style="font-size:11.5px;">${(s.refBloco || []).map(escH).join('<br>')}</td>`;
+    corpo = s.refBloco
+      ? `<tr><td class="l-lab" rowspan="${N + 1}" style="width:30%;">AMOSTRA: ${s.amostra}<br>MÉTODO: ${s.metodo}</td><td class="l-rt" colspan="2" style="width:30%;">RESULTADO</td><td class="l-rt" style="width:40%;">VALORES DE REFERÊNCIA</td></tr>` +
+        s.linhas.map(([k,n,u],i)=>`<tr><td colspan="2" style="text-align:center;"><b style="font-size:16px;">${n}</b> <span class="l-val" style="font-size:17px;">${escH(g(k) || '')}</span> <b>${u}</b></td>${i === 0 ? bloco : ''}</tr>`).join('')
+      : `<tr><td class="l-lab" rowspan="${N + 1}" style="width:30%;">AMOSTRA: ${s.amostra}<br>MÉTODO: ${s.metodo}</td><td></td><td class="l-rt">RESULTADO</td><td class="l-rt">VALORES DE REFERÊNCIA</td></tr>` + linhas;
+  } else {
+    const resultado = s.tipo === 'texto' ? `<span class="l-val" style="font-size:17px;">${escH(g('valor') || '')}</span>` : `<span class="l-val" style="font-size:19px;">${escH(g('valor') || '')}</span> <b style="font-size:16px;">${s.unid || ''}</b>`;
+    corpo = `<tr><td class="l-lab">AMOSTRA: ${s.amostra}<br>MÉTODO: ${s.metodo}</td><td class="l-rt" style="width:30%;">RESULTADO<div style="margin-top:6px;">${resultado}</div></td><td class="l-rt" style="width:34%;">VALORES DE REFERÊNCIA<div style="margin-top:4px;">${s.refs.map(escH).join('<br>')}</div></td></tr>`;
+  }
+  let hist = '';
+  if(s.historico){
+    const lin = [1,2,3].map(i=>`<tr><td>${escH(v[s.id + '.h' + i + 'd'] || '&nbsp;')}</td><td>${escH(v[s.id + '.h' + i + 'r'] || '')}</td><td>${escH(v[s.id + '.h' + i + 'i'] || '')}</td></tr>`).join('');
+    hist = `<table class="l-hist"><tr><th colspan="3">HISTÓRICO DE TITULAÇÕES ANTERIORES</th></tr><tr><td>DATA</td><td>RESULTADO (EM UB/mL)</td><td>INTERPRETAÇÃO</td></tr>${lin}</table>`;
+  }
+  const notas = (s.notas || []).length ? `<div class="l-notas">${s.notas.map(escH).join('<br>')}</div>` : '';
+  return `<div style="border-top:1px solid #000;margin-top:8px;"><div class="l-st">${s.titulo}</div><table class="l-sb">${corpo}</table>${hist}${notas}</div>`;
+}
+
+function laudoCoaguloHTML(m, r, pac){
+  const v = m.valores || {};
+  const paginas = {};
+  LAUDO_COAG.forEach(s=>{
+    if(Object.keys(v).some(k=>k.startsWith(s.id + '.') && v[k])) (paginas[s.pag] = paginas[s.pag] || []).push(s);
+  });
+  const nums = Object.keys(paginas).sort();
+  if(!nums.length) nums.push('1'), paginas['1'] = [];
+  return nums.map((n,i)=>`
+  <div class="laudo" ${i ? 'style="page-break-before:always;"' : ''}>
+    ${laudoCabecalho(r, pac, 'LABORATÓRIO DE<br>HEMOGLOBINOPATIAS<br>E COAGULOPATIAS')}
+    ${m.amostraExterna && i === 0 ? `<div class="l-ext">${escH(LAUDO_NOTA_EXTERNA)}</div>` : ''}
+    ${paginas[n].map(s=>laudoSecaoHTML(s, v)).join('')}
+    ${r.observacoes_resultado && i === nums.length - 1 ? `<div class="l-obs" style="margin-top:8px;"><b>Obs.:</b> ${escH(r.observacoes_resultado)}</div>` : ''}
+    ${laudoRodape()}
+  </div>`).join('');
+}
+
+function templateResultadoModelo(r, pac){
+  pac = pac || paciente;
+  const m = laudoParse(r);
+  if(!m) return `<div class="rx-sheet"><p>Resultado em modelo oficial sem dados.</p></div>`;
+  return LAUDO_CSS + (m.modelo === 'coagulo' ? laudoCoaguloHTML(m, r, pac) : laudoHemogramaHTML(m, r, pac));
 }
 
 function verResultadoExame(i){
@@ -3853,7 +4222,8 @@ async function filaLabBaixarResultadosExcel(){
     const fim = [r.medico || '', r.responsavel_laboratorio || '', r.responsavel_registro || ''];
     let params = [];
     try{ params = r.parametros_json ? JSON.parse(r.parametros_json) : []; }catch(e){ params = []; }
-    if(r.formato_resultado !== 'texto' && params.length){
+    if(r.formato_resultado === 'modelo') params = laudoLinhasPlanas(r);
+    if(r.formato_resultado !== 'texto' && Array.isArray(params) && params.length){
       params.forEach(p=>linhas.push([...base, p.parametro, p.resultado, p.unidade || '', p.referencia || '', ...fim]));
     } else {
       linhas.push([...base, '(resultado em texto)', r.resultado || '', '', '', ...fim]);
