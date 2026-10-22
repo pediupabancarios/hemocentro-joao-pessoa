@@ -3076,8 +3076,14 @@ function abrirRegistrarResultado(i){
   document.getElementById('resultado-categoria').value = r.categoria_laboratorio || 'Citohematologia';
   document.getElementById('resultado-data-liberacao').value = r.data_resultado ? brToISO(r.data_resultado) : '';
   document.getElementById('resultado-observacoes').value = r.observacoes_resultado || '';
-  document.getElementById('resultado-responsavel').value = r.responsavel_laboratorio || (currentUser ? currentUser.nome : '');
-  document.getElementById('resultado-registro-profissional').value = r.responsavel_registro || ((currentUser && currentUser.tipo === 'laboratorio' && currentUser.crm) ? ((currentUser.conselho || 'CRF-PB') + ' ' + currentUser.crm) : '');
+  // Assinatura: no perfil Laboratório vale sempre quem está logado (campos travados); o gestor pode ajustar.
+  const ehLabLogado = currentUser && currentUser.tipo === 'laboratorio';
+  const regLogado = (currentUser && currentUser.crm) ? ((currentUser.conselho || 'CRF-PB') + ' ' + currentUser.crm) : '';
+  const campoResp = document.getElementById('resultado-responsavel'), campoReg = document.getElementById('resultado-registro-profissional');
+  campoResp.value = ehLabLogado ? currentUser.nome : (r.responsavel_laboratorio || (currentUser ? currentUser.nome : ''));
+  campoReg.value = ehLabLogado ? regLogado : (r.responsavel_registro || regLogado);
+  campoResp.readOnly = campoReg.readOnly = !!ehLabLogado;
+  campoResp.style.background = campoReg.style.background = ehLabLogado ? 'var(--bg)' : '';
 
   const body = document.getElementById('resultado-parametros-body');
   body.innerHTML = '';
@@ -3107,8 +3113,12 @@ function abrirRegistrarResultado(i){
 function salvarResultadoExame(proximo){
   if(editingResultadoIdx === null) return;
   const formato = document.getElementById('resultado-formato').value;
-  const responsavel = document.getElementById('resultado-responsavel').value.trim();
-  const registroProfissional = document.getElementById('resultado-registro-profissional').value.trim();
+  let responsavel = document.getElementById('resultado-responsavel').value.trim();
+  let registroProfissional = document.getElementById('resultado-registro-profissional').value.trim();
+  if(currentUser && currentUser.tipo === 'laboratorio'){   // assinatura = usuário logado, sempre
+    responsavel = currentUser.nome;
+    registroProfissional = currentUser.crm ? ((currentUser.conselho || 'CRF-PB') + ' ' + currentUser.crm) : '';
+  }
   const observacoes = document.getElementById('resultado-observacoes').value.trim();
   const categoria = document.getElementById('resultado-categoria').value;
   const registroNumero = document.getElementById('resultado-registro').value.trim();
