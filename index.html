@@ -1008,6 +1008,7 @@
             <div class="hemo-comp-row"><label class="check-opt"><input type="checkbox" class="hemo-comp-cb" value="Concentrado de Hemácias Filtradas" onchange="toggleHemoQtd(this)"> Concentrado de Hemácias Filtradas</label><input type="text" class="hemo-comp-qtd" placeholder="Ex.: 2 U ou 600 mL" disabled></div>
             <div class="hemo-comp-row"><label class="check-opt"><input type="checkbox" class="hemo-comp-cb" value="Concentrado de Hemácias Lavadas" onchange="toggleHemoQtd(this)"> Concentrado de Hemácias Lavadas</label><input type="text" class="hemo-comp-qtd" placeholder="Ex.: 2 U ou 600 mL" disabled></div>
             <div class="hemo-comp-row"><label class="check-opt"><input type="checkbox" class="hemo-comp-cb" value="Concentrado de Hemácias Irradiadas" onchange="toggleHemoQtd(this)"> Concentrado de Hemácias Irradiadas</label><input type="text" class="hemo-comp-qtd" placeholder="Ex.: 2 U ou 600 mL" disabled></div>
+            <div class="hemo-comp-row"><label class="check-opt"><input type="checkbox" class="hemo-comp-cb" value="Concentrado de Hemácias Fenotipadas" onchange="toggleHemoQtd(this)"> Concentrado de Hemácias Fenotipadas</label><input type="text" class="hemo-comp-qtd" placeholder="Ex.: 2 U ou 600 mL" disabled></div>
             <div class="hemo-comp-row"><label class="check-opt"><input type="checkbox" class="hemo-comp-cb" value="Plasma Fresco Congelado" onchange="toggleHemoQtd(this)"> Plasma Fresco Congelado</label><input type="text" class="hemo-comp-qtd" placeholder="Ex.: 200 mL" disabled></div>
             <div class="hemo-comp-row"><label class="check-opt"><input type="checkbox" class="hemo-comp-cb" value="Concentrado de Plaquetas" onchange="toggleHemoQtd(this)"> Concentrado de Plaquetas</label><input type="text" class="hemo-comp-qtd" placeholder="Ex.: 6 U" disabled></div>
             <div class="hemo-comp-row"><label class="check-opt"><input type="checkbox" class="hemo-comp-cb" value="Crioprecipitado" onchange="toggleHemoQtd(this)"> Crioprecipitado</label><input type="text" class="hemo-comp-qtd" placeholder="Ex.: 10 U" disabled></div>
@@ -3932,9 +3933,11 @@ function imprimirResultadoExame(i){
 }
 
 /* ---------- Modelo oficial: Solicitação de Hemocomponentes (F.CP.107.03) ---------- */
+const HEMO_HEMACIAS_VARIANTES = [['Concentrado de Hemácias Filtradas','F','Filtradas'],['Concentrado de Hemácias Lavadas','L','Lavadas'],['Concentrado de Hemácias Irradiadas','I','Irradiadas'],['Concentrado de Hemácias Fenotipadas','Fen','Fenotipadas']];
 const HEMO_COMPONENTES = [
-  { match:["Concentrado de Hemácias","Concentrado de Hemácias Filtradas","Concentrado de Hemácias Lavadas","Concentrado de Hemácias Irradiadas"],
-    label:"mL ou Unid. de Concentrado de Hemácias<br>( F ) Filtradas &nbsp; ( L ) Lavadas &nbsp; ( I ) Irradiadas &nbsp; ( Fen ) Fenotipadas" },
+  { match:["Concentrado de Hemácias", ...HEMO_HEMACIAS_VARIANTES.map(v=>v[0])],
+    // as variantes escolhidas saem marcadas com X dentro dos parênteses
+    labelFn:(sel)=>"mL ou Unid. de Concentrado de Hemácias<br>" + HEMO_HEMACIAS_VARIANTES.map(v=>`( ${sel.includes(v[0]) ? '<b>X</b>' : v[1]} ) ${v[2]}`).join(' &nbsp; ') },
   { match:["Plasma Fresco Congelado"], label:"mL de Plasma Fresco Congelado" },
   { match:["Concentrado de Plaquetas"], label:"Unid. de Concentrado de Plaquetas" },
   { match:["Crioprecipitado"], label:"Unid. de Crioprecipitado" },
@@ -3947,11 +3950,14 @@ function hemoTableRows(r){
   const mapaQtd = parseHemoQtd(r.qtd);
   const semEstrutura = Object.keys(mapaQtd).length === 0;
   return HEMO_COMPONENTES.map(c=>{
-    const compBate = c.match.find(m=>selecionados.includes(m));
-    const bate = !!compBate;
-    const qtdComp = bate ? (mapaQtd[compBate.toLowerCase()] || (semEstrutura ? r.qtd : '')) : '';
+    const escolhidos = c.match.filter(m=>selecionados.includes(m));
+    const bate = escolhidos.length > 0;
+    // quantidade: de cada item escolhido (ex.: filtradas e irradiadas juntas aparecem somadas com " + ")
+    const qtds = escolhidos.map(m=>mapaQtd[m.toLowerCase()] || (semEstrutura ? r.qtd : '')).filter(Boolean);
+    const qtdComp = [...new Set(qtds)].join(' + ');
     const qtdTxt = bate ? ('<b>' + (qtdComp || '____') + '</b>') : '_____';
-    return '<tr><td class="hemo-comp-label">' + qtdTxt + ' ' + c.label + '</td>' +
+    const rotulo = c.labelFn ? c.labelFn(escolhidos) : c.label;
+    return '<tr><td class="hemo-comp-label">' + qtdTxt + ' ' + rotulo + '</td>' +
       HEMO_URGENCIAS.map(u=>'<td class="hemo-mark">' + ((bate && u===r.urgencia) ? 'X' : '') + '</td>').join('') +
       '</tr>';
   }).join('');
