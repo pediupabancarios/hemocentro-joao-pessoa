@@ -2398,6 +2398,7 @@ function labsRows(){
         ${podeImprimirBPA() ? `<button title="Imprimir BPA-1" onclick="imprimirBPA(${i})">${ico('bpa')}</button>` : ''}
         ${podeRegistrarResultado() ? `<button title="${r.resultado ? 'Editar resultado' : 'Registrar resultado'}" onclick="abrirRegistrarResultado(${i})">${ico('resultado')}</button>` : ''}
         ${r.resultado ? `<button title="Ver / Imprimir resultado" onclick="imprimirResultadoExame(${i})">${ico('verresultado')}</button>` : ''}
+        ${r.resultado ? `<button title="Baixar resultado em PDF" onclick="baixarResultadoExame(${i})">${ico('baixar')}</button>` : ''}
         ${podeCriarLaboratorio() ? `<button title="Editar" onclick="editarLab(${i})">${ico('editar')}</button>` : ''}
         ${podeCriarLaboratorio() ? `<button class="danger" title="Excluir" onclick="excluirLab(${i})">${ico('excluir')}</button>` : ''}
       </td>
@@ -3652,6 +3653,55 @@ function templateResultadoModelo(r, pac){
   return LAUDO_CSS + partes.map((h,i)=>i ? `<div style="page-break-before:always;"></div>` + h : h).join('');
 }
 
+/* ---------- Baixar laudos em PDF (arquivo no computador) ----------
+   Gera um PDF A4 com uma folha por laudo, direto no navegador (html2canvas + jsPDF, carregados só quando preciso). */
+function carregarScriptExterno(src){
+  return new Promise((ok, erro)=>{
+    const sc = document.createElement('script'); sc.src = src; sc.onload = ok; sc.onerror = ()=>erro(new Error('falha ao carregar ' + src));
+    document.head.appendChild(sc);
+  });
+}
+async function garantirPdfLibs(){
+  if(!window.html2canvas) await carregarScriptExterno('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+  if(!window.jspdf) await carregarScriptExterno('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+}
+function nomeArquivoSeguro(t){ return String(t || 'laudo').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\w\-]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'').slice(0,90) || 'laudo'; }
+async function baixarPDFdeHTML(bodyHTML, nomeArquivo, opcoes){
+  opcoes = opcoes || {};
+  showToast('Gerando o PDF...');
+  try{ await garantirPdfLibs(); }
+  catch(e){ console.error(e); showToast('Não consegui carregar o gerador de PDF (sem internet?). Use Imprimir / Salvar PDF.'); return null; }
+  const ifr = document.createElement('iframe');
+  ifr.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0;';
+  document.body.appendChild(ifr);
+  try{
+    await new Promise(ok=>{ ifr.onload = ok; ifr.srcdoc = printWindowShell(`<div style="padding:0 12mm;">${bodyHTML}</div>`, 'PDF'); });
+    const doc = ifr.contentDocument;
+    if(doc.fonts && doc.fonts.ready) await doc.fonts.ready;
+    const folhas = [...doc.querySelectorAll('.laudo, .rx-sheet')];
+    if(!folhas.length){ showToast('Nada para gerar.'); return null; }
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({unit:'mm', format:'a4', orientation:'portrait'});
+    for(let i = 0; i < folhas.length; i++){
+      const canvas = await window.html2canvas(folhas[i], {scale:2, backgroundColor:'#ffffff', useCORS:true, windowWidth:794});
+      let w = 186, h = canvas.height * w / canvas.width;
+      if(h > 279){ h = 279; w = canvas.width * h / canvas.height; }
+      if(i) pdf.addPage();
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.93), 'JPEG', 12, 9, w, h);
+    }
+    if(!opcoes.semSalvar){ pdf.save(nomeArquivoSeguro(nomeArquivo) + '.pdf'); showToast('PDF salvo no computador (pasta Downloads).'); }
+    return pdf;
+  }catch(e){
+    console.error(e); showToast('Erro ao gerar o PDF.'); return null;
+  }finally{
+    ifr.remove();
+  }
+}
+function baixarResultadoExame(i){
+  const r = labs[i];
+  baixarPDFdeHTML(templateResultadoExame(r), `Resultado_${paciente.nome}_${r.exame}_${r.data_resultado || ''}`);
+}
+
 function verResultadoExame(i){
   const r = labs[i];
   abrirDocumentoImpressao(printWindowShell(templateResultadoExame(r), 'Resultado de Exame — ' + paciente.nome), false);
@@ -4105,7 +4155,7 @@ function filaLabRows(){
       <td><span class="status ${statusClass(r.situacao)}">${r.situacao}</span></td>
       <td class="row-actions">
         ${pode && av ? `<button title="${av[1]}" onclick="filaLabMudarEtapa('${r.id}','${av[0]}')">${ico('avancar')}</button>` : ''}
-        ${r.situacao === 'Concluído' ? `<button title="Imprimir resultado" onclick="filaLabImprimirUm('${r.id}')">${ico('verresultado')}</button>` : ''}
+        ${r.situacao === 'Concluído' ? `<button title="Imprimir resultado" onclick="filaLabImprimirUm('${r.id}')">${ico('verresultado')}</button><button title="Baixar resultado em PDF" onclick="filaLabBaixarUm('${r.id}')">${ico('baixar')}</button>` : ''}
         ${pode ? `<button title="${r.situacao === 'Concluído' ? 'Editar resultado' : 'Registrar resultado'}" onclick="filaLabRegistrar('${r.id}','${r.paciente_id}')">${ico('resultado')}</button>` : ''}
         <button title="Abrir paciente" onclick="selecionarPaciente('${r.paciente_id}')">${ico('ver')}</button>
       </td>
@@ -4122,6 +4172,7 @@ function filaLabBarraLote(){
     ${podeRegistrarResultado() ? `<button class="btn-secondary" onclick="filaLabEtapaLote('Coletado')">Marcar como coletados</button>
     <button class="btn-secondary" onclick="filaLabEtapaLote('Em análise')">Colocar em análise</button>` : ''}
     <button class="btn-secondary" onclick="filaLabImprimirResultados()">🖨️ Imprimir resultados</button>
+    <button class="btn-secondary" onclick="filaLabImprimirResultados(null,'baixar')">⬇️ Baixar PDF</button>
     <button class="btn-secondary" onclick="filaLabLimparSel()">Limpar seleção</button>
   </div>`;
 }
@@ -4178,7 +4229,8 @@ function filaLabTemplate(){
       <input type="date" id="fila-lab-dia-res" value="${filaLabDiaResultados || isoLocal(new Date())}" onchange="filaLabDiaResultados=this.value"
         style="padding:6px 10px;border:1.5px solid var(--line);border-radius:9px;font-size:12.5px;outline:none;">
       <button class="btn-secondary" onclick="filaLabBaixarResultadosExcel()" title="Planilha com todos os resultados (valor por valor) liberados no dia">📊 Excel do dia</button>
-      <button class="btn-secondary" onclick="filaLabImprimirResultados(filaLabDiaEscolhido())" title="Todos os laudos do dia, um por folha — na janela, use Imprimir / Salvar PDF">📄 PDF dos laudos do dia</button>
+      <button class="btn-secondary" onclick="filaLabImprimirResultados(filaLabDiaEscolhido(),'baixar')" title="Baixa um arquivo PDF com todos os laudos do dia, um por folha">⬇️ Baixar PDF do dia</button>
+      <button class="btn-secondary" onclick="filaLabImprimirResultados(filaLabDiaEscolhido())" title="Abre os laudos do dia para imprimir">🖨️ Imprimir laudos do dia</button>
     </div>
     <div id="fila-lab-lote">${filaLabBarraLote()}</div>
     <div style="overflow-x:auto;margin-top:8px;">
@@ -4264,6 +4316,14 @@ function filaLabFolhaResultado(row){
   return templateResultadoExame(r, pac);
 }
 
+// Baixa o PDF do laudo de um exame concluído
+async function filaLabBaixarUm(id){
+  const { data, error } = await supabaseClient.from('solicitacoes_exames').select('*').eq('id', id).single();
+  if(error || !data){ console.error(error); showToast('Erro ao buscar o resultado.'); return; }
+  if(data.situacao !== 'Concluído'){ showToast('Este exame ainda não foi liberado pelo laboratório.'); return; }
+  baixarPDFdeHTML(filaLabFolhaResultado(data), `Resultado_${data.paciente_nome}_${data.exame}_${data.data_resultado || ''}`);
+}
+
 // Imprime o laudo de um exame concluído (qualquer perfil que veja a fila)
 async function filaLabImprimirUm(id){
   const { data, error } = await supabaseClient.from('solicitacoes_exames').select('*').eq('id', id).single();
@@ -4273,7 +4333,7 @@ async function filaLabImprimirUm(id){
 }
 
 // Imprime/salva em PDF os laudos (um por folha): do dia informado ou, sem dia, dos exames marcados na fila
-async function filaLabImprimirResultados(dia){
+async function filaLabImprimirResultados(dia, modo){
   let data;
   if(dia){
     data = await filaLabResultadosDoDia(dia);
@@ -4289,6 +4349,7 @@ async function filaLabImprimirResultados(dia){
   if(data.length > 60 && !confirm(`Gerar ${data.length} laudos de uma vez? Isso pode demorar.`)) return;
   const folhas = data.map(filaLabFolhaResultado);
   const titulo = dia ? `Laudos liberados em ${isoToBR(dia)} — ${folhas.length} folha(s)` : `Resultados de exames — ${folhas.length} folha(s)`;
+  if(modo === 'baixar'){ baixarPDFdeHTML(folhas.join(''), dia ? `Laudos_${dia}` : `Laudos_selecionados_${isoLocal(new Date())}`); return; }
   abrirDocumentoImpressao(printWindowShell(folhas.join('<div class="page-break"></div>'), titulo), false);
 }
 
@@ -4575,7 +4636,7 @@ function recepListaImpHTML(){
     <div class="recep-row" style="${ok ? '' : 'opacity:.7;'}">
       <input type="checkbox" ${ok ? '' : 'disabled'} ${filaLabSel.has(r.id) ? 'checked' : ''} onchange="recepToggleSel('${r.id}', this.checked)">
       <div class="grow"><b>${r.paciente_nome || '—'}</b><div class="sub">${r.exame}${r.registro_numero ? ' · etiqueta ' + r.registro_numero : ''} · ${quando}</div></div>
-      ${ok ? `<span class="status concluido">Liberado</span><button class="btn-secondary" onclick="filaLabImprimirUm('${r.id}')">${ico('verresultado')} Imprimir</button>`
+      ${ok ? `<span class="status concluido">Liberado</span><button class="btn-secondary" onclick="filaLabImprimirUm('${r.id}')">${ico('verresultado')} Imprimir</button><button class="btn-secondary" onclick="filaLabBaixarUm('${r.id}')">${ico('baixar')} Baixar PDF</button>`
            : `<span class="status ${statusClass(r.situacao)}">${r.situacao}</span><span class="sub">Aguardando laboratório</span>`}
     </div>`;
   }).join('');
@@ -4589,7 +4650,8 @@ function recepBarraImpHTML(){
     <span style="font-size:12px;color:var(--muted);">Dia:</span>
     <input type="date" id="fila-lab-dia-res" value="${filaLabDiaResultados || isoLocal(new Date())}" onchange="filaLabDiaResultados=this.value"
       style="padding:6px 10px;border:1.5px solid var(--line);border-radius:9px;font-size:12.5px;outline:none;">
-    <button class="btn-secondary" onclick="filaLabImprimirResultados(filaLabDiaEscolhido())">PDF dos laudos do dia</button>
+    <button class="btn-secondary" onclick="filaLabImprimirResultados(null,'baixar')">Baixar PDF dos selecionados</button>
+    <button class="btn-secondary" onclick="filaLabImprimirResultados(filaLabDiaEscolhido(),'baixar')">Baixar PDF do dia</button>
     <button class="btn-secondary" onclick="filaLabBaixarResultadosExcel()">Excel do dia</button>`;
 }
 function recepAtualizarListaImp(){
