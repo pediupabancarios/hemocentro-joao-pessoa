@@ -593,6 +593,21 @@
   .lh-tile span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px;}
   .lh-tile.pri{background:#1D5FC4;border-color:#1D5FC4;}
   .lh-tile.pri svg{stroke:#fff;} .lh-tile.pri b{color:#fff;} .lh-tile.pri span{color:#dbe7fb;}
+  .rw-steps{display:flex;gap:6px;margin-bottom:16px;}
+  .rw-steps div{flex:1;text-align:center;font-size:12px;color:var(--muted);}
+  .rw-steps span{display:flex;width:26px;height:26px;border-radius:50%;margin:0 auto 4px;align-items:center;justify-content:center;background:#fff;border:1px solid var(--line);font-size:12px;font-weight:700;}
+  .rw-steps .on{color:var(--text);font-weight:700;} .rw-steps .on span{background:var(--red);color:#fff;border-color:var(--red);}
+  .rw-steps .ok span{background:var(--green-bg);color:var(--green-text);border-color:#b9e3c8;}
+  .rw-card{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:13.5px;}
+  .rw-ex{display:flex;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:6px;font-size:13.5px;}
+  .rw-ok{color:var(--green-text);font-weight:700;font-size:12.5px;} .rw-pend{color:var(--muted);font-size:12.5px;}
+  .rw-ck{display:flex;gap:8px;align-items:flex-start;font-size:14px;margin:9px 0;}
+  .rw-erro{color:#B3261E;font-size:13px;margin-top:8px;min-height:18px;font-weight:600;}
+  .rw-fora{color:#B3261E !important;font-weight:800 !important;border-color:#B3261E !important;}
+  .rw-resumo table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:10px;}
+  .rw-resumo td,.rw-resumo th{padding:4px 6px;border-bottom:1px solid var(--line);text-align:left;}
+  .rw-resumo th{font-size:11.5px;color:var(--muted);font-weight:600;}
+  .rw-resumo .baixo,.rw-resumo .alto{color:#B3261E;font-weight:800;}
   .recep-tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);padding:0 14px;overflow-x:auto;}
   .recep-tab{display:flex;align-items:center;gap:7px;padding:12px 14px;font-size:13.5px;font-weight:700;color:var(--muted);background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;font-family:inherit;}
   .recep-tab.on{color:var(--red-dark);border-bottom-color:var(--red);}
@@ -1101,104 +1116,140 @@
 
 <!-- Registrar Resultado de Exame -->
 <div class="modal-overlay" id="modal-resultado">
-  <div class="modal" style="max-width:760px;">
+  <div class="modal" style="max-width:820px;">
     <div class="modal-head"><h3 id="modal-resultado-title">Registrar Resultado do Exame</h3><button class="close" onclick="closeModal('modal-resultado')">✕</button></div>
     <div class="modal-body">
-      <div class="form-grid">
-        <div class="form-field full">
-          <label>Paciente</label>
-          <input type="text" id="resultado-paciente-display" disabled>
+      <div id="rw-steps" class="rw-steps"></div>
+
+      <div id="rw-1" class="rw-passo">
+        <div class="form-grid">
+          <div class="form-field full">
+            <label>Paciente</label>
+            <input type="text" id="resultado-paciente-display" disabled>
+          </div>
+          <div class="form-field full">
+            <label>Exame(s) solicitado(s)</label>
+            <input type="text" id="resultado-exame-display" disabled>
+          </div>
+          <div class="form-field">
+            <label>Nº de Registro (laboratório)</label>
+            <input type="text" id="resultado-registro" placeholder="Ex.: 2665">
+          </div>
+          <div class="form-field">
+            <label>Laboratório responsável</label>
+            <select id="resultado-categoria">
+              <option value="Citohematologia">Citohematologia</option>
+              <option value="Hemoglobinopatias e Coagulopatias">Hemoglobinopatias e Coagulopatias</option>
+              <option value="Sorologia">Sorologia</option>
+              <option value="Imunohematologia">Imunohematologia</option>
+              <option value="Outro">Outro</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Data da liberação</label>
+            <input type="date" id="resultado-data-liberacao">
+          </div>
         </div>
-        <div class="form-field full">
-          <label>Exame(s) solicitado(s)</label>
-          <input type="text" id="resultado-exame-display" disabled>
+        <div id="rw-exames" style="margin-top:14px;"></div>
+      </div>
+
+      <div id="rw-2" class="rw-passo">
+        <div class="form-grid">
+          <div class="form-field">
+            <label>Preenchimento rápido</label>
+            <select id="resultado-quick-fill" onchange="preencherModeloResultado(this.value); this.value='';">
+              <option value="">— Escolher modelo —</option>
+              <option value="hemograma">Hemograma (padrão)</option>
+              <option value="coagulograma">Coagulograma (padrão)</option>
+              <option value="sorologia">Sorologia (padrão)</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Formato do resultado</label>
+            <select id="resultado-formato" onchange="alternarFormatoResultado(this.value)">
+              <option value="tabela">Tabela de parâmetros (com valores de referência)</option>
+              <option value="texto">Texto livre (ex.: Coombs, Classificação, Fenotipagem)</option>
+              <option value="modelo">Modelo oficial do laboratório (Hemograma / Coagulopatias)</option>
+            </select>
+          </div>
         </div>
-        <div class="form-field">
-          <label>Nº de Registro (laboratório)</label>
-          <input type="text" id="resultado-registro" placeholder="Ex.: 2665">
+
+        <div id="resultado-modo-tabela">
+          <div class="form-section-title" style="margin-top:18px;">Parâmetros e Resultados</div>
+          <table class="param-table" id="resultado-parametros-tabela">
+            <thead>
+              <tr><th>Parâmetro</th><th>Resultado</th><th>Unidade</th><th>Valores de Referência</th><th></th></tr>
+            </thead>
+            <tbody id="resultado-parametros-body"></tbody>
+          </table>
+          <button type="button" class="btn-secondary" style="margin-top:8px;" onclick="adicionarLinhaParametro()">+ Adicionar linha</button>
         </div>
-        <div class="form-field">
-          <label>Laboratório responsável</label>
-          <select id="resultado-categoria">
-            <option value="Citohematologia">Citohematologia</option>
-            <option value="Hemoglobinopatias e Coagulopatias">Hemoglobinopatias e Coagulopatias</option>
-            <option value="Sorologia">Sorologia</option>
-            <option value="Imunohematologia">Imunohematologia</option>
-            <option value="Outro">Outro</option>
-          </select>
+
+        <div id="resultado-modo-modelo" style="display:none;">
+          <div class="form-field full" style="margin-top:14px;">
+            <label>Modelo</label>
+            <select id="resultado-modelo-tipo" onchange="modeloTrocarTipo(this.value)">
+              <option value="hemograma">Hemograma (faixa etária automática)</option>
+              <option value="coagulo">Hemoglobinopatias e Coagulopatias (ferritina, TP, TTPa, fatores...)</option>
+            </select>
+          </div>
+          <div id="resultado-modelo-corpo"></div>
         </div>
-        <div class="form-field">
-          <label>Data da liberação</label>
-          <input type="date" id="resultado-data-liberacao">
+
+        <div id="resultado-modo-texto" style="display:none;">
+          <div class="form-field full" style="margin-top:14px;">
+            <label>Resultado</label>
+            <textarea id="resultado-texto-simples" placeholder="Ex.: Coombs Direto: Negativo" style="min-height:140px;"></textarea>
+          </div>
         </div>
-        <div class="form-field">
-          <label>Preenchimento rápido</label>
-          <select id="resultado-quick-fill" onchange="preencherModeloResultado(this.value); this.value='';">
-            <option value="">— Escolher modelo —</option>
-            <option value="hemograma">Hemograma (padrão)</option>
-            <option value="coagulograma">Coagulograma (padrão)</option>
-            <option value="sorologia">Sorologia (padrão)</option>
-          </select>
-        </div>
-        <div class="form-field full">
-          <label>Formato do resultado</label>
-          <select id="resultado-formato" onchange="alternarFormatoResultado(this.value)">
-            <option value="tabela">Tabela de parâmetros (com valores de referência)</option>
-            <option value="texto">Texto livre (resultado simples — ex.: Coombs, Classificação, Fenotipagem)</option>
-            <option value="modelo">Modelo oficial do laboratório (Hemograma por faixa etária / Coagulopatias)</option>
-          </select>
+
+        <div class="form-field full" style="margin-top:16px;">
+          <label>Observações</label>
+          <textarea id="resultado-observacoes" placeholder="Ex.: Presença de macrócitos, anisocitose..."></textarea>
         </div>
       </div>
 
-      <div id="resultado-modo-tabela">
-        <div class="form-section-title" style="margin-top:18px;">Parâmetros e Resultados</div>
-        <table class="param-table" id="resultado-parametros-tabela">
-          <thead>
-            <tr><th>Parâmetro</th><th>Resultado</th><th>Unidade</th><th>Valores de Referência</th><th></th></tr>
-          </thead>
-          <tbody id="resultado-parametros-body"></tbody>
-        </table>
-        <button type="button" class="btn-secondary" style="margin-top:8px;" onclick="adicionarLinhaParametro()">+ Adicionar linha</button>
+      <div id="rw-3" class="rw-passo">
+        <div id="rw-resumo"></div>
+        <div class="rw-ck"><input type="checkbox" id="rw-c1"><label for="rw-c1">Todos os exames solicitados foram lançados</label></div>
+        <div class="rw-ck"><input type="checkbox" id="rw-c2"><label for="rw-c2">Valores conferidos com o equipamento</label></div>
+        <div class="rw-ck"><input type="checkbox" id="rw-c3"><label for="rw-c3">Conferência técnica realizada</label></div>
       </div>
 
-      <div id="resultado-modo-modelo" style="display:none;">
-        <div class="form-field full" style="margin-top:14px;">
-          <label>Modelo</label>
-          <select id="resultado-modelo-tipo" onchange="modeloTrocarTipo(this.value)">
-            <option value="hemograma">Hemograma (faixa etária automática)</option>
-            <option value="coagulo">Hemoglobinopatias e Coagulopatias (ferritina, TP, TTPa, fatores...)</option>
-          </select>
-        </div>
-        <div id="resultado-modelo-corpo"></div>
-      </div>
-
-      <div id="resultado-modo-texto" style="display:none;">
-        <div class="form-field full" style="margin-top:14px;">
-          <label>Resultado</label>
-          <textarea id="resultado-texto-simples" placeholder="Ex.: Coombs Direto: Negativo" style="min-height:140px;"></textarea>
+      <div id="rw-4" class="rw-passo">
+        <div class="rw-card">Ao liberar, o laudo fica disponível para a recepção imprimir e baixar. Ele sai no modelo oficial do laboratório, com a assinatura eletrônica abaixo.</div>
+        <div class="form-grid" style="margin-top:4px;">
+          <div class="form-field">
+            <label>Responsável pelo Laboratório (assinatura)</label>
+            <input type="text" id="resultado-responsavel" placeholder="Nome de quem está registrando o resultado">
+          </div>
+          <div class="form-field">
+            <label>Registro profissional (CRF / CRBM)</label>
+            <input type="text" id="resultado-registro-profissional" placeholder="Ex.: CRF-PB 01103">
+          </div>
         </div>
       </div>
 
-      <div class="form-field full" style="margin-top:16px;">
-        <label>Observações</label>
-        <textarea id="resultado-observacoes" placeholder="Ex.: Presença de macrócitos, anisocitose..."></textarea>
-      </div>
-      <div class="form-grid" style="margin-top:4px;">
-        <div class="form-field">
-          <label>Responsável pelo Laboratório (assinatura)</label>
-          <input type="text" id="resultado-responsavel" placeholder="Nome de quem está registrando o resultado">
-        </div>
-        <div class="form-field">
-          <label>Registro profissional (CRF / CRBM)</label>
-          <input type="text" id="resultado-registro-profissional" placeholder="Ex.: CRF-PB 01103">
+      <div id="rw-5" class="rw-passo" style="text-align:center;padding:22px 0;">
+        <svg viewBox="0 0 24 24" width="60" height="60" fill="none" stroke="#1C8A45" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/></svg>
+        <div style="font-size:19px;font-weight:800;margin:8px 0;color:var(--navy);">Resultados liberados</div>
+        <div id="rw-sucesso-txt" style="font-size:13px;color:var(--muted);margin-bottom:16px;"></div>
+        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+          <button class="btn-secondary" id="rw-b-imprimir">Imprimir laudo</button>
+          <button class="btn-secondary" id="rw-b-baixar">Baixar PDF</button>
         </div>
       </div>
+
+      <div style="margin-top:14px;text-align:right;"><a href="#" id="rw-toggle" style="font-size:12px;color:var(--muted);" onclick="event.preventDefault();rwAlternarModo()">Usar formulário simples (sem passos)</a></div>
     </div>
     <div class="modal-foot">
-      <button class="btn-secondary" onclick="closeModal('modal-resultado')">Cancelar</button>
-      <button class="btn-secondary" id="resultado-btn-parcial" style="display:none;" onclick="salvarResultadoExame(false, 'parcial')" title="Salva este exame e continua na mesma solicitação (ela só é concluída em Salvar Resultado)">Salvar e fazer outro exame</button>
-      <button class="btn-secondary" id="resultado-btn-proximo" style="display:none;" onclick="salvarResultadoExame(true)">Salvar e ir para o próximo ›</button>
-      <button class="btn-primary" onclick="salvarResultadoExame()">Salvar Resultado</button>
+      <button class="btn-secondary" id="rw-b-cancelar" onclick="closeModal('modal-resultado')">Cancelar</button>
+      <button class="btn-secondary" id="rw-b-voltar" onclick="rwVoltar()">Voltar</button>
+      <button class="btn-secondary" id="resultado-btn-parcial" style="display:none;" onclick="salvarResultadoExame(false, 'parcial')" title="Salva este exame e continua na mesma solicitação (ela só é concluída ao liberar)">Salvar e fazer outro exame</button>
+      <button class="btn-secondary" id="resultado-btn-proximo" style="display:none;" onclick="salvarResultadoExame(true)">Liberar e ir para o próximo ›</button>
+      <button class="btn-primary" id="rw-b-prox" onclick="rwProximo()">Próximo</button>
+      <button class="btn-primary" id="rw-b-salvar" onclick="salvarResultadoExame()">Salvar Resultado</button>
+      <button class="btn-primary" id="rw-b-fechar" onclick="closeModal('modal-resultado')">Voltar para a lista</button>
     </div>
   </div>
 </div>
@@ -3086,13 +3137,12 @@ function alternarFormatoResultado(formato){
   document.getElementById('resultado-modo-tabela').style.display = formato === 'tabela' ? 'block' : 'none';
   document.getElementById('resultado-modo-texto').style.display = formato === 'texto' ? 'block' : 'none';
   document.getElementById('resultado-modo-modelo').style.display = formato === 'modelo' ? 'block' : 'none';
-  const bp = document.getElementById('resultado-btn-parcial'); if(bp) bp.style.display = formato === 'modelo' ? '' : 'none';
+  if(typeof rwRender === 'function') rwRender();
   if(formato === 'modelo' && !document.getElementById('resultado-modelo-corpo').innerHTML.trim()) renderModeloResultado(document.getElementById('resultado-modelo-tipo').value || 'hemograma', null);
 }
 
 function abrirRegistrarResultado(i){
-  const btnProx = document.getElementById('resultado-btn-proximo');
-  if(btnProx) btnProx.style.display = 'none';   // só aparece quando aberto pela Fila do Laboratório
+  rwDaFila = false;   // só vira true quando aberto pela Fila do Laboratório
   const r = labs[i];
   editingResultadoIdx = i;
   document.getElementById('modal-resultado-title').textContent = r.resultado ? 'Editar Resultado do Exame' : 'Registrar Resultado do Exame';
@@ -3134,7 +3184,7 @@ function abrirRegistrarResultado(i){
   }
   document.getElementById('resultado-texto-simples').value = formatoInicial === 'texto' ? (r.resultado || '') : '';
   alternarFormatoResultado(formatoInicial);
-
+  rwIniciar(r);
   openModal('modal-resultado');
 }
 
@@ -3187,7 +3237,8 @@ function salvarResultadoExame(proximo, modo){
     observacoes_resultado: observacoes || null, responsavel_laboratorio: responsavel, responsavel_registro: registroProfissional || null,
     data_resultado: parcial ? null : isoToBR(hoje), situacao: parcial ? 'Em análise' : 'Concluído'
   });
-  if(!parcial){ closeModal('modal-resultado'); refreshTables(); }
+  const noPasso = rwAtivo && !parcial && !proximo;   // passo a passo: fica aberto e mostra a tela de sucesso
+  if(!parcial){ if(!noPasso) closeModal('modal-resultado'); refreshTables(); }
 
   if(supabaseConfigured && r.id){
     supabaseClient.from('solicitacoes_exames').update({
@@ -3209,6 +3260,7 @@ function salvarResultadoExame(proximo, modo){
         return;
       }
       showToast('Resultado registrado e assinado com sucesso.');
+      if(noPasso) rwSucesso(r.id);
       // mantém a fila local coerente e segue para o próximo exame, se foi pedido
       const naFila = filaLab.find(x=>x.id === r.id);
       if(naFila){ naFila.situacao = 'Concluído'; naFila.registro_numero = registroNumero || null; }
@@ -3222,6 +3274,7 @@ function salvarResultadoExame(proximo, modo){
     });
   } else {
     showToast('Resultado registrado nesta sessão.');
+    if(noPasso) rwSucesso(null);
   }
 }
 
@@ -3421,6 +3474,7 @@ function renderModeloResultado(tipo, dados){
   document.getElementById('resultado-modelo-corpo').innerHTML = tipo === 'coagulo' ? renderModeloCoagulo(dados) : renderModeloHemograma(dados);
   document.getElementById('resultado-categoria').value = tipo === 'coagulo' ? 'Hemoglobinopatias e Coagulopatias' : 'Citohematologia';
   modeloAtualizarRotulos();
+  rwMarcarFora();
 }
 function modeloColetar(){
   const valores = {}, obs = {};
@@ -3678,6 +3732,144 @@ function templateResultadoModelo(r, pac){
   if(mm.modelos.coagulo) partes.push(laudoCoaguloHTML(mm.modelos.coagulo, r, pac));
   // cada modelo começa numa folha nova
   return LAUDO_CSS + partes.map((h,i)=>i ? `<div style="page-break-before:always;"></div>` + h : h).join('');
+}
+
+/* ---------- Passo a passo para lançar resultados (Exames → Lançar → Revisar → Liberar) ---------- */
+let rwAtivo = true, rwPasso = 1, rwDaFila = false, rwUltimoId = null;
+const RW_NOMES = ['Exames','Lançar','Revisar','Liberar'];
+function rwFormato(){ return document.getElementById('resultado-formato').value; }
+function rwIniciar(r){
+  rwPasso = 1;
+  ['rw-c1','rw-c2','rw-c3'].forEach(id=>{ document.getElementById(id).checked = false; });
+  document.getElementById('rw-sucesso-txt').textContent = '';
+  rwListarExames(r);
+  rwRender();
+}
+function rwAlternarModo(){ rwAtivo = !rwAtivo; if(rwAtivo) rwPasso = 1; rwRender(); }
+function rwModeloDoExame(nome){
+  const ex = normExame(nome);
+  if(/hemograma/.test(ex)) return 'hemograma';
+  if(/(ferritina|folato|vitamina b12|homocist|coagulograma|fator|d dimero|antitrombina|proteina c|proteina s|anticoagulante lupico|inibidor|ristocetina|von willebrand|resistencia a proteina|tempo de|perfil hemoglobinico)/.test(ex)) return 'coagulo';
+  return '';
+}
+function rwListarExames(r){
+  const lista = parseExamesList((r || labs[editingResultadoIdx] || {}).exame);
+  const feito = {};
+  Object.keys(modeloEstado || {}).forEach(t=>{ feito[t] = Object.keys(modeloEstado[t].valores || {}).length > 0; });
+  const jaTem = r && r.resultado;
+  document.getElementById('rw-exames').innerHTML = '<div style="font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:700;">EXAMES SOLICITADOS</div>' + lista.map(n=>{
+    const m = rwModeloDoExame(n);
+    const lancado = m ? !!feito[m] : !!jaTem;
+    return `<div class="rw-ex"><span>${escH(n)}</span><span class="${lancado ? 'rw-ok' : 'rw-pend'}">${lancado ? '✔ lançado' : 'a lançar'}</span></div>`;
+  }).join('');
+}
+function rwRender(){
+  const el = id => document.getElementById(id); if(!el('rw-1')) return;
+  const formato = rwFormato();
+  const show = (id, v) => { const e = el(id); if(e) e.style.display = v ? '' : 'none'; };
+  [1,2,3,4].forEach(n=>show('rw-' + n, rwAtivo ? rwPasso === n : true));
+  show('rw-5', rwAtivo && rwPasso === 5);
+  // cabeçalho com os passos
+  const st = el('rw-steps');
+  st.style.display = rwAtivo && rwPasso <= 4 ? 'flex' : 'none';
+  st.innerHTML = RW_NOMES.map((nm,i)=>{ const n = i + 1, c = n < rwPasso ? 'ok' : (n === rwPasso ? 'on' : ''); return `<div class="${c}"><span>${n < rwPasso ? '✓' : n}</span>${nm}</div>`; }).join('');
+  // botões do rodapé
+  const ehModelo = formato === 'modelo';
+  const b = (id, v) => show(id, v);
+  if(!rwAtivo){
+    b('rw-b-cancelar', true); b('rw-b-voltar', false); b('rw-b-prox', false); b('rw-b-fechar', false);
+    b('resultado-btn-parcial', ehModelo); b('resultado-btn-proximo', rwDaFila); b('rw-b-salvar', true);
+    el('rw-b-salvar').textContent = 'Salvar Resultado';
+  } else {
+    b('rw-b-cancelar', rwPasso < 5);
+    b('rw-b-voltar', rwPasso > 1 && rwPasso < 5);
+    b('resultado-btn-parcial', rwPasso === 2 && ehModelo);
+    b('rw-b-prox', rwPasso < 4);
+    b('resultado-btn-proximo', rwPasso === 4 && rwDaFila);
+    b('rw-b-salvar', rwPasso === 4);
+    b('rw-b-fechar', rwPasso === 5);
+    el('rw-b-salvar').textContent = 'Liberar resultados';
+    el('rw-b-prox').textContent = ['', 'Próximo: lançar', 'Próximo: revisar', 'Próximo: liberar'][rwPasso] || 'Próximo';
+  }
+  show('rw-toggle', rwPasso < 5);
+  el('rw-toggle').textContent = rwAtivo ? 'Usar formulário simples (sem passos)' : 'Voltar ao passo a passo';
+  if(rwPasso === 1) rwListarExames();
+}
+function rwErro(msg){
+  let e = document.getElementById('rw-erro');
+  if(!e){ e = document.createElement('div'); e.id = 'rw-erro'; e.className = 'rw-erro'; document.querySelector('#modal-resultado .modal-body').appendChild(e); }
+  e.textContent = msg || '';
+  if(msg) showToast(msg);
+}
+function rwVoltar(){ rwErro(''); if(rwPasso > 1){ rwPasso--; rwRender(); } }
+function rwTemResultado(){
+  const f = rwFormato();
+  if(f === 'modelo') return Object.keys(modeloMontar().modelos).length > 0;
+  if(f === 'texto') return !!document.getElementById('resultado-texto-simples').value.trim();
+  return coletarParametros().length > 0;
+}
+function rwProximo(){
+  rwErro('');
+  if(rwPasso === 2){
+    if(!rwTemResultado()){ rwErro('Preencha ao menos um resultado antes de revisar.'); return; }
+    document.getElementById('rw-resumo').innerHTML = rwResumoHTML();
+  }
+  if(rwPasso === 3 && !(['rw-c1','rw-c2','rw-c3'].every(id=>document.getElementById(id).checked))){ rwErro('Marque as três conferências para continuar.'); return; }
+  if(rwPasso < 4){ rwPasso++; rwRender(); }
+}
+function rwSucesso(id){
+  rwUltimoId = id; rwPasso = 5;
+  const r = labs[editingResultadoIdx];
+  document.getElementById('rw-sucesso-txt').textContent = `${paciente.nome}${r && r.registro_numero ? ' · etiqueta ' + r.registro_numero : ''} · ${r ? r.data_resultado : ''}`;
+  document.getElementById('rw-b-imprimir').onclick = ()=>{ if(id) filaLabImprimirUm(id); };
+  document.getElementById('rw-b-baixar').onclick = ()=>{ if(id) filaLabBaixarUm(id); };
+  document.getElementById('rw-b-imprimir').style.display = document.getElementById('rw-b-baixar').style.display = id ? '' : 'none';
+  rwRender();
+}
+
+// destaca o que está fora da referência (usa a faixa "a"/"–" ou "até"/">" do texto da referência)
+function rwFora(valor, ref){
+  const v = numBR(valor); if(isNaN(v)) return 0;
+  const r = String(ref || '');
+  const faixas = [...r.matchAll(/(-?\d[\d.,]*)\s*(?:a|–|—|-)\s*(-?\d[\d.,]*)/g)];
+  if(faixas.length > 1) return 0;                                  // várias referências (por idade/sexo): não arrisca
+  if(faixas.length === 1){ const lo = numBR(faixas[0][1]), hi = numBR(faixas[0][2]); if(!isNaN(lo) && !isNaN(hi)) return v < lo ? -1 : (v > hi ? 1 : 0); }
+  let m = r.match(/(?:até|ate)\s*(\d[\d.,]*)/i); if(m){ const hi = numBR(m[1]); return !isNaN(hi) && v > hi ? 1 : 0; }
+  m = r.match(/>\s*(\d[\d.,]*)/); if(m){ const lo = numBR(m[1]); return !isNaN(lo) && v < lo ? -1 : 0; }
+  return 0;
+}
+function rwMarcarFora(){
+  document.querySelectorAll('#resultado-modelo-corpo input[data-k]').forEach(inp=>{
+    if(inp.dataset.k.startsWith('obs.') || inp.dataset.k.includes('.h')) return;
+    const tr = inp.closest('tr'); if(!tr) return;
+    const tds = [...tr.children]; const pos = tds.indexOf(inp.closest('td'));
+    const refTd = tds.slice(pos + 1).find(t=>/\d\s*(?:a|–|—|-)\s*\d|até|>/i.test(t.textContent));
+    inp.classList.toggle('rw-fora', !!(refTd && inp.value.trim() && rwFora(inp.value, refTd.textContent)));
+  });
+}
+document.addEventListener('input', e=>{ if(e.target && e.target.closest && e.target.closest('#resultado-modelo-corpo')) rwMarcarFora(); });
+
+function rwResumoHTML(){
+  const f = rwFormato();
+  let corpo = '';
+  const linhas = (rows)=> `<table><thead><tr><th>Parâmetro</th><th>Resultado</th><th>Referência</th></tr></thead><tbody>${rows.map(x=>{
+    const k = rwFora(x.resultado, x.referencia);
+    return `<tr><td>${escH(x.parametro)}</td><td class="${k < 0 ? 'baixo' : (k > 0 ? 'alto' : '')}">${escH(x.resultado)} ${escH(x.unidade || '')}${k < 0 ? ' ↓' : (k > 0 ? ' ↑' : '')}</td><td style="color:var(--muted);">${escH(x.referencia || '')}</td></tr>`;
+  }).join('')}</tbody></table>`;
+  if(f === 'modelo'){
+    const m = modeloMontar();
+    Object.keys(m.modelos).forEach(t=>{
+      const so = {v:3, modelos:{[t]: m.modelos[t]}};
+      const rows = laudoLinhasPlanas({formato_resultado:'modelo', parametros_json:JSON.stringify(so)});
+      const rot = t === 'hemograma' ? 'Hemograma · ' + ((HEMO_FAIXAS[m.modelos[t].faixa] || {}).rotulo || '').toLowerCase() : 'Hemoglobinopatias e Coagulopatias';
+      corpo += `<div class="rw-card"><div style="font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:700;">${rot.toUpperCase()}</div>${linhas(rows)}</div>`;
+    });
+  } else if(f === 'texto'){
+    corpo = `<div class="rw-card" style="white-space:pre-wrap;">${escH(document.getElementById('resultado-texto-simples').value)}</div>`;
+  } else {
+    corpo = `<div class="rw-card">${linhas(coletarParametros().map(p=>({parametro:p.parametro, resultado:p.resultado, unidade:p.unidade, referencia:p.referencia})))}</div>`;
+  }
+  return `<div class="rw-resumo">${corpo}<div style="font-size:12px;color:var(--muted);">Valores fora da referência aparecem em vermelho (↓ abaixo, ↑ acima).</div></div>`;
 }
 
 /* ---------- Baixar laudos em PDF (arquivo no computador) ----------
@@ -4428,8 +4620,7 @@ async function filaLabRegistrar(labId, pacId){
   }
   if(i < 0){ showToast('Solicitação não encontrada.'); return; }
   abrirRegistrarResultado(i);
-  const bp = document.getElementById('resultado-btn-proximo');   // só faz sentido vindo da fila
-  if(bp) bp.style.display = '';
+  rwDaFila = true; rwRender();   // "Liberar e ir para o próximo" só faz sentido vindo da fila
 }
 
 /* ================= LABORATÓRIO — tela inicial (blocos) ================= */
