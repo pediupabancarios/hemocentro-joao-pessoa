@@ -3548,10 +3548,14 @@ function laudoRodape(r){
   r = r || {};
   const idx = laudoQuemLiberou(r);
   const quem = idx >= 0 ? LAUDO_ASSINANTES[idx][0] : (r.responsavel_laboratorio || '').trim();
-  const carimbo = `<div style="font-style:italic;font-weight:700;font-size:11px;line-height:1.15;margin-bottom:1px;">${escH(quem)}</div><div style="font-size:7.5px;color:#333;margin-bottom:2px;">Assinado eletronicamente${r.data_resultado ? ' em ' + escH(r.data_resultado) : ''}</div>`;
-  const extra = (quem && idx < 0) ? `<div style="text-align:right;margin-top:auto;padding-top:10px;font-size:10px;">${carimbo}<span style="font-size:9px;">${escH(r.responsavel_registro || '')}</span></div>` : '';
+  const dataAss = r.data_resultado ? ' em ' + escH(r.data_resultado) : '';
+  // quem está na lista: só "Assinado eletronicamente em <data>" acima do próprio nome (o nome já está impresso embaixo)
+  const carimboLista = `<div style="font-style:italic;font-size:9px;margin-bottom:2px;">Assinado eletronicamente${dataAss}</div>`;
+  // quem não está na lista (ex.: gestor): linha extra com nome e registro
+  const carimboExtra = `<div style="font-style:italic;font-weight:700;font-size:11px;line-height:1.15;margin-bottom:1px;">${escH(quem)}</div><div style="font-size:7.5px;color:#333;margin-bottom:2px;">Assinado eletronicamente${dataAss}</div>`;
+  const extra = (quem && idx < 0) ? `<div style="text-align:right;margin-top:auto;padding-top:10px;font-size:10px;">${carimboExtra}<span style="font-size:9px;">${escH(r.responsavel_registro || '')}</span></div>` : '';
   return `${extra}<div class="l-ass" ${extra ? 'style="margin-top:4px;padding-top:4px;"' : ''}>${LAUDO_ASSINANTES.map((a,i)=>`<div style="display:flex;flex-direction:column;justify-content:flex-end;">
-    <div style="min-height:28px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;">${i === idx ? carimbo : ''}</div>
+    <div style="min-height:16px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;">${i === idx ? carimboLista : ''}</div>
     <div style="border-top:1px solid #444;padding-top:2px;">${a[0]}<br>${a[1]}<br>${a[2]}</div></div>`).join('')}</div>`;
 }
 
