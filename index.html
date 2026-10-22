@@ -1007,6 +1007,7 @@
             <div class="hemo-comp-row"><label class="check-opt"><input type="checkbox" class="hemo-comp-cb" value="Concentrado de Hemácias" onchange="toggleHemoQtd(this)"> Concentrado de Hemácias</label><input type="text" class="hemo-comp-qtd" placeholder="Ex.: 2 U ou 600 mL" disabled></div>
             <div class="hemo-comp-row"><label class="check-opt"><input type="checkbox" class="hemo-comp-cb" value="Concentrado de Hemácias Filtradas" onchange="toggleHemoQtd(this)"> Concentrado de Hemácias Filtradas</label><input type="text" class="hemo-comp-qtd" placeholder="Ex.: 2 U ou 600 mL" disabled></div>
             <div class="hemo-comp-row"><label class="check-opt"><input type="checkbox" class="hemo-comp-cb" value="Concentrado de Hemácias Lavadas" onchange="toggleHemoQtd(this)"> Concentrado de Hemácias Lavadas</label><input type="text" class="hemo-comp-qtd" placeholder="Ex.: 2 U ou 600 mL" disabled></div>
+            <div class="hemo-comp-row"><label class="check-opt"><input type="checkbox" class="hemo-comp-cb" value="Concentrado de Hemácias Irradiadas" onchange="toggleHemoQtd(this)"> Concentrado de Hemácias Irradiadas</label><input type="text" class="hemo-comp-qtd" placeholder="Ex.: 2 U ou 600 mL" disabled></div>
             <div class="hemo-comp-row"><label class="check-opt"><input type="checkbox" class="hemo-comp-cb" value="Plasma Fresco Congelado" onchange="toggleHemoQtd(this)"> Plasma Fresco Congelado</label><input type="text" class="hemo-comp-qtd" placeholder="Ex.: 200 mL" disabled></div>
             <div class="hemo-comp-row"><label class="check-opt"><input type="checkbox" class="hemo-comp-cb" value="Concentrado de Plaquetas" onchange="toggleHemoQtd(this)"> Concentrado de Plaquetas</label><input type="text" class="hemo-comp-qtd" placeholder="Ex.: 6 U" disabled></div>
             <div class="hemo-comp-row"><label class="check-opt"><input type="checkbox" class="hemo-comp-cb" value="Crioprecipitado" onchange="toggleHemoQtd(this)"> Crioprecipitado</label><input type="text" class="hemo-comp-qtd" placeholder="Ex.: 10 U" disabled></div>
@@ -3932,8 +3933,8 @@ function imprimirResultadoExame(i){
 
 /* ---------- Modelo oficial: Solicitação de Hemocomponentes (F.CP.107.03) ---------- */
 const HEMO_COMPONENTES = [
-  { match:["Concentrado de Hemácias","Concentrado de Hemácias Filtradas","Concentrado de Hemácias Lavadas"],
-    label:"mL ou Unid. de Concentrado de Hemácias<br>( F ) Filtradas &nbsp; ( L ) Lavadas &nbsp; ( Fen ) Fenotipadas" },
+  { match:["Concentrado de Hemácias","Concentrado de Hemácias Filtradas","Concentrado de Hemácias Lavadas","Concentrado de Hemácias Irradiadas"],
+    label:"mL ou Unid. de Concentrado de Hemácias<br>( F ) Filtradas &nbsp; ( L ) Lavadas &nbsp; ( I ) Irradiadas &nbsp; ( Fen ) Fenotipadas" },
   { match:["Plasma Fresco Congelado"], label:"mL de Plasma Fresco Congelado" },
   { match:["Concentrado de Plaquetas"], label:"Unid. de Concentrado de Plaquetas" },
   { match:["Crioprecipitado"], label:"Unid. de Crioprecipitado" },
