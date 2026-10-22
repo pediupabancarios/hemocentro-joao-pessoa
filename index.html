@@ -1179,6 +1179,7 @@
     </div>
     <div class="modal-foot">
       <button class="btn-secondary" onclick="closeModal('modal-resultado')">Cancelar</button>
+      <button class="btn-secondary" id="resultado-btn-parcial" style="display:none;" onclick="salvarResultadoExame(false, 'parcial')" title="Salva este exame e continua na mesma solicitação (ela só é concluída em Salvar Resultado)">Salvar e fazer outro exame</button>
       <button class="btn-secondary" id="resultado-btn-proximo" style="display:none;" onclick="salvarResultadoExame(true)">Salvar e ir para o próximo ›</button>
       <button class="btn-primary" onclick="salvarResultadoExame()">Salvar Resultado</button>
     </div>
@@ -3061,6 +3062,7 @@ function alternarFormatoResultado(formato){
   document.getElementById('resultado-modo-tabela').style.display = formato === 'tabela' ? 'block' : 'none';
   document.getElementById('resultado-modo-texto').style.display = formato === 'texto' ? 'block' : 'none';
   document.getElementById('resultado-modo-modelo').style.display = formato === 'modelo' ? 'block' : 'none';
+  const bp = document.getElementById('resultado-btn-parcial'); if(bp) bp.style.display = formato === 'modelo' ? '' : 'none';
   if(formato === 'modelo' && !document.getElementById('resultado-modelo-corpo').innerHTML.trim()) renderModeloResultado(document.getElementById('resultado-modelo-tipo').value || 'hemograma', null);
 }
 
@@ -3096,8 +3098,10 @@ function abrirRegistrarResultado(i){
   document.getElementById('resultado-modelo-corpo').innerHTML = '';
   let formatoInicial = r.formato_resultado || (exameSugereTextoLivre(r.exame) ? 'texto' : 'tabela');
   const salvoModelo = r.formato_resultado === 'modelo' ? laudoParse(r) : null;
+  modeloEstado = salvoModelo ? JSON.parse(JSON.stringify(salvoModelo.modelos)) : {};
   if(salvoModelo){
-    renderModeloResultado(salvoModelo.modelo, salvoModelo);
+    const primeiro = salvoModelo.modelos.hemograma ? 'hemograma' : 'coagulo';
+    renderModeloResultado(primeiro, salvoModelo.modelos[primeiro]);
   } else if(!r.resultado){
     // resultado novo: sugere o modelo oficial quando o exame é hemograma ou coagulopatia
     const ex = normExame(r.exame);
@@ -3110,7 +3114,8 @@ function abrirRegistrarResultado(i){
   openModal('modal-resultado');
 }
 
-function salvarResultadoExame(proximo){
+function salvarResultadoExame(proximo, modo){
+  const parcial = modo === 'parcial';   // salva sem concluir: o exame segue "Em análise" e a tela continua aberta
   if(editingResultadoIdx === null) return;
   const formato = document.getElementById('resultado-formato').value;
   let responsavel = document.getElementById('resultado-responsavel').value.trim();
@@ -3132,8 +3137,8 @@ function salvarResultadoExame(proximo){
   let textoSimples = null;
 
   if(formato === 'modelo'){
-    const m = modeloColetar();
-    if(!Object.keys(m.valores).length){ showToast('Preencha ao menos um resultado do modelo.'); return; }
+    const m = modeloMontar();
+    if(!Object.keys(m.modelos).length){ showToast('Preencha ao menos um resultado do modelo.'); return; }
     parametrosJson = JSON.stringify(m);
     resultadoResumo = laudoResumo(m);
   } else if(formato === 'texto'){
@@ -3156,20 +3161,30 @@ function salvarResultadoExame(proximo){
     resultado: resultadoResumo, formato_resultado: formato,
     parametros_json: parametrosJson, categoria_laboratorio: categoria, registro_numero: registroNumero || null,
     observacoes_resultado: observacoes || null, responsavel_laboratorio: responsavel, responsavel_registro: registroProfissional || null,
-    data_resultado: isoToBR(hoje), situacao:'Concluído'
+    data_resultado: parcial ? null : isoToBR(hoje), situacao: parcial ? 'Em análise' : 'Concluído'
   });
-  closeModal('modal-resultado');
-  refreshTables();
+  if(!parcial){ closeModal('modal-resultado'); refreshTables(); }
 
   if(supabaseConfigured && r.id){
     supabaseClient.from('solicitacoes_exames').update({
       resultado: resultadoResumo, formato_resultado: formato,
       parametros_json: parametrosJson, categoria_laboratorio: categoria, registro_numero: registroNumero || null,
       observacoes_resultado: observacoes || null, responsavel_laboratorio: responsavel, responsavel_registro: registroProfissional || null,
-      data_resultado: hoje, situacao:'Concluído'
+      data_resultado: parcial ? null : hoje, situacao: parcial ? 'Em análise' : 'Concluído'
     }).eq('id', r.id).then(({error})=>{
-      showToast(error ? 'Erro ao salvar resultado no Supabase.' : 'Resultado registrado e assinado com sucesso.');
-      if(error){ console.error(error); return; }
+      if(error){ showToast('Erro ao salvar resultado no Supabase.'); console.error(error); return; }
+      if(parcial){
+        // continua na mesma solicitação: vai para o modelo que ainda não foi preenchido
+        const outro = modeloTipoAtual === 'hemograma' ? 'coagulo' : 'hemograma';
+        const nomeOutro = outro === 'coagulo' ? 'Hemoglobinopatias e Coagulopatias' : 'Hemograma';
+        const feito = Object.keys(modeloEstado[outro]?.valores || {}).length;
+        showToast(feito ? 'Resultado salvo (parcial).' : `Resultado salvo. Agora preencha: ${nomeOutro}.`);
+        if(!feito) modeloTrocarTipo(outro);
+        else modeloAtualizarRotulos();
+        const nf = filaLab.find(x=>x.id === r.id); if(nf){ nf.situacao = 'Em análise'; nf.registro_numero = registroNumero || null; }
+        return;
+      }
+      showToast('Resultado registrado e assinado com sucesso.');
       // mantém a fila local coerente e segue para o próximo exame, se foi pedido
       const naFila = filaLab.find(x=>x.id === r.id);
       if(naFila){ naFila.situacao = 'Concluído'; naFila.registro_numero = registroNumero || null; }
@@ -3373,30 +3388,52 @@ function renderModeloCoagulo(d){
   <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;"><input type="checkbox" id="mod-externa" ${d.amostraExterna ? 'checked' : ''}> Amostra coletada por outro órgão de saúde (imprime a observação sobre a amostra)</label>`;
 }
 
+let modeloEstado = {};          // {hemograma:{...}, coagulo:{...}} — vários modelos na mesma solicitação
+let modeloTipoAtual = 'hemograma';
 function renderModeloResultado(tipo, dados){
   const box = document.getElementById('resultado-modo-modelo'); if(!box) return;
+  modeloTipoAtual = tipo;
   document.getElementById('resultado-modelo-tipo').value = tipo;
   document.getElementById('resultado-modelo-corpo').innerHTML = tipo === 'coagulo' ? renderModeloCoagulo(dados) : renderModeloHemograma(dados);
   document.getElementById('resultado-categoria').value = tipo === 'coagulo' ? 'Hemoglobinopatias e Coagulopatias' : 'Citohematologia';
+  modeloAtualizarRotulos();
 }
 function modeloColetar(){
-  const tipo = document.getElementById('resultado-modelo-tipo').value;
   const valores = {}, obs = {};
   document.querySelectorAll('#resultado-modelo-corpo [data-k]').forEach(i=>{
     const k = i.dataset.k, val = i.value.trim();
     if(k.startsWith('obs.')) obs[k.slice(4)] = val; else if(val) valores[k] = val;
   });
-  return {v:2, modelo:tipo, faixa: tipo === 'hemograma' ? document.getElementById('mod-faixa').value : null, valores, obs, amostraExterna: !!document.getElementById('mod-externa')?.checked};
+  return {faixa: modeloTipoAtual === 'hemograma' ? document.getElementById('mod-faixa').value : null, valores, obs, amostraExterna: !!document.getElementById('mod-externa')?.checked};
+}
+// guarda o que está na tela e devolve {v:3, modelos:{...}} só com os modelos que têm algum resultado
+function modeloMontar(){
+  modeloEstado[modeloTipoAtual] = modeloColetar();
+  const modelos = {};
+  Object.keys(modeloEstado).forEach(t=>{ if(Object.keys(modeloEstado[t].valores || {}).length) modelos[t] = modeloEstado[t]; });
+  return {v:3, modelos};
+}
+function modeloAtualizarRotulos(){
+  const sel = document.getElementById('resultado-modelo-tipo'); if(!sel) return;
+  const nomes = {hemograma:'Hemograma (faixa etária automática)', coagulo:'Hemoglobinopatias e Coagulopatias (ferritina, TP, TTPa, fatores...)'};
+  const atual = (()=>{ try{ return modeloColetar(); }catch(e){ return null; } })();
+  [...sel.options].forEach(o=>{
+    const e = o.value === modeloTipoAtual ? atual : modeloEstado[o.value];
+    o.textContent = nomes[o.value] + (e && Object.keys(e.valores || {}).length ? '  ✔ preenchido' : '');
+  });
 }
 function modeloTrocarFaixa(){ renderModeloResultado('hemograma', modeloColetar()); }
-function modeloTrocarTipo(t){ renderModeloResultado(t, null); }
+function modeloTrocarTipo(t){
+  modeloEstado[modeloTipoAtual] = modeloColetar();
+  renderModeloResultado(t, modeloEstado[t] || null);
+}
 function modeloAtualizarAbs(){
   const v = {}; document.querySelectorAll('#resultado-modelo-corpo [data-k]').forEach(i=>{ v[i.dataset.k] = i.value; });
   document.querySelectorAll('#resultado-modelo-corpo [data-abs]').forEach(b=>{ b.textContent = absLeuco(v, b.dataset.abs); });
 }
-function laudoResumo(m){
+function laudoResumoUm(tipo, m){
   const v = m.valores || {};
-  if(m.modelo === 'coagulo'){
+  if(tipo === 'coagulo'){
     const feitos = LAUDO_COAG.filter(s=>Object.keys(v).some(k=>k.startsWith(s.id + '.') && v[k])).map(s=>s.titulo.replace(/\s*\(.*\)/,''));
     return 'Hemoglobinopatias/Coagulopatias: ' + feitos.join('; ');
   }
@@ -3405,25 +3442,38 @@ function laudoResumo(m){
   if(v.leucocitos) p.push(`Leucócitos ${v.leucocitos} /mm3`); if(v.plaquetas) p.push(`Plaquetas ${v.plaquetas} x10³/mm³`);
   return `Hemograma (${HEMO_FAIXAS[m.faixa] ? HEMO_FAIXAS[m.faixa].rotulo.toLowerCase() : ''}): ` + p.join('; ');
 }
-function laudoParse(r){ try{ const m = JSON.parse(r.parametros_json); return (m && m.v === 2) ? m : null; }catch(e){ return null; } }
+function laudoResumo(m){ return ['hemograma','coagulo'].filter(t=>m.modelos[t]).map(t=>laudoResumoUm(t, m.modelos[t])).join(' | '); }
+// lê parametros_json (v:3 com vários modelos; v:2 antigo com um modelo vira v:3)
+function laudoParse(r){
+  try{
+    const m = JSON.parse(r.parametros_json);
+    if(!m) return null;
+    if(m.v === 3 && m.modelos) return m;
+    if(m.v === 2) return {v:3, modelos:{[m.modelo]:{faixa:m.faixa, valores:m.valores || {}, obs:m.obs || {}, amostraExterna:!!m.amostraExterna}}};
+  }catch(e){}
+  return null;
+}
 
 // Linhas "planas" (parâmetro/resultado/unidade/referência) para Excel
 function laudoLinhasPlanas(r){
-  const m = laudoParse(r); if(!m) return [];
-  const v = m.valores || {}, out = [];
-  if(m.modelo === 'hemograma'){
-    const F = HEMO_FAIXAS[m.faixa] || HEMO_FAIXAS.mulher;
-    HEMO_ERITRO.forEach(([k,n,u])=>{ if(v[k]) out.push({parametro:n,resultado:v[k],unidade:u,referencia:F[k] + ' ' + u}); });
-    if(v.leucocitos) out.push({parametro:'Leucócitos totais',resultado:v.leucocitos,unidade:'/mm³',referencia:F.leucocitos});
-    HEMO_DIF.forEach(([k,n])=>{ if(v[k]){ out.push({parametro:n + ' (%)',resultado:v[k],unidade:'%',referencia:HEMO_REL[k] || ''}); const a = absLeuco(v,k); if(a) out.push({parametro:n + ' (abs)',resultado:a,unidade:'/mm³',referencia:F.abs[k] || HEMO_ABS_COMUM[k] || ''}); } });
-    if(v.plaquetas) out.push({parametro:'Plaquetas',resultado:v.plaquetas,unidade:'x10³/mm³',referencia:F.plaquetas});
-    if(v.reticulocitos) out.push({parametro:'Reticulócitos',resultado:v.reticulocitos,unidade:'%',referencia:HEMO_RETIC_REF.join(' / ')});
-  } else {
-    LAUDO_COAG.forEach(s=>{
-      if(s.tipo === 'multi') s.linhas.forEach(([k,n,u,ref])=>{ const x = v[s.id + '.' + k]; if(x) out.push({parametro:s.titulo + ' — ' + n,resultado:x,unidade:u,referencia:ref || (s.refBloco || []).join(' ')}); });
-      else { const x = v[s.id + '.valor']; if(x) out.push({parametro:s.titulo,resultado:x,unidade:s.unid || '',referencia:s.refs.join(' / ')}); }
-    });
-  }
+  const mm = laudoParse(r); if(!mm) return [];
+  const out = [];
+  Object.keys(mm.modelos).forEach(tipo=>{
+    const m = mm.modelos[tipo], v = m.valores || {};
+    if(tipo === 'hemograma'){
+      const F = HEMO_FAIXAS[m.faixa] || HEMO_FAIXAS.mulher;
+      HEMO_ERITRO.forEach(([k,n,u])=>{ if(v[k]) out.push({parametro:n,resultado:v[k],unidade:u,referencia:F[k] + ' ' + u}); });
+      if(v.leucocitos) out.push({parametro:'Leucócitos totais',resultado:v.leucocitos,unidade:'/mm³',referencia:F.leucocitos});
+      HEMO_DIF.forEach(([k,n])=>{ if(v[k]){ out.push({parametro:n + ' (%)',resultado:v[k],unidade:'%',referencia:HEMO_REL[k] || ''}); const a = absLeuco(v,k); if(a) out.push({parametro:n + ' (abs)',resultado:a,unidade:'/mm³',referencia:F.abs[k] || HEMO_ABS_COMUM[k] || ''}); } });
+      if(v.plaquetas) out.push({parametro:'Plaquetas',resultado:v.plaquetas,unidade:'x10³/mm³',referencia:F.plaquetas});
+      if(v.reticulocitos) out.push({parametro:'Reticulócitos',resultado:v.reticulocitos,unidade:'%',referencia:HEMO_RETIC_REF.join(' / ')});
+    } else {
+      LAUDO_COAG.forEach(s=>{
+        if(s.tipo === 'multi') s.linhas.forEach(([k,n,u,ref])=>{ const x = v[s.id + '.' + k]; if(x) out.push({parametro:s.titulo + ' — ' + n,resultado:x,unidade:u,referencia:ref || (s.refBloco || []).join(' ')}); });
+        else { const x = v[s.id + '.valor']; if(x) out.push({parametro:s.titulo,resultado:x,unidade:s.unid || '',referencia:s.refs.join(' / ')}); }
+      });
+    }
+  });
   return out;
 }
 
@@ -3597,9 +3647,13 @@ function laudoCoaguloHTML(m, r, pac){
 
 function templateResultadoModelo(r, pac){
   pac = pac || paciente;
-  const m = laudoParse(r);
-  if(!m) return `<div class="rx-sheet"><p>Resultado em modelo oficial sem dados.</p></div>`;
-  return LAUDO_CSS + (m.modelo === 'coagulo' ? laudoCoaguloHTML(m, r, pac) : laudoHemogramaHTML(m, r, pac));
+  const mm = laudoParse(r);
+  if(!mm || !Object.keys(mm.modelos).length) return `<div class="rx-sheet"><p>Resultado em modelo oficial sem dados.</p></div>`;
+  const partes = [];
+  if(mm.modelos.hemograma) partes.push(laudoHemogramaHTML(mm.modelos.hemograma, r, pac));
+  if(mm.modelos.coagulo) partes.push(laudoCoaguloHTML(mm.modelos.coagulo, r, pac));
+  // cada modelo começa numa folha nova
+  return LAUDO_CSS + partes.map((h,i)=>i ? `<div style="page-break-before:always;"></div>` + h : h).join('');
 }
 
 function verResultadoExame(i){
