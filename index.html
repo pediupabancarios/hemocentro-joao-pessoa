@@ -3209,7 +3209,7 @@ function salvarResultadoExame(proximo, modo){
     responsavel = currentUser.nome;
     registroProfissional = (currentUser.conselho || 'CRF-PB') + ' ' + currentUser.crm;
   }
-  if(currentUser && currentUser.tipo === 'laboratorio' && !currentUser.crm && !responsavel){   // login da equipe: precisa escolher quem assina
+  if(!parcial && currentUser && currentUser.tipo === 'laboratorio' && !currentUser.crm && !responsavel){   // login da equipe: precisa escolher quem assina ao LIBERAR
     showToast('Escolha quem assina o laudo.');
     if(rwAtivo && rwPasso < 5){ rwPasso = 4; rwRender(); }
     return;
@@ -3219,7 +3219,7 @@ function salvarResultadoExame(proximo, modo){
   const registroNumero = document.getElementById('resultado-registro').value.trim();
   const dataLiberacao = document.getElementById('resultado-data-liberacao').value;
 
-  if(!responsavel){ showToast('Informe o nome do responsável pelo laboratório.'); return; }
+  if(!parcial && !responsavel){ showToast('Informe o nome do responsável pelo laboratório.'); return; }
 
   let parametros = [];
   let resultadoResumo = '';
@@ -3261,7 +3261,7 @@ function salvarResultadoExame(proximo, modo){
   Object.assign(r, {
     resultado: resultadoResumo, formato_resultado: formato,
     parametros_json: parametrosJson, categoria_laboratorio: categoria, registro_numero: registroNumero || null,
-    observacoes_resultado: observacoes || null, responsavel_laboratorio: responsavel, responsavel_registro: registroProfissional || null,
+    observacoes_resultado: observacoes || null, responsavel_laboratorio: responsavel || null, responsavel_registro: registroProfissional || null,
     data_resultado: parcial ? null : isoToBR(hoje), situacao: parcial ? 'Em análise' : 'Concluído'
   });
   const noPasso = rwAtivo && !parcial && !proximo;   // passo a passo: fica aberto e mostra a tela de sucesso
@@ -3271,7 +3271,7 @@ function salvarResultadoExame(proximo, modo){
     supabaseClient.from('solicitacoes_exames').update({
       resultado: resultadoResumo, formato_resultado: formato,
       parametros_json: parametrosJson, categoria_laboratorio: categoria, registro_numero: registroNumero || null,
-      observacoes_resultado: observacoes || null, responsavel_laboratorio: responsavel, responsavel_registro: registroProfissional || null,
+      observacoes_resultado: observacoes || null, responsavel_laboratorio: responsavel || null, responsavel_registro: registroProfissional || null,
       data_resultado: parcial ? null : hoje, situacao: parcial ? 'Em análise' : 'Concluído'
     }).eq('id', r.id).then(({error})=>{
       if(error){ showToast('Erro ao salvar resultado no Supabase.'); console.error(error); return; }
