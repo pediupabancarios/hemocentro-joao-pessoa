@@ -3639,7 +3639,8 @@ function laudoCabecalho(r, pac, titulo){
     <tr><td class="k">Data de nascimento:</td><td colspan="2"><b>${escH(pac.nascimento)}</b></td></tr>
     <tr><td class="k">Solicitante Dr(a):</td><td colspan="2"><b>${escH(r.medico || '')}</b></td></tr>
     <tr><td class="k">Data da coleta:</td><td style="width:26%;"><b>${escH(r.data || '')}</b></td><td>Data da liberação: <b>${escH(r.data_resultado || '')}</b></td></tr>
-  </table>`;
+  </table>
+  ${r.__parcial ? `<div style="border:2px solid #B3261E;color:#B3261E;text-align:center;padding:4px 8px;margin:0 0 8px;font-family:Arial,sans-serif;"><b style="font-size:13px;">RESULTADO PARCIAL — AINDA NÃO LIBERADO</b><div style="font-size:11px;margin-top:2px;">Exames pendentes: ${escH(r.__parcial)}</div></div>` : ''}`;
 }
 // Rodapé com as assinaturas do laboratório. Quem liberou o resultado aparece "assinado" (nome + registro + data)
 // acima da própria linha; os demais ficam só com a linha. Se quem liberou não está na lista, sai uma linha extra.
@@ -3658,14 +3659,14 @@ function laudoQuemLiberou(r){
 }
 function laudoRodape(r){
   r = r || {};
-  const idx = laudoQuemLiberou(r);
+  const idx = r.__parcial ? -1 : laudoQuemLiberou(r);   // parcial não é assinado
   const quem = idx >= 0 ? LAUDO_ASSINANTES[idx][0] : (r.responsavel_laboratorio || '').trim();
   const dataAss = r.data_resultado ? ' em ' + escH(r.data_resultado) : '';
   // quem está na lista: só "Assinado eletronicamente em <data>" acima do próprio nome (o nome já está impresso embaixo)
   const carimboLista = `<div style="font-style:italic;font-size:9px;margin-bottom:2px;">Assinado eletronicamente${dataAss}</div>`;
   // quem não está na lista (ex.: gestor): linha extra com nome e registro
   const carimboExtra = `<div style="font-style:italic;font-weight:700;font-size:11px;line-height:1.15;margin-bottom:1px;">${escH(quem)}</div><div style="font-size:7.5px;color:#333;margin-bottom:2px;">Assinado eletronicamente${dataAss}</div>`;
-  const extra = (quem && idx < 0) ? `<div style="text-align:right;margin-top:auto;padding-top:10px;font-size:10px;">${carimboExtra}<span style="font-size:9px;">${escH(r.responsavel_registro || '')}</span></div>` : '';
+  const extra = (quem && idx < 0 && !r.__parcial) ? `<div style="text-align:right;margin-top:auto;padding-top:10px;font-size:10px;">${carimboExtra}<span style="font-size:9px;">${escH(r.responsavel_registro || '')}</span></div>` : '';
   return `${extra}<div class="l-ass" ${extra ? 'style="margin-top:4px;padding-top:4px;"' : ''}>${LAUDO_ASSINANTES.map((a,i)=>`<div style="display:flex;flex-direction:column;justify-content:flex-end;">
     <div style="min-height:16px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;">${i === idx ? carimboLista : ''}</div>
     <div style="border-top:1px solid #444;padding-top:2px;">${a[0]}<br>${a[1]}<br>${a[2]}</div></div>`).join('')}</div>`;
@@ -3764,6 +3765,11 @@ function templateResultadoModelo(r, pac){
   pac = pac || paciente;
   const mm = laudoParse(r);
   if(!mm || !Object.keys(mm.modelos).length) return `<div class="rx-sheet"><p>Resultado em modelo oficial sem dados.</p></div>`;
+  // solicitação ainda não concluída: marca como parcial e lista o que falta (exame sem resultado confirmado)
+  if(r.situacao && r.situacao !== 'Concluído'){
+    const pend = parseExamesList(r.exame).filter(n=>rwExameLancado(n, mm.modelos) !== true);
+    r = Object.assign({}, r, {__parcial: pend.length ? pend.join(', ') : 'a conferir'});
+  }
   const partes = [];
   if(mm.modelos.hemograma) partes.push(laudoHemogramaHTML(mm.modelos.hemograma, r, pac));
   if(mm.modelos.coagulo) partes.push(laudoCoaguloHTML(mm.modelos.coagulo, r, pac));
@@ -4413,7 +4419,7 @@ function filaLabAtrasado(r){
 async function carregarFilaLab(){
   if(!supabaseConfigured) return;
   const { data, error } = await supabaseClient.from('solicitacoes_exames')
-    .select('id, paciente_id, paciente_nome, data, exame, situacao, medico, medico_crm, registro_numero, data_resultado')
+    .select('id, paciente_id, paciente_nome, data, exame, situacao, medico, medico_crm, registro_numero, data_resultado, resultado')
     .order('data', {ascending:true}).limit(3000);
   if(error){ console.error(error); showToast('Erro ao carregar a fila do laboratório.'); return; }
   filaLab = data || [];
@@ -4487,7 +4493,8 @@ function filaLabRows(){
       <td><span class="status ${statusClass(r.situacao)}">${r.situacao}</span></td>
       <td class="row-actions">
         ${pode && av ? `<button title="${av[1]}" onclick="filaLabMudarEtapa('${r.id}','${av[0]}')">${ico('avancar')}</button>` : ''}
-        ${r.situacao === 'Concluído' ? `<button title="Imprimir resultado" onclick="filaLabImprimirUm('${r.id}')">${ico('verresultado')}</button><button title="Baixar resultado em PDF" onclick="filaLabBaixarUm('${r.id}')">${ico('baixar')}</button>` : ''}
+        ${r.situacao === 'Concluído' ? `<button title="Imprimir resultado" onclick="filaLabImprimirUm('${r.id}')">${ico('verresultado')}</button><button title="Baixar resultado em PDF" onclick="filaLabBaixarUm('${r.id}')">${ico('baixar')}</button>`
+          : (r.resultado ? `<button title="Imprimir resultado PARCIAL (sai marcado como não liberado)" onclick="filaLabImprimirUm('${r.id}')">${ico('verresultado')}</button>` : '')}
         ${pode ? `<button title="${r.situacao === 'Concluído' ? 'Editar resultado' : 'Registrar resultado'}" onclick="filaLabRegistrar('${r.id}','${r.paciente_id}')">${ico('resultado')}</button>` : ''}
         <button title="Abrir paciente" onclick="selecionarPaciente('${r.paciente_id}')">${ico('ver')}</button>
       </td>
@@ -4639,7 +4646,7 @@ function filaLabFolhaResultado(row){
   const p = pacientesList.find(x=>x.id === row.paciente_id);
   const pac = { nome: (p && p.nome) || row.paciente_nome || '—', nascimento: p && p.nascimento ? isoToBR(p.nascimento) : '—' };
   const r = {
-    data: isoToBR(row.data), medico: row.medico, exame: row.exame,
+    data: isoToBR(row.data), medico: row.medico, exame: row.exame, situacao: row.situacao,
     resultado: row.resultado, formato_resultado: row.formato_resultado, parametros_json: row.parametros_json,
     categoria_laboratorio: row.categoria_laboratorio, registro_numero: row.registro_numero,
     observacoes_resultado: row.observacoes_resultado, responsavel_laboratorio: row.responsavel_laboratorio,
@@ -4652,7 +4659,7 @@ function filaLabFolhaResultado(row){
 async function filaLabBaixarUm(id){
   const { data, error } = await supabaseClient.from('solicitacoes_exames').select('*').eq('id', id).single();
   if(error || !data){ console.error(error); showToast('Erro ao buscar o resultado.'); return; }
-  if(data.situacao !== 'Concluído'){ showToast('Este exame ainda não foi liberado pelo laboratório.'); return; }
+  if(data.situacao !== 'Concluído' && !data.resultado){ showToast('Este exame ainda não tem resultado lançado.'); return; }
   baixarPDFdeHTML(filaLabFolhaResultado(data), `Resultado_${data.paciente_nome}_${data.exame}_${data.data_resultado || ''}`);
 }
 
@@ -4660,7 +4667,7 @@ async function filaLabBaixarUm(id){
 async function filaLabImprimirUm(id){
   const { data, error } = await supabaseClient.from('solicitacoes_exames').select('*').eq('id', id).single();
   if(error || !data){ console.error(error); showToast('Erro ao buscar o resultado.'); return; }
-  if(data.situacao !== 'Concluído'){ showToast('Este exame ainda não foi liberado pelo laboratório.'); return; }
+  if(data.situacao !== 'Concluído' && !data.resultado){ showToast('Este exame ainda não tem resultado lançado.'); return; }
   abrirDocumentoImpressao(printWindowShell(filaLabFolhaResultado(data), `Resultado de exame — ${data.paciente_nome || ''}`), true);
 }
 
@@ -5061,13 +5068,13 @@ function recepListaImpHTML(){
   const aviso = todas.length > lista.length ? `<div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Mostrando 100 de ${todas.length} — use a busca ou o período.</div>` : '';
   return aviso + lista.map(r=>{
     const ok = r.situacao === 'Concluído';
-    const quando = ok ? `liberado em ${isoToBR(r.data_resultado || r.data)}` : `pedido em ${isoToBR(r.data)}`;
+    const quando = ok ? `liberado em ${isoToBR(r.data_resultado || r.data)}` : `pedido em ${isoToBR(r.data)}${r.resultado ? ' · resultado parcial lançado' : ''}`;
     return `
     <div class="recep-row" style="${ok ? '' : 'opacity:.7;'}">
       <input type="checkbox" ${ok ? '' : 'disabled'} ${filaLabSel.has(r.id) ? 'checked' : ''} onchange="recepToggleSel('${r.id}', this.checked)">
       <div class="grow"><b>${r.paciente_nome || '—'}</b><div class="sub">${r.exame}${r.registro_numero ? ' · etiqueta ' + r.registro_numero : ''} · ${quando}</div></div>
       ${ok ? `<span class="status concluido">Liberado</span><button class="btn-secondary" onclick="filaLabImprimirUm('${r.id}')">${ico('verresultado')} Imprimir</button><button class="btn-secondary" onclick="filaLabBaixarUm('${r.id}')">${ico('baixar')} Baixar PDF</button>`
-           : `<span class="status ${statusClass(r.situacao)}">${r.situacao}</span><span class="sub">Aguardando laboratório</span>`}
+           : `<span class="status ${statusClass(r.situacao)}">${r.situacao}</span>${r.resultado ? `<button class="btn-secondary" title="Sai marcado como RESULTADO PARCIAL, não liberado" onclick="filaLabImprimirUm('${r.id}')">${ico('verresultado')} Imprimir parcial</button>` : '<span class="sub">Aguardando laboratório</span>'}`}
     </div>`;
   }).join('');
 }
