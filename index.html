@@ -1220,6 +1220,12 @@
 
       <div id="rw-4" class="rw-passo">
         <div class="rw-card">Ao liberar, o laudo fica disponível para a recepção imprimir e baixar. Ele sai no modelo oficial do laboratório, com a assinatura eletrônica abaixo.</div>
+        <div id="rw-assinante-wrap" style="display:none;margin-bottom:10px;">
+          <div class="form-field full">
+            <label>Quem assina o laudo</label>
+            <select id="rw-assinante" onchange="rwEscolherAssinante(this.value)"></select>
+          </div>
+        </div>
         <div class="form-grid" style="margin-top:4px;">
           <div class="form-field">
             <label>Responsável pelo Laboratório (assinatura)</label>
@@ -3154,14 +3160,17 @@ function abrirRegistrarResultado(i){
   document.getElementById('resultado-categoria').value = r.categoria_laboratorio || 'Citohematologia';
   document.getElementById('resultado-data-liberacao').value = r.data_resultado ? brToISO(r.data_resultado) : '';
   document.getElementById('resultado-observacoes').value = r.observacoes_resultado || '';
-  // Assinatura: no perfil Laboratório vale sempre quem está logado (campos travados); o gestor pode ajustar.
-  const ehLabLogado = currentUser && currentUser.tipo === 'laboratorio';
+  // Assinatura: login pessoal do laboratório (com registro) assina sempre em seu nome, travado.
+  // Login da equipe (sem registro) escolhe, na lista, qual responsável assina. O gestor pode ajustar à mão.
+  const ehLabPessoal = currentUser && currentUser.tipo === 'laboratorio' && !!currentUser.crm;
+  const ehLabEquipe = currentUser && currentUser.tipo === 'laboratorio' && !currentUser.crm;
   const regLogado = (currentUser && currentUser.crm) ? ((currentUser.conselho || 'CRF-PB') + ' ' + currentUser.crm) : '';
   const campoResp = document.getElementById('resultado-responsavel'), campoReg = document.getElementById('resultado-registro-profissional');
-  campoResp.value = ehLabLogado ? currentUser.nome : (r.responsavel_laboratorio || (currentUser ? currentUser.nome : ''));
-  campoReg.value = ehLabLogado ? regLogado : (r.responsavel_registro || regLogado);
-  campoResp.readOnly = campoReg.readOnly = !!ehLabLogado;
-  campoResp.style.background = campoReg.style.background = ehLabLogado ? 'var(--bg)' : '';
+  campoResp.value = ehLabPessoal ? currentUser.nome : (ehLabEquipe ? (r.responsavel_laboratorio || '') : (r.responsavel_laboratorio || (currentUser ? currentUser.nome : '')));
+  campoReg.value = ehLabPessoal ? regLogado : (ehLabEquipe ? (r.responsavel_registro || '') : (r.responsavel_registro || regLogado));
+  campoResp.readOnly = campoReg.readOnly = !!(ehLabPessoal || ehLabEquipe);
+  campoResp.style.background = campoReg.style.background = (ehLabPessoal || ehLabEquipe) ? 'var(--bg)' : '';
+  rwPrepararAssinante(ehLabEquipe, r);
 
   const body = document.getElementById('resultado-parametros-body');
   body.innerHTML = '';
@@ -3196,9 +3205,14 @@ function salvarResultadoExame(proximo, modo){
   const formato = document.getElementById('resultado-formato').value;
   let responsavel = document.getElementById('resultado-responsavel').value.trim();
   let registroProfissional = document.getElementById('resultado-registro-profissional').value.trim();
-  if(currentUser && currentUser.tipo === 'laboratorio'){   // assinatura = usuário logado, sempre
+  if(currentUser && currentUser.tipo === 'laboratorio' && currentUser.crm){   // login pessoal: assina sempre em seu nome
     responsavel = currentUser.nome;
-    registroProfissional = currentUser.crm ? ((currentUser.conselho || 'CRF-PB') + ' ' + currentUser.crm) : '';
+    registroProfissional = (currentUser.conselho || 'CRF-PB') + ' ' + currentUser.crm;
+  }
+  if(currentUser && currentUser.tipo === 'laboratorio' && !currentUser.crm && !responsavel){   // login da equipe: precisa escolher quem assina
+    showToast('Escolha quem assina o laudo.');
+    if(rwAtivo && rwPasso < 5){ rwPasso = 4; rwRender(); }
+    return;
   }
   const observacoes = document.getElementById('resultado-observacoes').value.trim();
   const categoria = document.getElementById('resultado-categoria').value;
@@ -3806,6 +3820,37 @@ function rwRender(){
   show('rw-toggle', rwPasso < 5);
   el('rw-toggle').textContent = rwAtivo ? 'Usar formulário simples (sem passos)' : 'Voltar ao passo a passo';
   if(rwPasso === 1) rwListarExames();
+}
+// Login da equipe do laboratório: lista dos responsáveis cadastrados para escolher quem assina
+let rwAssinantes = null;
+async function rwCarregarAssinantes(){
+  if(rwAssinantes) return rwAssinantes;
+  const { data, error } = await supabaseClient.from('usuarios').select('id, nome, crm, conselho').eq('tipo','laboratorio').eq('ativo', true).not('crm','is',null).order('nome', {ascending:true});
+  rwAssinantes = error ? [] : (data || []);
+  return rwAssinantes;
+}
+async function rwPrepararAssinante(equipe, r){
+  const wrap = document.getElementById('rw-assinante-wrap'); if(!wrap) return;
+  wrap.style.display = equipe ? '' : 'none';
+  if(!equipe) return;
+  const lista = await rwCarregarAssinantes();
+  const sel = document.getElementById('rw-assinante');
+  const regAtual = laudoRegNum(r && r.responsavel_registro);
+  let escolhido = '';
+  lista.forEach((u,i)=>{ if(regAtual && laudoRegNum(u.crm) === regAtual) escolhido = String(i); });
+  if(!escolhido && r && r.responsavel_laboratorio) escolhido = 'outro';
+  sel.innerHTML = `<option value="">— Escolha quem assina —</option>` +
+    lista.map((u,i)=>`<option value="${i}" ${escolhido === String(i) ? 'selected' : ''}>${escH(u.nome)} — ${escH((u.conselho || 'CRF-PB') + ' ' + u.crm)}</option>`).join('') +
+    `<option value="outro" ${escolhido === 'outro' ? 'selected' : ''}>Outro (digitar nome e registro)</option>`;
+  const resp = document.getElementById('resultado-responsavel'), reg = document.getElementById('resultado-registro-profissional');
+  if(escolhido === 'outro'){ resp.readOnly = reg.readOnly = false; resp.style.background = reg.style.background = ''; }
+}
+function rwEscolherAssinante(v){
+  const resp = document.getElementById('resultado-responsavel'), reg = document.getElementById('resultado-registro-profissional');
+  if(v === 'outro'){ resp.readOnly = reg.readOnly = false; resp.style.background = reg.style.background = ''; resp.value = ''; reg.value = ''; resp.focus(); return; }
+  resp.readOnly = reg.readOnly = true; resp.style.background = reg.style.background = 'var(--bg)';
+  const u = v === '' ? null : (rwAssinantes || [])[parseInt(v, 10)];
+  resp.value = u ? u.nome : ''; reg.value = u ? (u.conselho || 'CRF-PB') + ' ' + u.crm : '';
 }
 function rwErro(msg){
   let e = document.getElementById('rw-erro');
