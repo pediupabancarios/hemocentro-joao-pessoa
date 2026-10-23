@@ -3365,7 +3365,7 @@ const LAUDO_COAG = [
   {id:'folato',pag:1,titulo:'FOLATO',amostra:'SORO',metodo:'QUIMIOLUMINESCÊNCIA',tipo:'simples',unid:'ng/mL',refs:['3,1 – 20,5 ng/mL']},
   {id:'b12',pag:1,titulo:'VITAMINA B12',amostra:'SORO',metodo:'QUIMIOLUMINESCÊNCIA',tipo:'simples',unid:'pg/mL',refs:['187 - 883 pg/mL']},
   {id:'homocisteina',pag:1,titulo:'HOMOCISTEÍNA',amostra:'SORO',metodo:'QUIMIOLUMINESCÊNCIA',tipo:'simples',unid:'µmol/L',refs:['HOMENS: 5,46 – 16,20 µmol/L','MULHERES: 4,44 – 13,56 µmol/L']},
-  {id:'perfilhb',pag:1,titulo:'PERFIL HEMOGLOBÍNICO',amostra:'SANGUE TOTAL',metodo:'HPLC',tipo:'multi',linhas:[['a','A','%',''],['a2','A₂','%',''],['f','F','%','']],refBloco:['ADULTOS:','Hemoglobina A: 94.0 - 96.5%','Hemoglobina A2: 2.2 - 3.5%','Hemoglobina F: até 2%','NEONATOS:','Hemoglobina A: até 20%','Hemoglobina F: até 80%']},
+  {id:'perfilhb',pag:1,titulo:'PERFIL HEMOGLOBÍNICO',amostra:'SANGUE TOTAL',metodo:'HPLC',tipo:'multi',linhas:[['a','A','%',''],['a2','A₂','%',''],['f','F','%','']],extras:[['e1','S'],['e2','C'],['e3','D']],refBloco:['ADULTOS:','Hemoglobina A: 94.0 - 96.5%','Hemoglobina A2: 2.2 - 3.5%','Hemoglobina F: até 2%','NEONATOS:','Hemoglobina A: até 20%','Hemoglobina F: até 80%']},
   {id:'tp',pag:2,titulo:'TEMPO DE PROTROMBINA (TP)',amostra:'PLASMA CITRATADO',metodo:'COAGULOMÉTRICO',tipo:'multi',linhas:[['paciente','PLASMA PACIENTE','s','12,0 – 15,0 segundos'],['controle','PLASMA CONTROLE','s','-----'],['atividade','ATIVIDADE ENZIMÁTICA','%','> 70%'],['inr','INR','','Até 1,20']],notas:['ISI (ÍNDICE DE SENSIBILIDADE INTERNACIONAL) da tromboplastina: 1,01','NOTA 1: Recomenda-se o uso do INR (International Normalizes Ratio) para monitorização de paciente em anticoagulação oral com antagonistas de vitamina K (AVKs). Para as demais situações clínicas, sugere-se o acompanhamento dos resultados expressos em segundos.','NOTA 2: Para maior parte das indicações de anticoagulação com AVKs, o intervalo terapêutico recomendado do INR é de 2,0 a 3,0.']},
   {id:'ttpa',pag:2,titulo:'TEMPO DE TROMBOPLASTINA PARCIAL ATIVADO (TTPa)',amostra:'PLASMA CITRATADO',metodo:'COAGULOMÉTRICO',tipo:'multi',linhas:[['paciente','PLASMA PACIENTE','s','25,0 – 34,0 segundos'],['controle','PLASMA CONTROLE','s','-----'],['relacao','RELAÇÃO TTPa paciente/TTPa controle','','0,90 – 1,20 segundos']],notas:['NOTA 1: O Tempo de Tromboplastina Parcial ativado (TTPa) permite avaliar alterações hereditárias ou adquiridas nos fatores da coagulação que compõem a via intrínseca. Dentre as condições adquiridas, encontra-e a terapia com drogas anticoagulantes tais como a heparina não fracionada, o argatroban e a leperudina, sendo este teste utilizado para o monitoramento destes medicamentos.']},
   {id:'tt',pag:2,titulo:'TEMPO DE TROMBINA (TT)',amostra:'PLASMA CITRATADO',metodo:'COAGULOMÉTRICO',tipo:'multi',linhas:[['paciente','PLASMA PACIENTE','s','16,0 – 19,0 segundos'],['controle','PLASMA CONTROLE','s','-----'],['relacao','RELAÇÃO TT paciente/TT controle','','0,90 – 1,20 segundos']]},
@@ -3455,7 +3455,11 @@ function renderModeloHemograma(d){
 function renderModeloCoagulo(d){
   d = d || {}; const v = d.valores || {};
   const secs = LAUDO_COAG.map(s=>{
-    const campos = s.tipo === 'multi' ? s.linhas.map(([k,nome,un,ref])=>`<tr><td>${nome}</td><td style="width:150px;">${modeloInput(s.id + '.' + k, v[s.id + '.' + k])}</td><td>${un}</td><td style="color:var(--muted);">${escH(ref || '')}</td></tr>`).join('')
+    const extrasHTML = (s.extras || []).map(([k,padrao])=>{
+      const nomeSalvo = v[s.id + '.' + k + 'n'];
+      return `<tr><td><input type="text" data-k="${s.id}.${k}n" value="${escH(nomeSalvo != null ? nomeSalvo : padrao)}" placeholder="Variante (ex.: S)" style="width:130px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px;"></td><td style="width:150px;">${modeloInput(s.id + '.' + k, v[s.id + '.' + k])}</td><td>%</td><td style="color:var(--muted);">linha livre — informe o nome da hemoglobina</td></tr>`;
+    }).join('');
+    const campos = s.tipo === 'multi' ? s.linhas.map(([k,nome,un,ref])=>`<tr><td>${nome}</td><td style="width:150px;">${modeloInput(s.id + '.' + k, v[s.id + '.' + k])}</td><td>${un}</td><td style="color:var(--muted);">${escH(ref || '')}</td></tr>`).join('') + extrasHTML
       : `<tr><td>Resultado</td><td style="width:150px;">${modeloInput(s.id + '.valor', v[s.id + '.valor'])}</td><td>${s.unid || ''}</td><td style="color:var(--muted);">${s.refs.map(escH).join(' · ')}</td></tr>`;
     const hist = s.historico ? `<tr><td colspan="4" style="padding-top:8px;font-size:12px;color:var(--muted);">Histórico de titulações anteriores (opcional):</td></tr>` + [1,2,3].map(i=>`<tr><td>${modeloInput(s.id + '.h' + i + 'd', v[s.id + '.h' + i + 'd'], 'placeholder="Data"')}</td><td>${modeloInput(s.id + '.h' + i + 'r', v[s.id + '.h' + i + 'r'], 'placeholder="UB/mL"')}</td><td colspan="2">${modeloInput(s.id + '.h' + i + 'i', v[s.id + '.h' + i + 'i'], 'placeholder="Interpretação"')}</td></tr>`).join('') : '';
     const preenchido = Object.keys(v).some(k=>k.startsWith(s.id + '.') && String(v[k] || '').trim());
@@ -3484,6 +3488,7 @@ function modeloColetar(){
     const k = i.dataset.k, val = i.value.trim();
     if(k.startsWith('obs.')) obs[k.slice(4)] = val; else if(val) valores[k] = val;
   });
+  Object.keys(valores).forEach(k=>{ if(/\.e\d+n$/.test(k) && !valores[k.slice(0,-1)]) delete valores[k]; });   // nome de linha extra sem valor não conta
   return {faixa: modeloTipoAtual === 'hemograma' ? document.getElementById('mod-faixa').value : null, valores, obs, amostraExterna: !!document.getElementById('mod-externa')?.checked};
 }
 // guarda o que está na tela e devolve {v:3, modelos:{...}} só com os modelos que têm algum resultado
@@ -3549,7 +3554,10 @@ function laudoLinhasPlanas(r){
       if(v.reticulocitos) out.push({parametro:'Reticulócitos',resultado:v.reticulocitos,unidade:'%',referencia:HEMO_RETIC_REF.join(' / ')});
     } else {
       LAUDO_COAG.forEach(s=>{
-        if(s.tipo === 'multi') s.linhas.forEach(([k,n,u,ref])=>{ const x = v[s.id + '.' + k]; if(x) out.push({parametro:s.titulo + ' — ' + n,resultado:x,unidade:u,referencia:ref || (s.refBloco || []).join(' ')}); });
+        if(s.tipo === 'multi'){
+        s.linhas.forEach(([k,n,u,ref])=>{ const x = v[s.id + '.' + k]; if(x) out.push({parametro:s.titulo + ' — ' + n,resultado:x,unidade:u,referencia:ref || (s.refBloco || []).join(' ')}); });
+        (s.extras || []).forEach(([k])=>{ const x = v[s.id + '.' + k]; if(x) out.push({parametro:s.titulo + ' — ' + (v[s.id + '.' + k + 'n'] || k),resultado:x,unidade:'%',referencia:''}); });
+      }
         else { const x = v[s.id + '.valor']; if(x) out.push({parametro:s.titulo,resultado:x,unidade:s.unid || '',referencia:s.refs.join(' / ')}); }
       });
     }
@@ -3687,12 +3695,14 @@ function laudoSecaoHTML(s, v){
   const g = k => v[s.id + '.' + k];
   let corpo;
   if(s.tipo === 'multi'){
-    const N = s.linhas.length;
+    const extrasPreenchidos = (s.extras || []).filter(([k])=>g(k)).map(([k])=>[k, g(k + 'n') || k, '%']);
+    const linhasTodas = [...s.linhas, ...extrasPreenchidos];
+    const N = linhasTodas.length;
     const linhas = s.linhas.map(([k,n,u,ref])=>`<tr><td style="text-align:right;font-size:12px;width:27%;">${n}</td><td style="text-align:center;white-space:nowrap;width:15%;"><span class="l-val" style="font-size:17px;">${escH(g(k) || '')}</span> <b>${u}</b></td><td class="l-rt" style="width:28%;">${escH(ref || '')}</td></tr>`).join('');
     const bloco = `<td class="l-rt" rowspan="${N}" style="font-size:11.5px;">${(s.refBloco || []).map(escH).join('<br>')}</td>`;
     corpo = s.refBloco
       ? `<tr><td class="l-lab" rowspan="${N + 1}" style="width:30%;">AMOSTRA: ${s.amostra}<br>MÉTODO: ${s.metodo}</td><td class="l-rt" colspan="2" style="width:30%;">RESULTADO</td><td class="l-rt" style="width:40%;">VALORES DE REFERÊNCIA</td></tr>` +
-        s.linhas.map(([k,n,u],i)=>`<tr><td colspan="2" style="text-align:center;"><b style="font-size:16px;">${n}</b> <span class="l-val" style="font-size:17px;">${escH(g(k) || '')}</span> <b>${u}</b></td>${i === 0 ? bloco : ''}</tr>`).join('')
+        linhasTodas.map(([k,n,u],i)=>`<tr><td colspan="2" style="text-align:center;"><b style="font-size:16px;">${escH(n)}</b> <span class="l-val" style="font-size:17px;">${escH(g(k) || '')}</span> <b>${u}</b></td>${i === 0 ? bloco : ''}</tr>`).join('')
       : `<tr><td class="l-lab" rowspan="${N + 1}" style="width:30%;">AMOSTRA: ${s.amostra}<br>MÉTODO: ${s.metodo}</td><td></td><td class="l-rt">RESULTADO</td><td class="l-rt">VALORES DE REFERÊNCIA</td></tr>` + linhas;
   } else {
     const resultado = s.tipo === 'texto' ? `<span class="l-val" style="font-size:17px;">${escH(g('valor') || '')}</span>` : `<span class="l-val" style="font-size:19px;">${escH(g('valor') || '')}</span> <b style="font-size:16px;">${s.unid || ''}</b>`;
