@@ -1973,6 +1973,7 @@ function atualizarPacienteTopo(){
 }
 
 function renderPage(page){
+  if(PAGINAS_COM_PACIENTES.includes(page)) setTimeout(()=>atualizarPacientesEPagina(), 50);   // pega edições feitas por outras pessoas
   atualizarPacienteTopo();
   const cp = document.getElementById('context-page');
   if(cp) cp.textContent = NOMES_PAGINA[page] || '—';
@@ -4448,7 +4449,7 @@ function filaLabLinhas(){
     if(filaLabEtapa !== 'todas' && r.situacao !== filaLabEtapa) return false;
     if(!filaLabPassaPeriodo(r)) return false;
     if(!t) return true;
-    return normNome([r.paciente_nome, r.exame, r.medico, r.registro_numero].join(' ')).includes(t);
+    return normNome([nomePacienteDe(r), r.exame, r.medico, r.registro_numero].join(' ')).includes(t);
   });
   const dir = filaLabOrdem === 'recentes' ? -1 : 1;
   return lista.slice().sort((a,b)=> dir * (a.data||'').localeCompare(b.data||''));
@@ -4488,7 +4489,7 @@ function filaLabRows(){
     <tr>
       <td class="col-check">${(pode || r.situacao === 'Concluído') ? `<input type="checkbox" ${filaLabSel.has(r.id) ? 'checked' : ''} onchange="filaLabToggleSel('${r.id}', this.checked)">` : ''}</td>
       <td>${isoToBR(r.data)}${filaLabSeloAtraso(r)}</td>
-      <td><b>${r.paciente_nome || '—'}</b></td>
+      <td><b>${nomePacienteDe(r)}</b></td>
       <td>${r.exame}</td>
       <td>${r.medico || '—'}</td>
       <td>${r.registro_numero ? `<b>${r.registro_numero}</b>` : '—'}</td>
@@ -4659,22 +4660,25 @@ function filaLabFolhaResultado(row){
 
 // Baixa o PDF do laudo de um exame concluído
 async function filaLabBaixarUm(id){
+  await recarregarPacientes(true);
   const { data, error } = await supabaseClient.from('solicitacoes_exames').select('*').eq('id', id).single();
   if(error || !data){ console.error(error); showToast('Erro ao buscar o resultado.'); return; }
   if(data.situacao !== 'Concluído' && !data.resultado){ showToast('Este exame ainda não tem resultado lançado.'); return; }
-  baixarPDFdeHTML(filaLabFolhaResultado(data), `Resultado_${data.paciente_nome}_${data.exame}_${data.data_resultado || ''}`);
+  baixarPDFdeHTML(filaLabFolhaResultado(data), `Resultado_${nomePacienteDe(data)}_${data.exame}_${data.data_resultado || ''}`);
 }
 
 // Imprime o laudo de um exame concluído (qualquer perfil que veja a fila)
 async function filaLabImprimirUm(id){
+  await recarregarPacientes(true);
   const { data, error } = await supabaseClient.from('solicitacoes_exames').select('*').eq('id', id).single();
   if(error || !data){ console.error(error); showToast('Erro ao buscar o resultado.'); return; }
   if(data.situacao !== 'Concluído' && !data.resultado){ showToast('Este exame ainda não tem resultado lançado.'); return; }
-  abrirDocumentoImpressao(printWindowShell(filaLabFolhaResultado(data), `Resultado de exame — ${data.paciente_nome || ''}`), true);
+  abrirDocumentoImpressao(printWindowShell(filaLabFolhaResultado(data), `Resultado de exame — ${nomePacienteDe(data)}`), true);
 }
 
 // Imprime/salva em PDF os laudos (um por folha): do dia informado ou, sem dia, dos exames marcados na fila
 async function filaLabImprimirResultados(dia, modo){
+  await recarregarPacientes(true);
   let data;
   if(dia){
     data = await filaLabResultadosDoDia(dia);
@@ -4793,6 +4797,42 @@ function labIr(destino){
   clickNav('filalab');
   if(destino === 'relatorios' || destino === 'laudos') setTimeout(()=>document.getElementById('fila-lab-dia-res')?.scrollIntoView({block:'center', behavior:'smooth'}), 350);
 }
+
+/* ================= ATUALIZAÇÃO DOS CADASTROS DE PACIENTES =================
+   A lista de pacientes é carregada no login. Se outra pessoa (ex.: recepção) edita um cadastro, quem já está logado
+   continuava vendo o dado antigo. Aqui a lista é recarregada de tempos em tempos, ao voltar para a aba e antes de imprimir. */
+let _pacRecarregadoEm = 0;
+async function recarregarPacientes(forcar){
+  if(!supabaseConfigured || !currentUser) return false;
+  if(!forcar && Date.now() - _pacRecarregadoEm < 30000) return false;
+  _pacRecarregadoEm = Date.now();
+  try{
+    const { data, error } = await supabaseClient.from('pacientes').select('*').order('created_at', {ascending:true});
+    if(error || !data) return false;
+    const mudou = JSON.stringify(data) !== JSON.stringify(pacientesList);
+    pacientesList = data;
+    if(mudou && currentPacienteId){
+      const ativo = data.find(x=>x.id === currentPacienteId);
+      if(ativo && !document.querySelector('.modal-overlay.show')) { await ativarPaciente(ativo, false); atualizarPacienteTopo(); }
+    }
+    return mudou;
+  }catch(e){ return false; }
+}
+const PAGINAS_COM_PACIENTES = ['filalab','labhome','dados','resumo','laboratorios'];
+async function atualizarPacientesEPagina(forcar){
+  const pag = document.querySelector('.nav-item.active')?.dataset.page;
+  const mudou = await recarregarPacientes(forcar);
+  const ed = document.activeElement;
+  const digitando = ed && /^(INPUT|TEXTAREA|SELECT)$/.test(ed.tagName);
+  if(mudou && PAGINAS_COM_PACIENTES.includes(pag) && !document.querySelector('.modal-overlay.show') && !digitando &&
+     document.querySelector('.nav-item.active')?.dataset.page === pag) renderPage(pag);
+}
+function nomePacienteDe(r){
+  const p = r && r.paciente_id ? pacientesList.find(x=>x.id === r.paciente_id) : null;
+  return (p && p.nome) || (r && r.paciente_nome) || '—';
+}
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'visible') atualizarPacientesEPagina(); });
+setInterval(()=>{ if(document.visibilityState === 'visible') atualizarPacientesEPagina(); }, 2 * 60 * 1000);
 
 /* ================= AVISO DE VERSÃO NOVA =================
    O app é uma página única: quem deixa a aba aberta continua com o código antigo depois de uma atualização.
@@ -5074,7 +5114,7 @@ function recepListaImpHTML(){
     return `
     <div class="recep-row" style="${ok ? '' : 'opacity:.7;'}">
       <input type="checkbox" ${ok ? '' : 'disabled'} ${filaLabSel.has(r.id) ? 'checked' : ''} onchange="recepToggleSel('${r.id}', this.checked)">
-      <div class="grow"><b>${r.paciente_nome || '—'}</b><div class="sub">${r.exame}${r.registro_numero ? ' · etiqueta ' + r.registro_numero : ''} · ${quando}</div></div>
+      <div class="grow"><b>${nomePacienteDe(r)}</b><div class="sub">${r.exame}${r.registro_numero ? ' · etiqueta ' + r.registro_numero : ''} · ${quando}</div></div>
       ${ok ? `<span class="status concluido">Liberado</span><button class="btn-secondary" onclick="filaLabImprimirUm('${r.id}')">${ico('verresultado')} Imprimir</button><button class="btn-secondary" onclick="filaLabBaixarUm('${r.id}')">${ico('baixar')} Baixar PDF</button>`
            : `<span class="status ${statusClass(r.situacao)}">${r.situacao}</span>${r.resultado ? `<button class="btn-secondary" title="Sai marcado como RESULTADO PARCIAL, não liberado" onclick="filaLabImprimirUm('${r.id}')">${ico('verresultado')} Imprimir parcial</button>` : '<span class="sub">Aguardando laboratório</span>'}`}
     </div>`;
@@ -7137,6 +7177,8 @@ function salvarPaciente(){
       if(error){ showToast('Erro ao salvar alterações do paciente.'); console.error(error); return; }
       const idx = pacientesList.findIndex(x=>x.id === editingPacienteId);
       if(idx > -1) pacientesList[idx] = data[0];
+      // mantém o nome gravado nas solicitações e agendamentos igual ao cadastro (o laboratório lê dali)
+      ['solicitacoes_exames','solicitacoes_hemocomponentes','agendamentos'].forEach(t=>{ supabaseClient.from(t).update({paciente_nome: data[0].nome}).eq('paciente_id', editingPacienteId).then(({error})=>{ if(error) console.error(t, error); }); });
       closeModal('modal-paciente');
       showToast('Dados do paciente atualizados com sucesso.');
       if(currentPacienteId === editingPacienteId){
@@ -7295,7 +7337,7 @@ function datasetExport(tipo){
     return {
       titulo: `Fila do Laboratório (${rotuloFiltro}) — ${isoToBR(isoLocal(new Date()))}`,
       cols: ['Data','Paciente','Exame(s)','Médico','Nº etiqueta','Situação','Dias em aberto'],
-      rows: filaLabLinhas().map(r=>[isoToBR(r.data), r.paciente_nome, r.exame, r.medico, r.registro_numero || '', r.situacao, r.situacao === 'Concluído' ? '' : diasDesdeISO(r.data)])
+      rows: filaLabLinhas().map(r=>[isoToBR(r.data), nomePacienteDe(r), r.exame, r.medico, r.registro_numero || '', r.situacao, r.situacao === 'Concluído' ? '' : diasDesdeISO(r.data)])
     };
   }
   if(tipo === 'hemocomponentes'){
