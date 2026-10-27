@@ -1838,8 +1838,10 @@ function podeCriarDocumentos(){
 }
 
 function podeCriarLaboratorio(){
-  return !currentUser || currentUser.tipo === 'medico' || currentUser.tipo === 'gestor' || currentUser.tipo === 'recepcao';
+  return !currentUser || currentUser.tipo === 'medico' || currentUser.tipo === 'gestor' || currentUser.tipo === 'recepcao' || currentUser.tipo === 'laboratorio';
 }
+// o laboratório cria e edita solicitações, mas não exclui (exclusão fica com médico, recepção e gestor)
+function podeExcluirLaboratorio(){ return podeCriarLaboratorio() && !(currentUser && currentUser.tipo === 'laboratorio'); }
 
 function podeRegistrarResultado(){
   return currentUser && (currentUser.tipo === 'laboratorio' || currentUser.tipo === 'gestor');
@@ -2482,7 +2484,7 @@ function labsRows(){
         ${r.resultado ? `<button title="Ver / Imprimir resultado" onclick="imprimirResultadoExame(${i})">${ico('verresultado')}</button>` : ''}
         ${r.resultado ? `<button title="Baixar resultado em PDF" onclick="baixarResultadoExame(${i})">${ico('baixar')}</button>` : ''}
         ${podeCriarLaboratorio() ? `<button title="Editar" onclick="editarLab(${i})">${ico('editar')}</button>` : ''}
-        ${podeCriarLaboratorio() ? `<button class="danger" title="Excluir" onclick="excluirLab(${i})">${ico('excluir')}</button>` : ''}
+        ${podeExcluirLaboratorio() ? `<button class="danger" title="Excluir" onclick="excluirLab(${i})">${ico('excluir')}</button>` : ''}
       </td>
     </tr>`).join('');
 }
@@ -4226,7 +4228,7 @@ function documentosTemplate(){
         ${resultadoBtn}
         ${verResultadoBtn}
         ${(d._tipo==='exame' ? podeCriarLaboratorio() : podeCriarDocumentos()) ? `<button title="Editar" onclick="${editarFn}">${ico('editar')}</button>` : ''}
-        ${(d._tipo==='exame' ? podeCriarLaboratorio() : podeCriarDocumentos()) ? `<button class="danger" title="Excluir" onclick="${excluirFn}">${ico('excluir')}</button>` : ''}
+        ${(d._tipo==='exame' ? podeExcluirLaboratorio() : podeCriarDocumentos()) ? `<button class="danger" title="Excluir" onclick="${excluirFn}">${ico('excluir')}</button>` : ''}
       </td>
     </tr>`;
   }).join('') : `<tr class="empty-row"><td colspan="5">Nenhum documento registrado para este paciente.</td></tr>`;
