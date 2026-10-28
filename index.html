@@ -3391,6 +3391,9 @@ const HEMO_RETIC_REF = ['Recém Nascido até 10%','Adulto 0.5 a 2.0 %','Na gravi
 const HEMO_FONIO = [['fonio_com','Fônio com citrato'],['fonio_sem','Fônio sem citrato']];
 const LAUDO_NOTA_EXTERNA = '*Observação sobre a amostra: a amostra utilizada para realização deste(s) exame(s) foi coletada por outro órgão de saúde (hospital ou laboratório) e encaminhada ao Laboratório de Coagulopatias e Hemoglobinopatias do Hemocentro da Paraíba para processamento e análise. O laboratório responsabiliza-se exclusivamente pela execução técnica e liberação dos resultados analíticos, não se responsabilizando pelas condições de coleta, transporte e armazenamento pré-analítico da amostra.';
 
+// Plasma controle fixo: já vem preenchido ao abrir TP/TTPa/TT (pode ser alterado no lançamento).
+// Só é salvo junto com algum resultado do próprio exame — sozinho não conta como exame feito.
+const COAG_CONTROLE_PADRAO = {'tp.controle':'13,4','ttpa.controle':'29,6','tt.controle':'17,6'};
 const LAUDO_COAG = [
   {id:'ferritina',pag:1,titulo:'FERRITINA',amostra:'SORO',metodo:'QUIMIOLUMINESCÊNCIA',tipo:'simples',unid:'ng/mL',refs:['RECÉM-NASCIDOS: 25 - 200 ng/mL','7 dias a um mês: 200 - 600 ng/mL','2 a 5 meses: 50 - 200 ng/mL','6 meses a 15 anos: 10 - 150 ng/mL','HOMENS: 30 – 300 ng/mL','MULHERES: 20 – 200 ng/mL']},
   {id:'folato',pag:1,titulo:'FOLATO',amostra:'SORO',metodo:'QUIMIOLUMINESCÊNCIA',tipo:'simples',unid:'ng/mL',refs:['3,1 – 20,5 ng/mL']},
@@ -3492,7 +3495,9 @@ function renderModeloCoagulo(d){
       const nomeSalvo = v[s.id + '.' + k + 'n'];
       return `<tr><td><input type="text" data-k="${s.id}.${k}n" value="${escH(nomeSalvo != null ? nomeSalvo : padrao)}" placeholder="Variante (ex.: S)" style="width:130px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px;"></td><td style="width:150px;">${modeloInput(s.id + '.' + k, v[s.id + '.' + k])}</td><td>%</td><td style="color:var(--muted);">linha livre — informe o nome da hemoglobina</td></tr>`;
     }).join('');
-    const campos = s.tipo === 'multi' ? s.linhas.map(([k,nome,un,ref])=>`<tr><td>${nome}</td><td style="width:150px;">${modeloInput(s.id + '.' + k, v[s.id + '.' + k])}</td><td>${un}</td><td style="color:var(--muted);">${escH(ref || '')}</td></tr>`).join('') + extrasHTML
+    const temDado = Object.keys(v).some(k=>k.startsWith(s.id + '.') && String(v[k] || '').trim());
+    const valIni = k=>{ const c = s.id + '.' + k; return v[c] != null ? v[c] : (!temDado && COAG_CONTROLE_PADRAO[c]) || ''; };
+    const campos = s.tipo === 'multi' ? s.linhas.map(([k,nome,un,ref])=>`<tr><td>${nome}</td><td style="width:150px;">${modeloInput(s.id + '.' + k, valIni(k))}</td><td>${un}</td><td style="color:var(--muted);">${escH(ref || '')}</td></tr>`).join('') + extrasHTML
       : `<tr><td>Resultado</td><td style="width:150px;">${modeloInput(s.id + '.valor', v[s.id + '.valor'])}</td><td>${s.unid || ''}</td><td style="color:var(--muted);">${s.refs.map(escH).join(' · ')}</td></tr>`;
     const hist = s.historico ? `<tr><td colspan="4" style="padding-top:8px;font-size:12px;color:var(--muted);">Histórico de titulações anteriores (opcional):</td></tr>` + [1,2,3].map(i=>`<tr><td>${modeloInput(s.id + '.h' + i + 'd', v[s.id + '.h' + i + 'd'], 'placeholder="Data"')}</td><td>${modeloInput(s.id + '.h' + i + 'r', v[s.id + '.h' + i + 'r'], 'placeholder="UB/mL"')}</td><td colspan="2">${modeloInput(s.id + '.h' + i + 'i', v[s.id + '.h' + i + 'i'], 'placeholder="Interpretação"')}</td></tr>`).join('') : '';
     const preenchido = Object.keys(v).some(k=>k.startsWith(s.id + '.') && String(v[k] || '').trim());
@@ -3522,6 +3527,10 @@ function modeloColetar(){
     if(k.startsWith('obs.')) obs[k.slice(4)] = val; else if(val) valores[k] = val;
   });
   Object.keys(valores).forEach(k=>{ if(/\.e\d+n$/.test(k) && !valores[k.slice(0,-1)]) delete valores[k]; });   // nome de linha extra sem valor não conta
+  Object.keys(COAG_CONTROLE_PADRAO).forEach(c=>{   // controle pré-preenchido sem resultado do paciente não conta
+    const sec = c.split('.')[0] + '.';
+    if(valores[c] && !Object.keys(valores).some(k=>k !== c && k.startsWith(sec))) delete valores[c];
+  });
   return {faixa: modeloTipoAtual === 'hemograma' ? document.getElementById('mod-faixa').value : null, valores, obs, amostraExterna: !!document.getElementById('mod-externa')?.checked};
 }
 // guarda o que está na tela e devolve {v:3, modelos:{...}} só com os modelos que têm algum resultado
