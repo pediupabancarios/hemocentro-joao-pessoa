@@ -3387,6 +3387,8 @@ const HEMO_FAIXAS = {
 };
 const HEMO_OBS_PADRAO = {eritro:'Normocrômica, Normocítica.', leuco:'Leucócitos bem conservados.', plaq:'Plaquetas normais em número e morfologia.'};
 const HEMO_RETIC_REF = ['Recém Nascido até 10%','Adulto 0.5 a 2.0 %','Na gravidez encontra-se aumentado.'];
+// Fônio (contagem de plaquetas em lâmina) — sai no laudo do hemograma, na mesma folha
+const HEMO_FONIO = [['fonio_com','Fônio com citrato'],['fonio_sem','Fônio sem citrato']];
 const LAUDO_NOTA_EXTERNA = '*Observação sobre a amostra: a amostra utilizada para realização deste(s) exame(s) foi coletada por outro órgão de saúde (hospital ou laboratório) e encaminhada ao Laboratório de Coagulopatias e Hemoglobinopatias do Hemocentro da Paraíba para processamento e análise. O laboratório responsabiliza-se exclusivamente pela execução técnica e liberação dos resultados analíticos, não se responsabilizando pelas condições de coleta, transporte e armazenamento pré-analítico da amostra.';
 
 const LAUDO_COAG = [
@@ -3478,7 +3480,9 @@ function renderModeloHemograma(d){
   <table class="param-table"><tbody><tr><td>Plaquetas</td><td style="width:140px;">${modeloInput('plaquetas', v.plaquetas)}</td><td>x10³/mm³</td><td style="color:var(--muted);">${F.plaquetas} x10³/mm³</td></tr></tbody></table>
   <div class="form-field full" style="margin-top:6px;"><label>Obs. plaquetas</label>${modeloInput('obs.plaq', ob.plaq != null ? ob.plaq : HEMO_OBS_PADRAO.plaq)}</div>
   <div class="form-section-title" style="margin-top:14px;">Reticulócitos (opcional)</div>
-  <table class="param-table"><tbody><tr><td>Reticulócitos</td><td style="width:140px;">${modeloInput('reticulocitos', v.reticulocitos)}</td><td>%</td><td style="color:var(--muted);">${HEMO_RETIC_REF.join(' · ')}</td></tr></tbody></table>`;
+  <table class="param-table"><tbody><tr><td>Reticulócitos</td><td style="width:140px;">${modeloInput('reticulocitos', v.reticulocitos)}</td><td>%</td><td style="color:var(--muted);">${HEMO_RETIC_REF.join(' · ')}</td></tr></tbody></table>
+  <div class="form-section-title" style="margin-top:14px;">Fônio — contagem de plaquetas (opcional)</div>
+  <table class="param-table"><tbody>${HEMO_FONIO.map(([k,nome])=>`<tr><td>${nome}</td><td style="width:140px;">${modeloInput(k, v[k])}</td><td>x10³/mm³</td><td style="color:var(--muted);">${F.plaquetas} x10³/mm³</td></tr>`).join('')}</tbody></table>`;
 }
 
 function renderModeloCoagulo(d){
@@ -3581,6 +3585,7 @@ function laudoLinhasPlanas(r){
       HEMO_DIF.forEach(([k,n])=>{ if(v[k]){ out.push({parametro:n + ' (%)',resultado:v[k],unidade:'%',referencia:HEMO_REL[k] || ''}); const a = absLeuco(v,k); if(a) out.push({parametro:n + ' (abs)',resultado:a,unidade:'/mm³',referencia:F.abs[k] || HEMO_ABS_COMUM[k] || ''}); } });
       if(v.plaquetas) out.push({parametro:'Plaquetas',resultado:v.plaquetas,unidade:'x10³/mm³',referencia:F.plaquetas});
       if(v.reticulocitos) out.push({parametro:'Reticulócitos',resultado:v.reticulocitos,unidade:'%',referencia:HEMO_RETIC_REF.join(' / ')});
+      HEMO_FONIO.forEach(([k,n])=>{ if(v[k]) out.push({parametro:n,resultado:v[k],unidade:'x10³/mm³',referencia:F.plaquetas}); });
     } else {
       LAUDO_COAG.forEach(s=>{
         if(s.tipo === 'multi'){
@@ -3693,6 +3698,13 @@ function laudoHemogramaHTML(m, r, pac){
       <td class="hr"><b>RESULTADO</b><div style="margin-top:3px;"><span class="l-val">${x(v.reticulocitos)}</span> <b>%</b></div></td>
       <td class="hr"><b>VALORES DE REFERÊNCIA</b><div style="font-size:10.5px;margin-top:2px;">${HEMO_RETIC_REF.join('<br>')}</div></td></tr>
     </table></div>` : '';
+  const fonio = HEMO_FONIO.some(([k])=>v[k]) ? `
+    <div class="l-box"><table class="hg">
+      <colgroup><col style="width:33%"><col style="width:30%"><col style="width:37%"></colgroup>
+      <tr><td><span class="l-big">FÔNIO</span><div class="l-small" style="margin-top:2px;">CONTAGEM DE PLAQUETAS<br>MÉTODO: FÔNIO (ESFREGAÇO)</div></td>
+      <td class="hr"><b>RESULTADO</b>${HEMO_FONIO.filter(([k])=>v[k]).map(([k,n])=>`<div style="margin-top:3px;font-size:10.5px;">${n.replace('Fônio ','')}: <span class="l-val">${x(v[k])}</span> <b>x10³/mm³</b></div>`).join('')}</td>
+      <td class="hr"><b>VALORES DE REFERÊNCIA</b><div style="font-size:10.5px;margin-top:2px;">${F.plaquetas} x10³/mm³</div></td></tr>
+    </table></div>` : '';
   return `
   <div class="laudo">
     ${laudoCabecalho(r, pac, 'LABORATÓRIO DE<br>CITOHEMATOLOGIA')}
@@ -3716,6 +3728,7 @@ function laudoHemogramaHTML(m, r, pac){
       </table>
     </div>
     ${retic}
+    ${fonio}
     ${r.observacoes_resultado ? `<div class="l-obs"><b>Obs.:</b> ${escH(r.observacoes_resultado)}</div>` : ''}
     ${laudoRodape(r)}
   </div>`;
@@ -3795,7 +3808,7 @@ function rwIniciar(r){
 function rwAlternarModo(){ rwAtivo = !rwAtivo; if(rwAtivo) rwPasso = 1; rwRender(); }
 function rwModeloDoExame(nome){
   const ex = normExame(nome);
-  if(/hemograma/.test(ex)) return 'hemograma';
+  if(/hemograma|fonio/.test(ex)) return 'hemograma';
   if(/(ferritina|folato|vitamina b12|homocist|coagulograma|fator|d dimero|antitrombina|proteina c|proteina s|anticoagulante lupico|inibidor|ristocetina|von willebrand|resistencia a proteina|tempo de|perfil hemoglobinico)/.test(ex)) return 'coagulo';
   return '';
 }
@@ -3803,8 +3816,9 @@ function rwModeloDoExame(nome){
 // Cada exame pedido que tem modelo oficial: onde o resultado deve estar (hemograma ou seções do modelo de coagulopatias)
 const RW_EXAME_MAPA = (()=>{
   const m = {};
-  const add = (nome, modelo, ids, ret)=>{ m[normExame(nome)] = {modelo, ids: ids || [], ret: !!ret}; };
-  add('Hemograma','hemograma'); add('Reticulócitos','hemograma',[],true);
+  const add = (nome, modelo, ids, chave)=>{ m[normExame(nome)] = {modelo, ids: ids || [], chave: chave || null}; };   // chave: campo próprio dentro do hemograma
+  add('Hemograma','hemograma'); add('Reticulócitos','hemograma',[],'reticulocitos');
+  add('Fônio com Citrato','hemograma',[],'fonio_com'); add('Fônio sem Citrato','hemograma',[],'fonio_sem');
   add('Ferritina','coagulo',['ferritina']); add('Folato','coagulo',['folato']); add('Vitamina B12','coagulo',['b12']); add('Homocisteína','coagulo',['homocisteina']);
   add('Eletroforese de Hemoglobina','coagulo',['perfilhb']);
   add('Coagulograma','coagulo',['tp','ttpa']); add('Tempo de Trombina (TT)','coagulo',['tt']); add('Fibrinogênio (Fator I)','coagulo',['f1']);
@@ -3820,7 +3834,7 @@ function rwExameLancado(nome, estado){
   const def = RW_EXAME_MAPA[normExame(nome)];
   if(!def) return null;                                   // sem modelo: não dá para conferir sozinho
   const v = (estado[def.modelo] && estado[def.modelo].valores) || {};
-  if(def.modelo === 'hemograma') return def.ret ? !!v.reticulocitos : Object.keys(v).some(k=>k !== 'reticulocitos' && v[k]);
+  if(def.modelo === 'hemograma') return def.chave ? !!v[def.chave] : Object.keys(v).some(k=>k !== 'reticulocitos' && !HEMO_FONIO.some(([f])=>f === k) && v[k]);
   return def.ids.some(id=>Object.keys(v).some(k=>k.startsWith(id + '.') && v[k]));
 }
 function rwExamesFaltando(){
