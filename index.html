@@ -4825,7 +4825,7 @@ function labHomeTemplate(){
         ${tile('subir','Lançar resultados','Hemograma, coagulopatias','lancar', true)}
         ${tile('amostras','Amostras', c ? `${nColetado} coletadas · ${nAnalise} em análise` : 'Coletado, em análise', 'amostras')}
         ${tile('pacientes','Pacientes','Buscar histórico','pacientes')}
-        ${tile('relatorios','Relatórios','Exames por mês','relatorios')}
+        ${tile('relatorios','Relatórios','Exames por período','relatorios')}
         ${tile('laudos','Laudos do dia', c ? `${nHoje} liberados hoje` : 'Baixar ou imprimir','laudos')}
       </div>
     </div>
@@ -4842,16 +4842,21 @@ function labIr(destino){
   if(destino === 'laudos') setTimeout(()=>document.getElementById('fila-lab-dia-res')?.scrollIntoView({block:'center', behavior:'smooth'}), 350);
 }
 
-/* ================= RELATÓRIOS DO LABORATÓRIO: EXAMES POR MÊS =================
-   Cada solicitação traz vários exames ("Hemograma; Ferritina"): cada um conta uma vez, no mês da data da solicitação. */
+/* ================= RELATÓRIOS DO LABORATÓRIO: EXAMES POR PERÍODO =================
+   Cada solicitação traz vários exames ("Hemograma; Ferritina"): cada um conta uma vez, pela data da solicitação. */
 let relLabDados = [];
 let relLabCarregado = false;
-let relLabMes = isoLocal(new Date()).slice(0,7);
+const REL_LAB_DATA_MIN = '2020-01-01';   // antes disso é data digitada errada
+function relLabLimitesMes(m){
+  const [a, n] = m.split('-').map(Number);
+  return [m + '-01', isoLocal(new Date(a, n, 0, 12))];
+}
+let [relLabDe, relLabAte] = relLabLimitesMes(isoLocal(new Date()).slice(0,7));
 const REL_LAB_ALIAS = {'hemograma completo':'hemograma'};   // nomes antigos do mesmo exame
 
 async function carregarRelLab(){
   if(!supabaseConfigured) return;
-  const { data, error } = await buscarTodasSolicitacoes('id, data, exame, situacao');
+  const { data, error } = await buscarTodasSolicitacoes('id, data, exame, situacao, paciente_id, paciente_nome, registro_numero');
   if(error){ console.error(error); showToast('Erro ao carregar o relatório do laboratório.'); return; }
   relLabDados = data || [];
   relLabCarregado = true;
@@ -4860,11 +4865,79 @@ function relLabRotuloMes(m){
   const [a, n] = m.split('-').map(Number);
   return ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][n-1] + ' de ' + a;
 }
+// mês selecionado, quando o período é exatamente um mês inteiro; senão ''
+function relLabMesInteiro(){
+  const m = relLabDe.slice(0,7), [de, ate] = relLabLimitesMes(m);
+  return relLabDe === de && relLabAte === ate ? m : '';
+}
+function relLabRotuloPeriodo(){
+  const m = relLabMesInteiro();
+  return m ? relLabRotuloMes(m) : `${isoToBR(relLabDe)} a ${isoToBR(relLabAte)}`;
+}
+function relLabDataInvalida(r){ return !r.data || r.data < REL_LAB_DATA_MIN || r.data > isoLocal(new Date()); }
+function relLabNoPeriodo(r){ return !relLabDataInvalida(r) && r.data >= relLabDe && r.data <= relLabAte; }
 function relLabMeses(){
   const atual = isoLocal(new Date()).slice(0,7);
-  const set = new Set([atual, relLabMes]);
-  relLabDados.forEach(r=>{ const m = (r.data || '').slice(0,7); if(m >= '2020' && m <= atual) set.add(m); });   // ignora datas digitadas erradas
+  const set = new Set([atual]);
+  relLabDados.forEach(r=>{ if(!relLabDataInvalida(r)) set.add(r.data.slice(0,7)); });
   return [...set].sort().reverse();
+}
+function relLabRedesenhar(){ const m = document.getElementById('main-content'); if(m) m.innerHTML = relLabTemplate(); }
+function relLabSetMes(m){ if(!m) return; [relLabDe, relLabAte] = relLabLimitesMes(m); relLabRedesenhar(); }
+function relLabSetAtalho(tipo){
+  const h = new Date(); relLabAte = isoLocal(h);
+  relLabDe = tipo === 'ano' ? h.getFullYear() + '-01-01' : isoLocal(new Date(h.getFullYear(), h.getMonth() - 2, 1, 12));
+  relLabRedesenhar();
+}
+function relLabSetData(campo, v){
+  if(!v) return;
+  if(campo === 'de'){ relLabDe = v; if(relLabAte < v) relLabAte = v; }   // a outra data acompanha, sem inverter o período
+  else { relLabAte = v; if(relLabDe > v) relLabDe = v; }
+  relLabRedesenhar();
+}
+// O que precisa de correção: datas erradas (fora da contagem) e possíveis duplicados do período (dentro da contagem)
+function relLabRevisar(){
+  const datas = relLabDados.filter(relLabDataInvalida);
+  const grupos = {};
+  relLabDados.filter(relLabNoPeriodo).forEach(r=>{
+    const k = [r.paciente_id, r.data, parseExamesList(r.exame).map(normExame).sort().join('|')].join('#');
+    (grupos[k] = grupos[k] || []).push(r);
+  });
+  const duplicados = Object.values(grupos).filter(g=>g.length > 1).sort((a,b)=>b[0].data.localeCompare(a[0].data));
+  return {datas, duplicados};
+}
+async function relLabCorrigirData(id, idInput){
+  const v = document.getElementById(idInput)?.value;
+  const hoje = isoLocal(new Date());
+  if(!v || v < REL_LAB_DATA_MIN || v > hoje){ showToast('Informe uma data válida, até hoje.'); return; }
+  const { error } = await supabaseClient.from('solicitacoes_exames').update({data: v}).eq('id', id);
+  if(error){ console.error(error); showToast('Erro ao corrigir a data.'); return; }
+  showToast('Data corrigida.');
+  await carregarRelLab();
+  relLabRedesenhar();
+}
+function relLabRevisarHTML(){
+  if(!relLabCarregado) return '';
+  const {datas, duplicados} = relLabRevisar();
+  if(!datas.length && !duplicados.length) return '';
+  const pode = podeRegistrarResultado();
+  const abrir = r=>`<button class="btn-secondary" style="padding:5px 10px;font-size:12px;" onclick="selecionarPaciente('${r.paciente_id}')">Abrir paciente</button>`;
+  const partes = [];
+  if(datas.length) partes.push(`${datas.length} ${datas.length === 1 ? 'data errada' : 'datas erradas'}`);
+  if(duplicados.length) partes.push(`${duplicados.length} ${duplicados.length === 1 ? 'possível duplicado' : 'possíveis duplicados'} no período`);
+  const blocoDatas = datas.length ? `
+    <div style="font-weight:700;margin:10px 0 2px;">Datas erradas <span style="font-weight:400;color:var(--muted);">— ficam fora da contagem até serem corrigidas</span></div>
+    ${datas.map((r,i)=>`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:7px 0;border-top:1px solid var(--line);">
+      <span style="flex:1;min-width:240px;"><b>${escH(nomePacienteDe(r))}</b> · ${isoToBR(r.data) || 'sem data'}${r.registro_numero ? ' · etiqueta ' + escH(r.registro_numero) : ''}<br><span style="color:var(--muted);">${escH(r.exame)}</span></span>
+      ${pode ? `<input type="date" id="rel-lab-data-${i}" min="${REL_LAB_DATA_MIN}" max="${isoLocal(new Date())}" style="padding:5px 8px;border:1.5px solid var(--line);border-radius:8px;font-size:12.5px;"><button class="btn-secondary" style="padding:5px 10px;font-size:12px;" onclick="relLabCorrigirData('${r.id}','rel-lab-data-${i}')">Salvar data</button>` : ''}
+      ${abrir(r)}</div>`).join('')}` : '';
+  const blocoDup = duplicados.length ? `
+    <div style="font-weight:700;margin:12px 0 2px;">Possíveis duplicados <span style="font-weight:400;color:var(--muted);">— mesmo paciente, data e exames. Continuam na contagem até um ser excluído (exclusão: perfil gestor)</span></div>
+    ${duplicados.map(g=>`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:7px 0;border-top:1px solid var(--line);">
+      <span style="flex:1;min-width:240px;"><b>${escH(nomePacienteDe(g[0]))}</b> · ${isoToBR(g[0].data)} · ${g.length} cópias: ${g.map(r=>escH(r.situacao) + (r.registro_numero ? ' (etiqueta ' + escH(r.registro_numero) + ')' : '')).join(', ')}<br><span style="color:var(--muted);">${escH(g[0].exame)}</span></span>
+      ${abrir(g[0])}</div>`).join('')}` : '';
+  return `<details style="margin:12px 18px 0;padding:9px 12px;border:1.5px solid #E0A800;border-radius:9px;background:#FFF9E6;font-size:12.5px;">
+    <summary style="cursor:pointer;font-weight:700;font-size:13px;">⚠️ Para revisar: ${partes.join(' · ')}</summary>${blocoDatas}${blocoDup}</details>`;
 }
 function relLabResumo(){
   const zero = ()=>({solicitados:0, pendentes:0, andamento:0, liberados:0});
@@ -4875,7 +4948,7 @@ function relLabResumo(){
   const porChave = {};
   grupos.forEach(g=>g.itens.forEach(i=>{ porChave[i.chave] = {g, i}; }));
   relLabDados.forEach(r=>{
-    if((r.data || '').slice(0,7) !== relLabMes) return;
+    if(!relLabNoPeriodo(r)) return;
     parseExamesList(r.exame).forEach(nome=>{
       const n = normExame(nome), chave = REL_LAB_ALIAS[n] || n;
       if(!porChave[chave]){ const i = Object.assign({nome, chave}, zero()); outros.itens.push(i); porChave[chave] = {g:outros, i}; }
@@ -4888,7 +4961,7 @@ function relLabResumo(){
   if(outros.itens.length) grupos.push(outros);
   const total = zero();
   grupos.forEach(g=>somar(total, g.total));
-  return {grupos, total, pedidos:relLabDados.filter(r=>(r.data || '').slice(0,7) === relLabMes).length};
+  return {grupos, total, pedidos:relLabDados.filter(relLabNoPeriodo).length};
 }
 function relLabTemplate(){
   if(!supabaseConfigured) return `<div class="placeholder"><div class="ic">📊</div><h3>Configure o Supabase primeiro</h3><p>O relatório precisa do banco conectado.</p></div>`;
@@ -4902,18 +4975,28 @@ function relLabTemplate(){
   return `
   <div class="panel" style="margin-top:4px;">
     <div class="panel-head">
-      <h3>📊 EXAMES POR MÊS</h3>
+      <h3>📊 EXAMES POR PERÍODO</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-        <select onchange="relLabMes=this.value;renderPage('relatoriolab')" title="Mês do relatório" style="padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;font-size:13px;outline:none;background:#fff;">
-          ${relLabMeses().map(m=>`<option value="${m}" ${m === relLabMes ? 'selected' : ''}>${relLabRotuloMes(m)}</option>`).join('')}
-        </select>
         <button class="btn-secondary" onclick="exportarExcel('relatoriolab')">📊 Excel</button>
         <button class="btn-secondary" onclick="exportarPDF('relatoriolab')">📄 PDF</button>
         <button class="btn-secondary" onclick="labIr('laudos')" title="Excel e PDF dos resultados liberados em um dia">Resultados do dia</button>
       </div>
     </div>
+    <div style="padding:12px 18px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12.5px;">
+      <select onchange="relLabSetMes(this.value)" title="Mês do relatório" style="padding:7px 10px;border:1.5px solid var(--line);border-radius:9px;font-size:13px;outline:none;background:#fff;">
+        ${relLabMesInteiro() ? '' : '<option value="" selected>Período personalizado</option>'}
+        ${relLabMeses().map(m=>`<option value="${m}" ${m === relLabMesInteiro() ? 'selected' : ''}>${relLabRotuloMes(m)}</option>`).join('')}
+      </select>
+      <button class="btn-secondary" style="padding:7px 12px;font-size:12px;" onclick="relLabSetAtalho('3m')">Últimos 3 meses</button>
+      <button class="btn-secondary" style="padding:7px 12px;font-size:12px;" onclick="relLabSetAtalho('ano')">Este ano</button>
+      <span style="font-weight:700;color:var(--muted);margin-left:4px;">De</span>
+      <input type="date" value="${relLabDe}" onchange="relLabSetData('de',this.value)" style="padding:6px 9px;border:1.5px solid var(--line);border-radius:9px;font-size:12.5px;outline:none;">
+      <span style="font-weight:700;color:var(--muted);">até</span>
+      <input type="date" value="${relLabAte}" onchange="relLabSetData('ate',this.value)" style="padding:6px 9px;border:1.5px solid var(--line);border-radius:9px;font-size:12.5px;outline:none;">
+    </div>
+    ${relLabRevisarHTML()}
     <div style="padding:12px 18px 0;font-size:13px;">
-      ${c ? `<b>${r.total.solicitados}</b> exames em <b>${r.pedidos}</b> solicitações · <b>${r.total.liberados}</b> liberados` : 'Carregando...'}
+      ${c ? `<b>${escH(relLabRotuloPeriodo())}:</b> <b>${r.total.solicitados}</b> exames em <b>${r.pedidos}</b> solicitações · <b>${r.total.liberados}</b> liberados` : 'Carregando...'}
       <div style="font-size:11.5px;color:var(--muted);margin-top:3px;">Conta pela data da solicitação. Em andamento = coletado ou em análise. A situação é a da solicitação inteira: um exame já lançado só conta como liberado quando a solicitação é concluída.</div>
     </div>
     <div style="overflow-x:auto;margin-top:8px;">
@@ -6327,7 +6410,7 @@ function salvarLab(){
     refreshTables();
     document.querySelectorAll('.lab-exame-cb:checked').forEach(cb=>cb.checked=false);
     if(supabaseConfigured && r.id){
-      supabaseClient.from('solicitacoes_exames').update({exame, medico, medico_crm: medicoCrm || null, registro_numero: registro || null}).eq('id', r.id).then(({error})=>{
+      supabaseClient.from('solicitacoes_exames').update(Object.assign({exame, medico, medico_crm: medicoCrm || null, registro_numero: registro || null}, data ? {data} : {})).eq('id', r.id).then(({error})=>{
         showToast(error ? 'Erro ao salvar alterações no Supabase.' : 'Solicitação atualizada com sucesso.');
         if(error) console.error(error);
       });
@@ -7478,7 +7561,7 @@ function datasetExport(tipo){
     });
     linhas.push(['', 'TOTAL DE EXAMES', r.total.solicitados, r.total.pendentes, r.total.andamento, r.total.liberados]);
     return {
-      titulo: `Exames por mês — ${relLabRotuloMes(relLabMes)}`,
+      titulo: `Exames por período — ${relLabRotuloPeriodo()}`,
       cols: ['Setor','Exame','Solicitados','Pendentes','Em andamento','Liberados'],
       rows: r.total.solicitados ? linhas : []
     };
