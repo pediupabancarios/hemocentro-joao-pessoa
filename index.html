@@ -4939,6 +4939,87 @@ function relLabRevisarHTML(){
   return `<details style="margin:12px 18px 0;padding:9px 12px;border:1.5px solid #E0A800;border-radius:9px;background:#FFF9E6;font-size:12.5px;">
     <summary style="cursor:pointer;font-weight:700;font-size:13px;">⚠️ Para revisar: ${partes.join(' · ')}</summary>${blocoDatas}${blocoDup}</details>`;
 }
+/* Gráficos de barras: acompanham o período do relatório. Barras em HTML com estilo próprio, para saírem iguais na tela e no PDF. */
+let relLabGrafTodos = false;           // false = só os mais pedidos no comparativo
+let relLabGrafExame = 'hemograma';     // exame da evolução mensal
+const REL_LAB_GRAF_MAX_MESES = 6, REL_LAB_GRAF_TOP = 8;
+const REL_LAB_TONS = ['#C5DCF6','#9CC3EE','#7DB0E9','#5B9BE3','#3F89DC','#2A78D6'];   // mês mais recente = mais escuro
+function relLabSomaMes(m, n){ const [a, x] = m.split('-').map(Number); return isoLocal(new Date(a, x - 1 + n, 1, 12)).slice(0,7); }
+function relLabMesCurto(m){ const [a, n] = m.split('-').map(Number); return ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][n-1] + '/' + String(a).slice(2); }
+// Meses de cada gráfico. Com um único mês escolhido, inclui os anteriores para haver o que comparar.
+function relLabGrafJanela(qtdSeMesInteiro){
+  const mesInteiro = relLabMesInteiro();
+  let fim = relLabAte.slice(0,7), ini = mesInteiro ? relLabSomaMes(fim, 1 - qtdSeMesInteiro) : relLabDe.slice(0,7);
+  if(relLabSomaMes(fim, 1 - REL_LAB_GRAF_MAX_MESES) > ini) ini = relLabSomaMes(fim, 1 - REL_LAB_GRAF_MAX_MESES);
+  const meses = [];
+  for(let m = ini; m <= fim; m = relLabSomaMes(m, 1)) meses.push(m);
+  const de = mesInteiro ? ini + '-01' : (relLabDe > ini + '-01' ? relLabDe : ini + '-01');
+  return {meses, de, ate:relLabAte};
+}
+function relLabMesParcial(m, j){
+  const [de, ate] = relLabLimitesMes(m);
+  return de < j.de || ate > j.ate || m === isoLocal(new Date()).slice(0,7);
+}
+function relLabContarPorMes(j){
+  const nomes = {}, cont = {};
+  Object.values(Object.assign({}, EXAME_CATEGORIAS, EXAME_CATEGORIAS_DIREITA)).flat().forEach(ex=>{ nomes[normExame(ex)] = ex; });
+  relLabDados.forEach(r=>{
+    if(relLabDataInvalida(r) || r.data < j.de || r.data > j.ate) return;
+    const m = r.data.slice(0,7);
+    parseExamesList(r.exame).forEach(nome=>{
+      const n = normExame(nome), chave = REL_LAB_ALIAS[n] || n;
+      const c = cont[chave] = cont[chave] || {chave, nome:nomes[chave] || nome, meses:{}, total:0};
+      c.meses[m] = (c.meses[m] || 0) + 1; c.total++;
+    });
+  });
+  return Object.values(cont).sort((a,b)=>b.total - a.total || a.nome.localeCompare(b.nome));
+}
+// Tira os meses antes do primeiro registro
+function relLabSemMesesVazios(meses, cont){
+  const i = meses.findIndex(m=>cont.some(c=>c.meses[m]));
+  return i > 0 ? meses.slice(i) : meses;
+}
+function relLabGraficosHTML(paraImpressao){
+  if(!relLabCarregado) return '';
+  const cor = 'print-color-adjust:exact;-webkit-print-color-adjust:exact;';
+  const titulo = t=>`<div style="font-weight:700;font-size:13px;">${t}</div>`;
+  const valor = 'font-size:11px;color:#444;font-variant-numeric:tabular-nums;';
+  // 1) comparativo entre meses
+  const jC = relLabGrafJanela(3);
+  const contC = relLabContarPorMes(jC);
+  jC.meses = relLabSemMesesVazios(jC.meses, contC);
+  const tons = REL_LAB_TONS.slice(-jC.meses.length);
+  const vis = (relLabGrafTodos || paraImpressao) ? contC : contC.slice(0, REL_LAB_GRAF_TOP);
+  const maxC = Math.max(1, ...vis.flatMap(c=>jC.meses.map(m=>c.meses[m] || 0)));
+  const legenda = jC.meses.map((m,i)=>`<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:${tons[i]};${cor}"></span>${relLabMesCurto(m)}${relLabMesParcial(m, jC) ? ' (parcial)' : ''}</span>`).join('');
+  const linhas = vis.map(c=>`<div style="display:grid;grid-template-columns:minmax(90px,150px) minmax(0,1fr);gap:0 10px;align-items:center;padding:6px 0;border-top:1px solid var(--line,#E2E2E2);page-break-inside:avoid;">
+    <div style="font-size:12.5px;">${escH(c.nome)}</div>
+    <div>${jC.meses.map((m,i)=>{ const n = c.meses[m] || 0; return `<div title="${escH(c.nome)} — ${relLabMesCurto(m)}: ${n}" style="display:flex;align-items:center;gap:6px;height:14px;margin:2px 0;"><div style="height:11px;min-width:2px;width:${(n / maxC * 85).toFixed(1)}%;background:${tons[i]};border-radius:0 4px 4px 0;${cor}"></div><span style="${valor}">${n}</span></div>`; }).join('')}</div>
+  </div>`).join('');
+  const botaoTodos = !paraImpressao && contC.length > REL_LAB_GRAF_TOP
+    ? `<button class="btn-secondary" style="padding:5px 10px;font-size:12px;" onclick="relLabGrafTodos=!relLabGrafTodos;relLabRedesenhar()">${relLabGrafTodos ? 'Ver só os mais pedidos' : `Ver todos (${contC.length})`}</button>` : '';
+  // 2) evolução de um exame
+  const jE = relLabGrafJanela(REL_LAB_GRAF_MAX_MESES);
+  const contE = relLabContarPorMes(jE);
+  const atual = contE.find(c=>c.chave === relLabGrafExame) || contE[0];
+  const mesesE = relLabSemMesesVazios(jE.meses, contE);
+  const maxE = atual ? Math.max(1, ...mesesE.map(m=>atual.meses[m] || 0)) : 1;
+  const colunas = atual ? mesesE.map(m=>{ const n = atual.meses[m] || 0, parcial = relLabMesParcial(m, jE); return `<div title="${escH(atual.nome)} — ${relLabMesCurto(m)}: ${n}" style="flex:1;max-width:90px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;">
+      <span style="${valor}">${n}</span><div style="width:24px;height:${Math.round(n / maxE * 130)}px;min-height:2px;margin-top:3px;background:${parcial ? '#9CC3EE' : '#2A78D6'};border-radius:4px 4px 0 0;${cor}"></div></div>`; }).join('') : '';
+  const rotulos = mesesE.map(m=>`<div style="flex:1;max-width:90px;text-align:center;font-size:11.5px;color:#555;padding-top:4px;">${relLabMesCurto(m)}</div>`).join('');
+  const seletor = paraImpressao || !atual ? '' : `<select onchange="relLabGrafExame=this.value;relLabRedesenhar()" title="Exame" style="padding:6px 9px;border:1.5px solid var(--line);border-radius:9px;font-size:12.5px;outline:none;background:#fff;max-width:230px;">
+    ${contE.slice().sort((a,b)=>a.nome.localeCompare(b.nome)).map(c=>`<option value="${escH(c.chave)}" ${c === atual ? 'selected' : ''}>${escH(c.nome)}</option>`).join('')}</select>`;
+  if(!contC.length && !contE.length) return paraImpressao ? '' : `<div style="padding:14px 18px 0;font-size:13px;color:var(--muted);">Sem exames neste período para montar os gráficos.</div>`;
+  return `<div style="padding:14px 18px 0;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">${titulo('Comparativo entre meses — exames solicitados')}${botaoTodos}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:11.5px;color:#555;margin-bottom:6px;">${legenda}</div>
+    ${linhas || '<div style="font-size:13px;color:#777;">Sem exames neste período.</div>'}
+    ${atual ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin:18px 0 10px;page-break-after:avoid;">${titulo('Evolução de um exame' + (paraImpressao ? ' — ' + escH(atual.nome) : ''))}${seletor}</div>
+    <div style="page-break-inside:avoid;"><div style="display:flex;align-items:flex-end;gap:14px;height:160px;border-bottom:1px solid #BBB;padding:0 8px;">${colunas}</div>
+    <div style="display:flex;gap:14px;padding:0 8px;">${rotulos}</div>
+    ${mesesE.some(m=>relLabMesParcial(m, jE)) ? '<div style="font-size:11.5px;color:#777;margin-top:6px;">Barra mais clara: mês parcial (em andamento ou cortado pelo período escolhido).</div>' : ''}</div>` : ''}
+  </div>`;
+}
 function relLabResumo(){
   const zero = ()=>({solicitados:0, pendentes:0, andamento:0, liberados:0});
   const somar = (t, c)=>{ Object.keys(c).forEach(k=>{ t[k] += c[k]; }); };
@@ -4999,7 +5080,8 @@ function relLabTemplate(){
       ${c ? `<b>${escH(relLabRotuloPeriodo())}:</b> <b>${r.total.solicitados}</b> exames em <b>${r.pedidos}</b> solicitações · <b>${r.total.liberados}</b> liberados` : 'Carregando...'}
       <div style="font-size:11.5px;color:var(--muted);margin-top:3px;">Conta pela data da solicitação. Em andamento = coletado ou em análise. A situação é a da solicitação inteira: um exame já lançado só conta como liberado quando a solicitação é concluída.</div>
     </div>
-    <div style="overflow-x:auto;margin-top:8px;">
+    ${relLabGraficosHTML()}
+    <div style="overflow-x:auto;margin-top:14px;">
       <table>
         <thead><tr><th>Exame</th><th style="text-align:right;">Solicitados</th><th style="text-align:right;">Pendentes</th><th style="text-align:right;">Em andamento</th><th style="text-align:right;">Liberados</th></tr></thead>
         <tbody>${linhas}
@@ -7563,7 +7645,8 @@ function datasetExport(tipo){
     return {
       titulo: `Exames por período — ${relLabRotuloPeriodo()}`,
       cols: ['Setor','Exame','Solicitados','Pendentes','Em andamento','Liberados'],
-      rows: r.total.solicitados ? linhas : []
+      rows: r.total.solicitados ? linhas : [],
+      antesDaTabela: relLabGraficosHTML(true)
     };
   }
   if(tipo === 'hemocomponentes'){
@@ -7596,6 +7679,7 @@ function exportarPDF(tipo){
   if(!d || !d.rows.length){ showToast('Nada para exportar ainda.'); return; }
   const tableHTML = `
     <h2 style="font-family:Arial;color:#132A4C;font-size:16px;">${d.titulo}</h2>
+    ${d.antesDaTabela ? `<div style="font-family:Arial;margin-bottom:14px;">${d.antesDaTabela}</div>` : ''}
     <table style="width:100%;border-collapse:collapse;font-family:Arial;font-size:10.5px;">
       <thead><tr>${d.cols.map(c=>`<th style="border:1px solid #333;padding:6px 8px;background:#F0F0F0;text-align:left;">${c}</th>`).join('')}</tr></thead>
       <tbody>${d.rows.map(r=>`<tr>${r.map(v=>`<td style="border:1px solid #333;padding:6px 8px;">${v ?? ''}</td>`).join('')}</tr>`).join('')}</tbody>
