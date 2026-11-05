@@ -3267,7 +3267,7 @@ function abrirRegistrarResultado(i){
   openModal('modal-resultado');
 }
 
-function salvarResultadoExame(proximo, modo){
+async function salvarResultadoExame(proximo, modo){
   let parcial = modo === 'parcial';   // salva sem concluir: o exame segue "Em análise" e a tela continua aberta
   let seqParcial = false;
   if(editingResultadoIdx === null) return;
@@ -3289,6 +3289,18 @@ function salvarResultadoExame(proximo, modo){
   const categoria = document.getElementById('resultado-categoria').value;
   const registroNumero = document.getElementById('resultado-registro').value.trim();
   const dataLiberacao = document.getElementById('resultado-data-liberacao').value;
+  {   // etiqueta única: só confere se o número foi alterado
+    const atual = labs[editingResultadoIdx];
+    if(registroNumero && atual && registroNumero.toLowerCase() !== String(atual.registro_numero || '').trim().toLowerCase()){
+      const dup = await etiquetaEmUso(registroNumero, atual.id);
+      if(dup){
+        showToast(etiquetaMensagem(registroNumero, dup));
+        if(rwAtivo && rwPasso !== 1){ rwPasso = 1; rwRender(); }
+        const campo = document.getElementById('resultado-registro'); if(campo){ campo.style.borderColor = '#B3261E'; campo.focus(); setTimeout(()=>{ campo.style.borderColor = ''; }, 4000); }
+        return;
+      }
+    }
+  }
 
   if(!parcial && !responsavel){ showToast('Informe o nome do responsável pelo laboratório.'); return; }
 
@@ -4087,6 +4099,29 @@ function rwResumoHTML(){
   const aviso = (fx.faltam.length ? `<div class="rw-card" style="background:#FFF6E0;border-color:#EBD28F;"><b>Faltam resultados de:</b> ${fx.faltam.map(escH).join(', ')}.<div class="rw-ck" style="margin-bottom:0;"><input type="checkbox" id="rw-disp"><label for="rw-disp">Dispensar — liberar o laudo sem esses exames (a solicitação será concluída)</label></div><div style="font-size:12px;color:var(--muted);margin-top:4px;">Ou volte e lance-os. Se liberar só uma parte, use "Salvar e fazer outro exame": a solicitação continua em análise.</div></div>` : '')
     + (fx.semModelo.length ? `<div class="rw-card" style="font-size:12.5px;color:var(--muted);">Sem modelo para conferir automaticamente: ${fx.semModelo.map(escH).join(', ')}. Confira se o resultado deles está lançado.</div>` : '');
   return `<div class="rw-resumo">${aviso}${corpo}<div style="font-size:12px;color:var(--muted);">Valores fora da referência aparecem em vermelho (↓ abaixo, ↑ acima).</div></div>`;
+}
+
+/* ---------- Etiqueta (nº de registro) não pode se repetir ---------- */
+// Procura no banco outra solicitação com a mesma etiqueta (ignora maiúsculas e espaços). Devolve a linha em uso ou null.
+async function etiquetaEmUso(valor, idAtual){
+  const v = String(valor || '').trim();
+  if(!v) return null;
+  const igual = r=>r.id !== idAtual && String(r.registro_numero || '').trim().toLowerCase() === v.toLowerCase();
+  let achado = (filaLab || []).find(igual) || (labs || []).find(igual) || null;       // já carregado na tela
+  if(!achado && supabaseConfigured){                                                  // e confere no banco (pega o que outras pessoas cadastraram agora)
+    const padrao = v.replace(/[\\%_]/g, m=>'\\' + m);
+    let q = supabaseClient.from('solicitacoes_exames').select('id, paciente_id, paciente_nome, data, registro_numero').ilike('registro_numero', padrao).limit(5);
+    if(idAtual) q = q.neq('id', idAtual);
+    const { data, error } = await q;
+    if(error){ console.error(error); return null; }
+    achado = (data || []).find(r=>String(r.registro_numero || '').trim().toLowerCase() === v.toLowerCase()) || null;
+  }
+  return achado;
+}
+function etiquetaMensagem(v, r){
+  const nome = (r.paciente_id && pacientesList.find(x=>x.id === r.paciente_id)?.nome) || r.paciente_nome || 'outro paciente';
+  const dt = r.data ? (String(r.data).includes('/') ? r.data : isoToBR(r.data)) : '';
+  return `A etiqueta ${v} já está cadastrada para ${nome}${dt ? ' (pedido de ' + dt + ')' : ''}. Cada etiqueta só pode ser usada uma vez — confira o número.`;
 }
 
 /* ---------- Baixar laudos em PDF (arquivo no computador) ----------
@@ -6869,7 +6904,7 @@ async function editarLab(i){
   }
 }
 
-function salvarLab(){
+async function salvarLab(){
   const checked = [...document.querySelectorAll('.lab-exame-cb:checked')].map(cb=>cb.value);
   if(!checked.length){ showToast('Marque ao menos um exame na lista.'); return; }
   const exame = checked.join('; ');
@@ -6879,6 +6914,18 @@ function salvarLab(){
   const medicoCrm = document.getElementById('lab-medico-crm').value.trim();
   const registro = document.getElementById('lab-registro').value.trim();
   if(!medico){ showToast('Selecione o médico solicitante.'); return; }
+
+  // etiqueta única: ao criar, ou ao editar mudando o número
+  const regAtual = editingLabId !== null ? (labs[editingLabId].registro_numero || '') : '';
+  if(registro && registro.toLowerCase() !== String(regAtual).trim().toLowerCase()){
+    const dup = await etiquetaEmUso(registro, editingLabId !== null ? labs[editingLabId].id : null);
+    if(dup){
+      const campo = document.getElementById('lab-registro');
+      showToast(etiquetaMensagem(registro, dup));
+      if(campo){ campo.style.borderColor = '#B3261E'; campo.focus(); setTimeout(()=>{ campo.style.borderColor = ''; }, 4000); }
+      return;
+    }
+  }
 
   if(editingLabId !== null){
     const idx = editingLabId;
