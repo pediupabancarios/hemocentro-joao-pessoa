@@ -614,7 +614,7 @@
   .le-card b{font-size:15.5px;color:var(--navy);}
   .le-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
   .le-pill{font-size:12px;font-weight:700;padding:3px 10px;border-radius:10px;background:var(--amber-bg);color:var(--amber-text);white-space:nowrap;}
-  .le-pill.b{background:#E6EEFB;color:#1D5FC4;} .le-pill.g{background:var(--green-bg);color:var(--green-text);}
+  .le-pill.b{background:#E6EEFB;color:#1D5FC4;} .le-pill.gv{background:var(--green-bg);color:var(--green-text);}
   .le-go{display:block;width:100%;margin-top:10px;background:var(--navy);color:#fff;border:none;border-radius:10px;padding:10px;font-weight:700;font-size:13.5px;cursor:pointer;font-family:inherit;}
   .le-cnt{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0;}
   .le-cnt div{border:1px solid var(--line);border-radius:12px;padding:10px 14px;background:#fff;}
@@ -626,6 +626,14 @@
   .le-row.sel{border-color:#1D5FC4;background:#EEF4FD;}
   .le-row .g{flex:1;min-width:0;} .le-row b{font-size:14.5px;} .le-row .sub{font-size:12.5px;color:var(--muted);margin-top:2px;}
   .le-bar{position:sticky;bottom:0;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;box-shadow:0 -4px 16px rgba(0,0,0,.06);}
+  .le-nome{color:#1D5FC4;cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
+  .ct-card{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;}
+  .ct-ex{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);}
+  .ct-ex:last-child{border-bottom:none;}
+  .ct-ex .g{flex:1;} .ct-ex b{font-size:14.5px;} .ct-ex .sub{font-size:12px;color:var(--muted);}
+  .ct-ex.foco{background:#EEF4FD;margin:0 -16px;padding:9px 16px;}
+  .ct-foot{border-radius:8px;padding:10px 12px;font-size:13px;background:var(--amber-bg);color:var(--amber-text);}
+  .ct-foot.ok{background:var(--green-bg);color:var(--green-text);}
   .recep-tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);padding:0 14px;overflow-x:auto;}
   .recep-tab{display:flex;align-items:center;gap:7px;padding:12px 14px;font-size:13.5px;font-weight:700;color:var(--muted);background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;font-family:inherit;}
   .recep-tab.on{color:var(--red-dark);border-bottom-color:var(--red);}
@@ -1281,6 +1289,15 @@
       <button class="btn-primary" id="rw-b-salvar" onclick="salvarResultadoExame()">Salvar Resultado</button>
       <button class="btn-primary" id="rw-b-fechar" onclick="closeModal('modal-resultado')">Voltar para a lista</button>
     </div>
+  </div>
+</div>
+
+<!-- Cartão: todos os exames de um paciente/registro -->
+<div class="modal-overlay" id="modal-cartao">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-head"><h3>Exames do paciente</h3><button class="close" onclick="closeModal('modal-cartao')">✕</button></div>
+    <div class="modal-body" id="cartao-corpo"></div>
+    <div class="modal-foot" id="cartao-rodape"></div>
   </div>
 </div>
 
@@ -2045,7 +2062,7 @@ function renderPage(page){
     });
   } else if(page === 'filalab'){
     main.innerHTML = filaLabTemplate();
-    carregarFilaLab().then(()=>{
+    carregarFilaLab().then(()=>labCarregarParciais()).then(()=>{
       if(document.querySelector('.nav-item.active')?.dataset.page === 'filalab') main.innerHTML = filaLabTemplate();
     });
   } else if(page === 'relatoriolab'){
@@ -4573,8 +4590,8 @@ function filaLabRows(){
     <tr>
       <td class="col-check">${(pode || r.situacao === 'Concluído') ? `<input type="checkbox" ${filaLabSel.has(r.id) ? 'checked' : ''} onchange="filaLabToggleSel('${r.id}', this.checked)">` : ''}</td>
       <td>${isoToBR(r.data)}${filaLabSeloAtraso(r)}</td>
-      <td><b>${nomePacienteDe(r)}</b></td>
-      <td>${r.exame}</td>
+      <td><b class="le-nome" title="Ver todos os exames deste paciente" onclick="labCartao('${r.id}')">${nomePacienteDe(r)}</b></td>
+      <td>${r.exame}${labSeloFaltam(r)}</td>
       <td>${r.medico || '—'}</td>
       <td>${r.registro_numero ? `<b>${r.registro_numero}</b>` : '—'}</td>
       <td><span class="status ${statusClass(r.situacao)}">${r.situacao}</span></td>
@@ -4832,6 +4849,82 @@ async function filaLabRegistrar(labId, pacId){
   rwDaFila = true; rwRender();   // "Liberar e ir para o próximo" só faz sentido vindo da fila
 }
 
+/* ================= CARTÃO DO PACIENTE (todos os exames do registro) ================= */
+// exames da solicitação com o estado de cada um
+function labCartaoExames(r){
+  const par = labParciais[r.id];
+  return parseExamesList(r.exame).map(n=>{
+    let estado, lancado = false;
+    if(r.situacao === 'Concluído'){ estado = 'Realizado'; lancado = true; }
+    else if(par && rwExameLancado(n, par) === true){ estado = 'Realizado'; lancado = true; }
+    else estado = r.situacao;      // Pendente | Coletado | Em análise
+    return {nome: n, estado, lancado};
+  });
+}
+function labFaltamDe(r){
+  if(r.situacao === 'Concluído' || !labParciais[r.id]) return null;   // só vale para solicitações parciais
+  return labCartaoExames(r).filter(e=>!e.lancado).map(e=>e.nome);
+}
+function labSeloFaltam(r){
+  const f = labFaltamDe(r);
+  return f && f.length ? `<br><span class="status urgente" title="${escH(f.join(', '))}">faltam ${f.length}</span>` : '';
+}
+let cartaoId = null;
+async function labCartao(id){
+  const r = filaLab.find(x=>x.id === id); if(!r) return;
+  cartaoId = id;
+  if(r.situacao !== 'Concluído' && !labParciais[id] && supabaseConfigured){   // garante o estado mais recente deste registro
+    const { data } = await supabaseClient.from('solicitacoes_exames').select('parametros_json').eq('id', id).single();
+    try{ const m = JSON.parse(data && data.parametros_json); if(m && m.modelos) labParciais[id] = m.modelos; else if(m && m.v === 2) labParciais[id] = {[m.modelo]: m}; }catch(e){}
+  }
+  labCartaoDesenhar();
+  openModal('modal-cartao');
+}
+function labCartaoDesenhar(){
+  const r = filaLab.find(x=>x.id === cartaoId); if(!r) return;
+  const exs = labCartaoExames(r), pend = exs.filter(e=>!e.lancado).length, feitos = exs.length - pend;
+  const pode = podeRegistrarResultado();
+  const foco = (typeof labExameAtual !== 'undefined' && labExameAtual) ? labExameAtual.key : null;
+  const pill = e => e.lancado ? 'gv' : (e.estado === 'Pendente' ? '' : 'b');
+  const quando = e => e.lancado ? (r.situacao === 'Concluído' ? `liberado em ${isoToBR(r.data_resultado || r.data)}${r.responsavel_laboratorio ? ' · ' + escH(r.responsavel_laboratorio) : ''}` : 'resultado lançado') : '';
+  document.getElementById('cartao-corpo').innerHTML = `
+    <div class="ct-card">
+      <div style="font-size:12px;color:var(--muted);">REGISTRO / ETIQUETA</div>
+      <div style="font-size:24px;font-weight:800;color:var(--navy);">${escH(r.registro_numero || '—')}</div>
+      <div style="font-size:14.5px;font-weight:700;margin-top:2px;">${escH(nomePacienteDe(r))}</div>
+      <div style="font-size:12.5px;color:var(--muted);">Solicitante: ${escH(r.medico || '—')} · pedido em ${isoToBR(r.data)}</div>
+    </div>
+    <div class="ct-card">
+      ${exs.map((e,i)=>`<div class="ct-ex ${foco && normExame(e.nome) === foco ? 'foco' : ''}">
+        <div class="g"><b>${escH(e.nome)}</b>${quando(e) ? `<div class="sub">${quando(e)}</div>` : ''}</div>
+        ${(!e.lancado && pode) ? `<button class="btn-secondary" style="padding:5px 12px;font-size:12.5px;" onclick="labCartaoLancar(${i})">Lançar</button>` : ''}
+        <span class="le-pill ${pill(e)}">${e.lancado ? 'Realizado' : e.estado}</span></div>`).join('')}
+    </div>
+    <div class="ct-foot ${pend ? '' : 'ok'}">${pend
+      ? `O paciente continua com ${pend} exame${pend > 1 ? 's' : ''} pendente${pend > 1 ? 's' : ''}${feitos ? `, mesmo que ${feitos} já ${feitos > 1 ? 'tenham' : 'tenha'} sido realizado${feitos > 1 ? 's' : ''}` : ''}. A solicitação só fica concluída quando todos tiverem resultado.`
+      : 'Todos os exames deste paciente foram realizados. Solicitação concluída.'}</div>`;
+  document.getElementById('cartao-rodape').innerHTML = `
+    <button class="btn-secondary" onclick="closeModal('modal-cartao')">Fechar</button>
+    <button class="btn-secondary" onclick="labCartaoImprimir()">Imprimir resultado${r.situacao === 'Concluído' ? '' : ' parcial'}</button>
+    ${(pend && pode) ? `<button class="btn-primary" onclick="labCartaoLancar(-1)">Lançar o próximo pendente</button>` : ''}`;
+}
+function labCartaoImprimir(){
+  const r = filaLab.find(x=>x.id === cartaoId); if(!r) return;
+  if(!r.resultado && r.situacao !== 'Concluído'){ showToast('Ainda não há nenhum resultado lançado para imprimir.'); return; }
+  filaLabImprimirUm(r.id);
+}
+async function labCartaoLancar(i){
+  const r = filaLab.find(x=>x.id === cartaoId); if(!r) return;
+  const exs = labCartaoExames(r);
+  const alvo = i >= 0 ? exs[i] : exs.find(e=>!e.lancado);
+  if(!alvo){ showToast('Não há exames pendentes.'); return; }
+  const def = RW_EXAME_MAPA[normExame(alvo.nome)];
+  labSeq = null;
+  rwFocoProximo = def ? {ids: def.ids || [], modelo: def.modelo || ''} : {ids:[], modelo:''};   // abre já no exame escolhido
+  closeModal('modal-cartao');
+  await filaLabRegistrar(r.id, r.paciente_id);
+}
+
 /* ================= LABORATÓRIO — Exames por setor ================= */
 let labExameAtual = null;            // {key, nome} quando um exame está aberto
 let labExTab = 'p', labExBusca = '', labExBuscaLista = '', labExSetor = 'hemo', labExAntigos = false;
@@ -4851,6 +4944,9 @@ const LAB_DIAS_RECENTE = 30;
 
 async function labExCarregar(){
   await carregarFilaLab();
+  await labCarregarParciais();
+}
+async function labCarregarParciais(){
   if(!supabaseConfigured) return;
   const { data } = await supabaseClient.from('solicitacoes_exames').select('id, parametros_json').neq('situacao','Concluído').not('parametros_json','is',null).limit(2000);
   labParciais = {};
@@ -4965,12 +5061,12 @@ function labExRenderLista(){
     return !q || normNome(nomePacienteDe(it.r) + ' ' + (it.r.registro_numero || '')).includes(q);
   }).sort((a,b)=>(a.r.data || '').localeCompare(b.r.data || ''));
   window._labExVis = vis;
-  const pill = st => st === 'Pendente' ? '' : (st === 'Liberado' || st === 'Lançado' ? ' g' : ' b');
+  const pill = st => st === 'Pendente' ? '' : (st === 'Liberado' || st === 'Lançado' ? ' gv' : ' b');
   box.innerHTML = vis.slice(0, 300).map(it=>{
     const r = it.r, atraso = labEhAberto(it) && diasDesdeISO(r.data) > FILA_LAB_DIAS_ATRASO;
     return `<div class="le-row ${labExSel.has(r.id) ? 'sel' : ''}" onclick="labExToggle('${r.id}')">
       <input type="checkbox" ${labExSel.has(r.id) ? 'checked' : ''} tabindex="-1">
-      <div class="g"><b>${escH(nomePacienteDe(r))}</b>
+      <div class="g"><b class="le-nome" title="Ver todos os exames deste paciente" onclick="event.stopPropagation();labCartao('${r.id}')">${escH(nomePacienteDe(r))}</b>
         <div class="sub">Etiqueta ${escH(r.registro_numero || '—')} · pedido em ${isoToBR(r.data)}${r.medico ? ' · ' + escH(r.medico) : ''}</div>
         ${atraso ? `<div style="color:#B3261E;font-size:12px;font-weight:700;">atrasado · ${diasDesdeISO(r.data)} dias</div>` : ''}</div>
       <span class="le-pill${pill(it.st)}">${it.st}</span></div>`;
