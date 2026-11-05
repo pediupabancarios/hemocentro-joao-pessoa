@@ -3467,9 +3467,9 @@ function templateResultadoExame(r, pac){
    Hemoglobinopatias/Coagulopatias. Guardado em parametros_json como
    {v:2, modelo:'hemograma'|'coagulo', faixa, valores:{}, obs:{}, amostraExterna} com formato_resultado='modelo'. */
 const LAUDO_ASSINANTES = [
-  ['Maria Bernadete L.S Miranda','Farmacêutica-Bioquímica','CRF-PB: 01103'],
+  ['Maria Bernadete Lucena Sousa Miranda','Farmacêutica-Bioquímica','CRF-PB: 1103'],
   ['Micael Luís M. de Queiroz','Biomédico','CRBM-2: 20690'],
-  ['Maria Daluz Castro Tenório','Farmacêutica-Bioquímica','CRF-PB: 00739'],
+  ['Maria Daluz Castro Tenório','Farmacêutica-Bioquímica','CRF-PB: 0739'],
   ['Sandra Sobreira Santos','Farmacêutica-Bioquímica','CRF-PB: 01309'],
   ['Mariana Nóbrega Santos','Farmacêutica-Bioquímica','CRF-PB: 03408'],
   ['Maria das Graças da Costa Silva','Biomédica','CRBM-2: 4129']
@@ -3784,8 +3784,8 @@ function laudoRodape(r){
   // quem não está na lista (ex.: gestor): linha extra com nome e registro
   const carimboExtra = `<div style="font-style:italic;font-weight:700;font-size:11px;line-height:1.15;margin-bottom:1px;">${escH(quem)}</div><div style="font-size:7.5px;color:#333;margin-bottom:2px;">Assinado eletronicamente${dataAss}</div>`;
   const extra = (quem && idx < 0 && !r.__parcial) ? `<div style="text-align:right;margin-top:auto;padding-top:10px;font-size:10px;">${carimboExtra}<span style="font-size:9px;">${escH(r.responsavel_registro || '')}</span></div>` : '';
-  return `${extra}<div class="l-ass" ${extra ? 'style="margin-top:4px;padding-top:4px;"' : ''}>${LAUDO_ASSINANTES.map((a,i)=>`<div style="display:flex;flex-direction:column;justify-content:flex-end;">
-    <div style="min-height:16px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;">${i === idx ? carimboLista : ''}</div>
+  return `${extra}<div class="l-ass" ${extra ? 'style="margin-top:4px;padding-top:4px;"' : ''}>${LAUDO_ASSINANTES.map((a,i)=>`<div style="display:flex;flex-direction:column;justify-content:flex-start;">
+    <div style="height:30px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;overflow:visible;">${i === idx ? carimboLista : ''}</div>
     <div style="border-top:1px solid #444;padding-top:2px;">${a[0]}<br>${a[1]}<br>${a[2]}</div></div>`).join('')}</div>`;
 }
 
