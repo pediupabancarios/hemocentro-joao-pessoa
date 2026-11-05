@@ -383,3 +383,27 @@ begin
     update solicitacoes_hemocomponentes set paciente_id = v_maria where paciente_id is null;
   end if;
 end $$;
+
+
+-- ==========================================================
+-- Etiqueta única (vale a partir de 05/11/2026)
+-- Não deixa cadastrar nem alterar uma solicitação para uma etiqueta (registro_numero) que já existe.
+-- As repetidas que já existiam antes dessa data não são alteradas.
+-- ==========================================================
+create index if not exists idx_sol_exames_etiqueta on solicitacoes_exames (upper(btrim(registro_numero)));
+create or replace function trg_etiqueta_unica() returns trigger language plpgsql as $$
+declare v text;
+begin
+  v := upper(btrim(coalesce(NEW.registro_numero, '')));
+  if v = '' then return NEW; end if;
+  if TG_OP = 'UPDATE' and v = upper(btrim(coalesce(OLD.registro_numero, ''))) then return NEW; end if;
+  perform pg_advisory_xact_lock(hashtext('etiqueta:' || v));
+  if exists (select 1 from solicitacoes_exames s
+             where upper(btrim(coalesce(s.registro_numero, ''))) = v and s.id <> NEW.id) then
+    raise exception 'ETIQUETA_DUPLICADA: a etiqueta % já está cadastrada', btrim(NEW.registro_numero) using errcode = '23505';
+  end if;
+  return NEW;
+end $$;
+drop trigger if exists etiqueta_unica on solicitacoes_exames;
+create trigger etiqueta_unica before insert or update of registro_numero on solicitacoes_exames
+  for each row execute function trg_etiqueta_unica();

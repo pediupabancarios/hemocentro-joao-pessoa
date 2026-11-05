@@ -3357,7 +3357,7 @@ async function salvarResultadoExame(proximo, modo){
       observacoes_resultado: observacoes || null, responsavel_laboratorio: responsavel || null, responsavel_registro: registroProfissional || null,
       data_resultado: parcial ? null : hoje, situacao: parcial ? 'Em análise' : 'Concluído'
     }).eq('id', r.id).then(({error})=>{
-      if(error){ showToast('Erro ao salvar resultado no Supabase.'); console.error(error); return; }
+      if(error){ showToast(ehErroEtiqueta(error) ? MSG_ETIQUETA_BANCO : 'Erro ao salvar resultado no Supabase.'); console.error(error); return; }
       if(seqParcial){
         const nf = filaLab.find(x=>x.id === r.id); if(nf){ nf.situacao = 'Em análise'; nf.registro_numero = registroNumero || null; }
         try{ labParciais[r.id] = JSON.parse(parametrosJson).modelos || {}; }catch(e){}
@@ -4118,6 +4118,9 @@ async function etiquetaEmUso(valor, idAtual){
   }
   return achado;
 }
+// o banco também recusa etiqueta repetida (trava definitiva, vale a partir de 05/11/2026)
+function ehErroEtiqueta(error){ return !!error && (error.code === '23505' || /ETIQUETA_DUPLICADA/.test(error.message || '')); }
+const MSG_ETIQUETA_BANCO = 'Esta etiqueta já está cadastrada em outra solicitação — confira o número.';
 function etiquetaMensagem(v, r){
   const nome = (r.paciente_id && pacientesList.find(x=>x.id === r.paciente_id)?.nome) || r.paciente_nome || 'outro paciente';
   const dt = r.data ? (String(r.data).includes('/') ? r.data : isoToBR(r.data)) : '';
@@ -6938,8 +6941,8 @@ async function salvarLab(){
     document.querySelectorAll('.lab-exame-cb:checked').forEach(cb=>cb.checked=false);
     if(supabaseConfigured && r.id){
       supabaseClient.from('solicitacoes_exames').update(Object.assign({exame, medico, medico_crm: medicoCrm || null, registro_numero: registro || null}, data ? {data} : {})).eq('id', r.id).then(({error})=>{
-        showToast(error ? 'Erro ao salvar alterações no Supabase.' : 'Solicitação atualizada com sucesso.');
-        if(error) console.error(error);
+        showToast(error ? (ehErroEtiqueta(error) ? MSG_ETIQUETA_BANCO : 'Erro ao salvar alterações no Supabase.') : 'Solicitação atualizada com sucesso.');
+        if(error){ console.error(error); if(ehErroEtiqueta(error)) loadDocumentosDoPaciente().then(()=>refreshTables()); }
       });
     } else {
       showToast('Solicitação atualizada nesta sessão.');
@@ -6959,6 +6962,7 @@ async function salvarLab(){
       registro_numero: registro || null,
       paciente_id: currentPacienteId, paciente_nome: paciente.nome
     }).select().then(({data:inserted, error})=>{
+      if(error && ehErroEtiqueta(error)){ labs.shift(); refreshTables(); showToast(MSG_ETIQUETA_BANCO); return; }   // o banco recusou: tira da lista
       if(!error && inserted && inserted[0]) labs[0].id = inserted[0].id;
       showToast(error ? 'Salvo localmente (falha ao gravar no Supabase).' : `${checked.length} exame(s) salvos no Supabase em uma única solicitação.`);
     });
