@@ -634,6 +634,16 @@
   .ct-ex.foco{background:#EEF4FD;margin:0 -16px;padding:9px 16px;}
   .ct-foot{border-radius:8px;padding:10px 12px;font-size:13px;background:var(--amber-bg);color:var(--amber-text);}
   .ct-foot.ok{background:var(--green-bg);color:var(--green-text);}
+  .le-meses{display:flex;gap:6px;flex-wrap:wrap;}
+  .le-meses button{border:1px solid var(--line);background:#fff;border-radius:16px;padding:6px 14px;font-size:13px;cursor:pointer;font-family:inherit;text-align:left;line-height:1.25;}
+  .le-meses button span{display:block;font-size:11px;color:var(--muted);}
+  .le-meses button.on{background:#1D5FC4;color:#fff;border-color:#1D5FC4;} .le-meses button.on span{color:#dbe7fb;}
+  .le-bars{display:flex;gap:4px;align-items:flex-end;height:30px;margin:10px 0 18px;}
+  .le-bars div{flex:1;background:#C9DBF7;border-radius:3px 3px 0 0;position:relative;min-width:8px;}
+  .le-bars div.on{background:#1D5FC4;}
+  .le-bars span{position:absolute;bottom:-15px;left:-4px;right:-4px;text-align:center;font-size:9.5px;color:var(--muted);}
+  .le-res{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:10px;cursor:pointer;background:#fff;}
+  .le-res:hover{border-color:#1D5FC4;}
   .recep-tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);padding:0 14px;overflow-x:auto;}
   .recep-tab{display:flex;align-items:center;gap:7px;padding:12px 14px;font-size:13.5px;font-weight:700;color:var(--muted);background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;font-family:inherit;}
   .recep-tab.on{color:var(--red-dark);border-bottom-color:var(--red);}
@@ -4927,7 +4937,18 @@ async function labCartaoLancar(i){
 
 /* ================= LABORATÓRIO — Exames por setor ================= */
 let labExameAtual = null;            // {key, nome} quando um exame está aberto
-let labExTab = 'p', labExBusca = '', labExBuscaLista = '', labExSetor = 'hemo', labExAntigos = false;
+let labExTab = 'p', labExBusca = '', labExBuscaLista = '', labExSetor = 'hemo', labExMes = '', labExBuscaGeral = '';
+const LAB_MESES_ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+function labMesAtualKey(){ return isoLocal(new Date()).slice(0,7); }
+function labExMesSel(){ return labExMes || labMesAtualKey(); }          // padrão: mês atual
+function labMesRotulo(k){ if(k === 'all') return 'Todos os meses'; const [y,m] = k.split('-'); return LAB_MESES_ABREV[+m - 1] + '/' + y; }
+function labNoMes(it){ const k = labExMesSel(); return k === 'all' || (it.r.data || '').slice(0,7) === k; }
+// meses com pedidos em aberto (mais o mês atual), do mais novo para o mais antigo
+function labExMesesLista(itens){
+  const set = new Set([labMesAtualKey()]);
+  itens.forEach(it=>{ if(labEhAberto(it) && it.r.data) set.add(it.r.data.slice(0,7)); });
+  return [...set].sort().reverse().slice(0, 8);
+}
 let labExSel = new Set();
 let labParciais = {};                // id da solicitação -> modelos já lançados (resultados parciais)
 let labSeq = null;                   // sequência de lançamento: {ids:[...], foco:{ids,modelo}}
@@ -4961,7 +4982,7 @@ function labExItens(){
       if(r.situacao === 'Concluído') st = 'Liberado';
       else { const par = labParciais[r.id]; st = (par && rwExameLancado(n, par) === true) ? 'Lançado' : r.situacao; }
       itens.push({key: normExame(n), nome: LAB_NOME_EXAME[normExame(n)] || n, r, st,
-        hojeLib: r.situacao === 'Concluído' && r.data_resultado === hoje, antigo: r.situacao !== 'Concluído' && (r.data || '') < lim});
+        hojeLib: r.situacao === 'Concluído' && r.data_resultado === hoje});
     });
   });
   return itens;
@@ -4977,41 +4998,82 @@ function labExListaHTML(){
   const opt = LAB_SETORES.map(([k,n])=>`<option value="${k}" ${labExSetor === k ? 'selected' : ''}>${n}</option>`).join('');
   return `
   <div class="panel" style="margin-top:4px;">
-    <div class="panel-head"><h3>🧪 EXAMES POR SETOR</h3>
-      <label style="font-size:12.5px;display:flex;gap:6px;align-items:center;"><input type="checkbox" ${labExAntigos ? 'checked' : ''} onchange="labExAntigos=this.checked;labExRenderCards()"> Incluir pedidos com mais de ${LAB_DIAS_RECENTE} dias</label></div>
+    <div class="panel-head"><h3>🧪 EXAMES POR SETOR</h3></div>
     <div style="padding:16px 18px;">
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
-        <input type="text" value="${labExBuscaLista.replace(/"/g,'&quot;')}" placeholder="Digite o nome do exame" oninput="labExBuscaLista=this.value;labExRenderCards()"
-          style="flex:1;min-width:220px;padding:10px 14px;border:1.5px solid var(--line);border-radius:9px;font-size:13.5px;outline:none;">
-        <select onchange="labExSetor=this.value;labExRenderCards()" style="padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;font-size:13px;background:#fff;">${opt}</select>
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:700;">BUSCAR PELO Nº DA ETIQUETA OU PELO NOME DO PACIENTE</div>
+      <input type="text" id="le-busca-geral" value="${labExBuscaGeral.replace(/"/g,'&quot;')}" placeholder="Ex.: 3528" oninput="labExBuscaGeral=this.value;labExBuscar()" autocomplete="off"
+        style="width:100%;padding:11px 14px;border:1.5px solid var(--line);border-radius:9px;font-size:14px;outline:none;">
+      <div id="le-resultados"></div>
+      <div id="le-corpo">
+        <div style="font-size:12.5px;color:var(--muted);margin:16px 0 6px;font-weight:700;">MÊS DO PEDIDO</div>
+        <div id="le-meses" class="le-meses"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin:14px 0;">
+          <input type="text" value="${labExBuscaLista.replace(/"/g,'&quot;')}" placeholder="Digite o nome do exame" oninput="labExBuscaLista=this.value;labExRenderCards()"
+            style="flex:1;min-width:220px;padding:10px 14px;border:1.5px solid var(--line);border-radius:9px;font-size:13.5px;outline:none;">
+          <select onchange="labExSetor=this.value;labExRenderCards()" style="padding:9px 12px;border:1.5px solid var(--line);border-radius:9px;font-size:13px;background:#fff;">${opt}</select>
+        </div>
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;font-weight:700;" id="le-tit">EXAMES COM AMOSTRAS PENDENTES</div>
+        <div id="le-cards" class="le-grid"></div>
+        <div style="font-size:12px;color:var(--muted);margin-top:12px;">Os números respeitam o mês escolhido. "Todos os meses" soma tudo, inclusive pedidos antigos.</div>
       </div>
-      <div style="font-size:12.5px;color:var(--muted);margin-bottom:8px;font-weight:700;">EXAMES COM AMOSTRAS PENDENTES</div>
-      <div id="le-cards" class="le-grid"></div>
-      <div id="le-nota" style="font-size:12px;color:var(--muted);margin-top:12px;"></div>
     </div>
   </div>`;
 }
+function labExSetMes(k){ labExMes = k; labExRenderCards(); }
 function labExRenderCards(){
   const box = document.getElementById('le-cards'); if(!box) return;
   if(!filaLabCarregada){ box.innerHTML = '<div style="color:var(--muted);">Carregando...</div>'; return; }
-  const q = normNome(labExBuscaLista), grupos = {};
-  let ocultos = 0;
-  labExItens().forEach(it=>{
-    if((LAB_SETOR_DE[it.key] || 'outros') !== labExSetor) return;
+  const q = normNome(labExBuscaLista), todos = labExItens();
+  const meses = labExMesesLista(todos), sel = labExMesSel();
+  const doSetor = todos.filter(it=>(LAB_SETOR_DE[it.key] || 'outros') === labExSetor);
+  // chips de mês, com o total de pendentes de cada um neste setor
+  const cont = k => doSetor.filter(it=>labEhAberto(it) && (k === 'all' || (it.r.data || '').slice(0,7) === k)).length;
+  document.getElementById('le-meses').innerHTML = meses.concat(['all']).map(k=>`<button class="${sel === k ? 'on' : ''}" onclick="labExSetMes('${k}')">${labMesRotulo(k) === 'Todos os meses' ? 'Todos' : labMesRotulo(k)}<span>${cont(k)} pendentes</span></button>`).join('');
+  document.getElementById('le-tit').textContent = 'EXAMES COM AMOSTRAS PENDENTES EM ' + (sel === 'all' ? 'TODOS OS MESES' : labMesRotulo(sel).toUpperCase());
+  const grupos = {};
+  doSetor.forEach(it=>{
     if(q && !normNome(it.nome).includes(q)) return;
-    const g = grupos[it.key] = grupos[it.key] || {nome: it.nome, pend: 0, exec: 0, hoje: 0};
+    const g = grupos[it.key] = grupos[it.key] || {nome: it.nome, pend: 0, exec: 0, hoje: 0, porMes: {}};
     if(it.hojeLib) g.hoje++;
-    if(labEhAberto(it)){ if(it.antigo && !labExAntigos){ ocultos++; return; } g.pend++; if(it.st !== 'Pendente') g.exec++; }
+    if(labEhAberto(it)){
+      const mk = (it.r.data || '').slice(0,7); g.porMes[mk] = (g.porMes[mk] || 0) + 1;
+      if(labNoMes(it)){ g.pend++; if(it.st !== 'Pendente') g.exec++; }
+    }
   });
   const lista = Object.keys(grupos).map(k=>({key:k, ...grupos[k]})).filter(g=>g.pend > 0 || g.hoje > 0).sort((a,b)=>b.pend - a.pend);
-  box.innerHTML = lista.map(g=>`
+  box.innerHTML = lista.map(g=>{
+    const vals = meses.map(k=>g.porMes[k] || 0), mx = Math.max(1, ...vals);
+    const barras = meses.slice(0,6).map((k,i)=>`<div class="${sel === k ? 'on' : ''}" title="${labMesRotulo(k)}: ${vals[i]}" style="height:${Math.max(4, Math.round(vals[i] / mx * 30))}px"><span>${LAB_MESES_ABREV[+k.slice(5) - 1]}</span></div>`).join('');
+    return `
     <div class="le-card">
       <div class="le-top"><b>${escH(g.nome)}</b><span class="le-pill">${g.pend} pendente${g.pend === 1 ? '' : 's'}</span></div>
       <div style="font-size:12.5px;color:var(--muted);margin-top:4px;">${g.exec} já em execução · ${g.hoje} liberado${g.hoje === 1 ? '' : 's'} hoje</div>
+      <div class="le-bars">${barras}</div>
       <button class="le-go" onclick="labAbrirExame('${g.key}')">Abrir ${escH(g.nome)} →</button>
-    </div>`).join('') || '<div style="color:var(--muted);">Nenhum exame pendente neste setor. 🎉</div>';
-  const nota = document.getElementById('le-nota');
-  if(nota) nota.textContent = ocultos ? `${ocultos} pedido(s) com mais de ${LAB_DIAS_RECENTE} dias estão ocultos. Marque "Incluir pedidos com mais de ${LAB_DIAS_RECENTE} dias" para vê-los.` : '';
+    </div>`;
+  }).join('') || '<div style="color:var(--muted);">Nenhum exame pendente neste setor e mês. 🎉</div>';
+}
+// busca geral: etiqueta ou nome, em todos os meses
+function labExBuscar(){
+  const q = normNome(labExBuscaGeral), corpo = document.getElementById('le-corpo'), box = document.getElementById('le-resultados');
+  if(!box) return;
+  if(corpo) corpo.style.display = q ? 'none' : '';
+  if(!q){ box.innerHTML = ''; return; }
+  const dig = labExBuscaGeral.trim();
+  const achados = filaLab.filter(r=>(r.registro_numero || '').toLowerCase().includes(dig.toLowerCase()) || normNome(nomePacienteDe(r)).includes(q))
+    .sort((a,b)=>(b.data || '').localeCompare(a.data || '')).slice(0, 30);
+  const realce = t => { const i = String(t).toLowerCase().indexOf(dig.toLowerCase()); return i < 0 || !dig ? escH(t) : escH(String(t).slice(0,i)) + '<mark style="background:#EEF4FD;color:#1D5FC4;padding:0 2px;border-radius:3px;">' + escH(String(t).slice(i, i + dig.length)) + '</mark>' + escH(String(t).slice(i + dig.length)); };
+  const meses = new Set(achados.filter(r=>r.registro_numero && r.registro_numero.toLowerCase() === dig.toLowerCase()).map(r=>(r.data || '').slice(0,7)));
+  box.innerHTML = achados.map(r=>{
+    const exs = labCartaoExames(r), pend = exs.filter(e=>!e.lancado).length;
+    return `<div class="le-res" onclick="labCartao('${r.id}')">
+      <div class="le-top"><div><b style="font-size:15px;">Etiqueta ${realce(r.registro_numero || '—')}</b>
+        <div style="font-size:12.5px;color:var(--muted);">${escH(nomePacienteDe(r))} · pedido em ${isoToBR(r.data)} (${labMesRotulo((r.data || '').slice(0,7))})</div></div>
+        <span class="le-pill ${pend ? '' : 'gv'}">${pend ? pend + ' pendente' + (pend > 1 ? 's' : '') : 'Concluído'}</span></div>
+      <div style="margin-top:6px;">${exs.map(e=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:3px 0;font-size:13px;"><span>${escH(e.nome)}</span><span class="le-pill ${e.lancado ? 'gv' : (e.estado === 'Pendente' ? '' : 'b')}">${e.lancado ? 'Realizado' : e.estado}</span></div>`).join('')}</div>
+    </div>`;
+  }).join('') + (meses.size > 1 ? `<div style="font-size:12.5px;color:var(--muted);margin-top:8px;">Atenção: a etiqueta ${escH(dig)} aparece em mais de um mês — confira o mês do pedido.</div>` : '')
+    || `<div style="font-size:13px;color:var(--muted);margin-top:10px;">Nenhum registro com "${escH(dig)}".</div>`;
 }
 
 function labAbrirExame(key){
@@ -5021,9 +5083,13 @@ function labAbrirExame(key){
 }
 function labExVoltar(){ labExameAtual = null; labExSel = new Set(); labExRender(); }
 function labExDetalheHTML(){
+  const meses = labExMesesLista(labExItens().filter(it=>it.key === labExameAtual.key)).concat(['all']);
+  const sel = labExMesSel();
+  const optMes = meses.map(k=>`<option value="${k}" ${sel === k ? 'selected' : ''}>${labMesRotulo(k)}</option>`).join('');
   return `
   <div class="panel" style="margin-top:4px;">
-    <div class="panel-head"><h3><a href="#" onclick="event.preventDefault();labExVoltar()" style="text-decoration:none;color:inherit;">←</a> ${escH(labExameAtual.nome.toUpperCase())}</h3><span class="le-pill" id="le-badge"></span></div>
+    <div class="panel-head"><h3><a href="#" onclick="event.preventDefault();labExVoltar()" style="text-decoration:none;color:inherit;">←</a> ${escH(labExameAtual.nome.toUpperCase())}</h3>
+      <div style="display:flex;gap:8px;align-items:center;"><select onchange="labExMes=this.value;labExRenderLista()" title="Mês do pedido" style="padding:6px 10px;border:1.5px solid var(--line);border-radius:9px;font-size:12.5px;background:#fff;">${optMes}</select><span class="le-pill" id="le-badge"></span></div></div>
     <div style="padding:6px 18px 18px;">
       <div class="le-cnt"><div><span>Pendentes</span><b id="le-c1">0</b></div><div><span>Em execução</span><b id="le-c2">0</b></div><div><span>Liberados hoje</span><b id="le-c3">0</b></div></div>
       <input type="text" value="${labExBusca.replace(/"/g,'&quot;')}" placeholder="Buscar por nome ou nº da etiqueta" oninput="labExBusca=this.value;labExRenderLista()"
@@ -5045,8 +5111,7 @@ function labExDetalheHTML(){
 function labExRenderLista(){
   const box = document.getElementById('le-lista'); if(!box || !labExameAtual) return;
   const todos = labExItens().filter(it=>it.key === labExameAtual.key);
-  const recentes = todos.filter(it=>!labEhAberto(it) || labExAntigos || !it.antigo);
-  const ocultos = todos.filter(it=>labEhAberto(it) && it.antigo && !labExAntigos).length;
+  const recentes = todos.filter(labNoMes);
   const abertos = recentes.filter(labEhAberto);
   document.getElementById('le-c1').textContent = abertos.filter(it=>it.st === 'Pendente').length;
   document.getElementById('le-c2').textContent = abertos.filter(it=>it.st !== 'Pendente').length;
@@ -5070,8 +5135,8 @@ function labExRenderLista(){
         <div class="sub">Etiqueta ${escH(r.registro_numero || '—')} · pedido em ${isoToBR(r.data)}${r.medico ? ' · ' + escH(r.medico) : ''}</div>
         ${atraso ? `<div style="color:#B3261E;font-size:12px;font-weight:700;">atrasado · ${diasDesdeISO(r.data)} dias</div>` : ''}</div>
       <span class="le-pill${pill(it.st)}">${it.st}</span></div>`;
-  }).join('') || '<div style="color:var(--muted);padding:8px 0;">Nada nesta aba.</div>';
-  document.getElementById('le-qtd').textContent = vis.length + ' amostra' + (vis.length === 1 ? '' : 's') + (ocultos ? ` · ${ocultos} antigas ocultas` : '');
+  }).join('') || '<div style="color:var(--muted);padding:8px 0;">Nada nesta aba neste mês.</div>';
+  document.getElementById('le-qtd').textContent = vis.length + ' amostra' + (vis.length === 1 ? '' : 's');
   document.getElementById('le-nsel').textContent = labExSel.size;
   const tb = document.getElementById('le-todos'); if(tb) tb.checked = vis.length > 0 && vis.every(it=>labExSel.has(it.r.id));
 }
