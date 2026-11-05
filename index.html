@@ -2015,21 +2015,31 @@ const NOMES_PAGINA = {
   usuarios:'Usuários', relatorios:'Relatórios', config:'Configurações'
 };
 
+function semPacienteAtivo(){ return supabaseConfigured && !currentPacienteId; }
 function atualizarPacienteTopo(){
   const temPront = paciente.prontuario && paciente.prontuario !== '—';
-  const rotulo = (paciente.nome || '—') + (temPront ? ' · ' + paciente.prontuario : '');
+  const rotulo = semPacienteAtivo() ? 'Nenhum paciente selecionado' : ((paciente.nome || '—') + (temPront ? ' · ' + paciente.prontuario : ''));
   const t = document.getElementById('topbar-patient-nome');
   if(t) t.textContent = rotulo;
   const c = document.getElementById('context-patient-nome');
-  if(c) c.textContent = paciente.nome || '—';
+  if(c) c.textContent = semPacienteAtivo() ? 'Nenhum' : (paciente.nome || '—');
 }
 
+const PAGINAS_DO_PACIENTE = ['resumo','receitas','laboratorios','hemocomponentes','medceaf','incidentes','documentos','anexos'];
 function renderPage(page){
   if(PAGINAS_COM_PACIENTES.includes(page)) setTimeout(()=>atualizarPacientesEPagina(), 50);   // pega edições feitas por outras pessoas
   atualizarPacienteTopo();
   const cp = document.getElementById('context-page');
   if(cp) cp.textContent = NOMES_PAGINA[page] || '—';
   const main = document.getElementById('main-content');
+  if(semPacienteAtivo() && PAGINAS_DO_PACIENTE.includes(page)){
+    main.innerHTML = `<div class="placeholder"><div class="ic">👤</div><h3>Nenhum paciente selecionado</h3>
+      <p>Escolha o paciente para ver ${NOMES_PAGINA[page] ? '“' + NOMES_PAGINA[page] + '”' : 'esta tela'}.</p>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px;">
+        <button class="btn-primary" onclick="abrirBuscaPaciente()">🔍 Buscar paciente</button>
+        <button class="btn-secondary" onclick="clickNav('dados')">Ver lista de pacientes</button></div></div>`;
+    return;
+  }
   if(page === 'resumo'){
     main.innerHTML = resumoTemplate();
     bindResumoEvents();
@@ -6777,6 +6787,7 @@ function gerarPrescricaoAuto(itens, via){
 }
 
 function abrirNovaReceita(){
+  if(semPacienteAtivo()){ showToast('Escolha primeiro o paciente (Dados do Paciente ou a busca no topo).'); return; }
   editingReceitaId = null;
   document.getElementById('modal-receita-title').textContent = 'Nova Receita Médica';
   document.getElementById('modal-receita-btn').textContent = 'Salvar Receita';
@@ -6867,6 +6878,7 @@ function salvarReceita(){
 }
 
 async function abrirNovaSolicitacaoLab(){
+  if(semPacienteAtivo()){ showToast('Escolha primeiro o paciente (Dados do Paciente ou a busca no topo).'); return; }
   editingLabId = null;
   document.getElementById('modal-lab-title').textContent = 'Nova Solicitação de Exames (F.CP.107.02)';
   document.getElementById('modal-lab-btn').textContent = 'Salvar Solicitação';
@@ -6998,6 +7010,7 @@ function limparHemoChecklist(){
 }
 
 async function abrirNovaSolicitacaoHemo(){
+  if(semPacienteAtivo()){ showToast('Escolha primeiro o paciente (Dados do Paciente ou a busca no topo).'); return; }
   editingHemoId = null;
   document.getElementById('modal-hemo-title').textContent = 'Solicitação de Hemocomponentes (F.CP.107.03)';
   document.getElementById('modal-hemo-btn').textContent = 'Salvar Solicitação';
@@ -7214,6 +7227,7 @@ function coletarMcMeds(){
 }
 
 function abrirNovaMedCeaf(){
+  if(semPacienteAtivo()){ showToast('Escolha primeiro o paciente (Dados do Paciente ou a busca no topo).'); return; }
   editingMedCeafId = null;
   document.getElementById('modal-medceaf-title').textContent = 'Solicitação de Medicamentos (CEAF / LME)';
   document.getElementById('modal-medceaf-btn').textContent = 'Salvar Solicitação';
@@ -7475,6 +7489,7 @@ function coletarChecks(cls){
 }
 
 function abrirNovaFichaInc(){
+  if(semPacienteAtivo()){ showToast('Escolha primeiro o paciente (Dados do Paciente ou a busca no topo).'); return; }
   editingFichaIncId = null;
   document.getElementById('modal-fichainc-title').textContent = 'Notificação de Incidente Transfusional (F.CQ.403)';
   document.getElementById('modal-fichainc-btn').textContent = 'Salvar Notificação';
@@ -7736,11 +7751,7 @@ function excluirPaciente(id){
 
     if(id === currentPacienteId){
       currentPacienteId = null;
-      if(pacientesList.length){
-        ativarPaciente(pacientesList[0], false).then(()=>renderPage('dados'));
-      } else {
-        renderPage('dados');
-      }
+      loadDocumentosDoPaciente().then(()=>{ atualizarPacienteTopo(); renderPage('dados'); });
     } else {
       renderPage('dados');
     }
@@ -7951,12 +7962,12 @@ async function initFromSupabase(){
   }
   try{
     const pacRes = await supabaseClient.from('pacientes').select('*').order('created_at', {ascending:true});
-    if(pacRes.data && pacRes.data.length){
-      pacientesList = pacRes.data;
-      await ativarPaciente(pacientesList[0], false);
-    } else {
-      await loadDocumentosDoPaciente();
-    }
+    if(pacRes.data && pacRes.data.length) pacientesList = pacRes.data;
+    currentPacienteId = null;                 // ao abrir, nenhum paciente fica ativo: a pessoa escolhe quem vai atender
+    await loadDocumentosDoPaciente();         // sem paciente: só limpa as listas
+    atualizarPacienteTopo();
+    const ativa = document.querySelector('.nav-item.active')?.dataset.page;
+    if(ativa && PAGINAS_DO_PACIENTE.includes(ativa)) renderPage(ativa);
     showToast('Dados carregados do Supabase — os cadastros agora persistem.');
   }catch(e){
     console.error(e);
@@ -7966,6 +7977,10 @@ async function initFromSupabase(){
 
 async function loadDocumentosDoPaciente(){
   if(!supabaseConfigured) return;
+  if(!currentPacienteId){            // sem paciente ativo não carrega documentos de ninguém
+    receitas = []; labs = []; hemos = []; medsCeaf = []; fichasInc = []; anexosList = [];
+    return;
+  }
   try{
     let rxQuery = supabaseClient.from('receitas').select('*').order('created_at', {ascending:false});
     let labQuery = supabaseClient.from('solicitacoes_exames').select('*').order('created_at', {ascending:false});
