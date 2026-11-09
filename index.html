@@ -751,6 +751,20 @@
       <button type="submit" class="login-btn">Entrar</button>
       <div class="login-error" id="login-error">Usuário ou senha incorretos. Tente novamente.</div>
     </form>
+    <form id="login-trocar-form" autocomplete="off" style="display:none">
+      <div class="login-title" style="margin-top:4px">Crie uma nova senha</div>
+      <p style="font-size:12.5px;color:#5B6574;margin:0 0 12px;line-height:1.5">Por segurança, defina uma senha pessoal antes de continuar. Use pelo menos 8 caracteres e não a compartilhe.</p>
+      <div class="field">
+        <label for="login-nova">Nova senha</label>
+        <input type="password" id="login-nova" placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label for="login-nova2">Repita a nova senha</label>
+        <input type="password" id="login-nova2" placeholder="Repita a senha" autocomplete="new-password">
+      </div>
+      <button type="submit" class="login-btn" id="login-trocar-btn">Salvar senha e entrar</button>
+      <div class="login-error" id="login-trocar-error"></div>
+    </form>
     <div class="login-hint">Acesso restrito a profissionais autorizados do Hemocentro João Pessoa.</div>
   </div>
 </div>
@@ -1490,7 +1504,7 @@
         </div>
         <div class="form-field">
           <label>Senha</label>
-          <input type="text" id="usr-senha" placeholder="Defina uma senha">
+          <input type="password" id="usr-senha" placeholder="Senha provisória (mín. 8)" autocomplete="new-password">
         </div>
         <div class="form-field full" id="usr-dias-atendimento-wrap">
           <label>Dias de Atendimento (define a agenda — 6 vagas de manhã + 6 à tarde por dia)</label>
@@ -1723,9 +1737,9 @@ let pacientesList = []; // preenchida a partir do Supabase (ou fica vazia se nã
 let currentPacienteId = null;
 
 /* ================= LOGIN ================= */
-const VALID_USER = "hemocentro";
-const VALID_PASS = "1234";
 let currentUser = null; // {id, nome, tipo, crm, conselho, login}
+let sessaoToken = null;     // token da sessão criada por pront_login (fica só na memória)
+let loginPendente = null;   // {usuario, senhaAtual} enquanto a troca obrigatória de senha não termina
 let perfilLoginSelecionado = null;
 
 function selecionarPerfilLogin(perfil){
@@ -1754,32 +1768,89 @@ document.getElementById('login-form').addEventListener('submit', async function(
 
   let loggedIn = null;
   let encontrouLoginSenha = false;
+  let falhaConexao = !supabaseConfigured;
 
   if(supabaseConfigured){
     try{
-      const { data, error } = await supabaseClient.from('usuarios').select('*').ilike('login', user).eq('ativo', true).limit(1);
-      if(!error && data && data.length && data[0].senha === pass){
+      // A senha é conferida no banco; o navegador nunca recebe a senha guardada.
+      const { data, error } = await supabaseClient.rpc('pront_login', {p_login: user, p_senha: pass, p_tipo: perfilLoginSelecionado});
+      if(error) throw error;
+      if(data && data.ok){
         encontrouLoginSenha = true;
-        if(data[0].tipo === perfilLoginSelecionado){
-          loggedIn = data[0];
+        loggedIn = data.usuario;
+        sessaoToken = data.token;
+        if(data.trocar_senha){
+          loginPendente = {usuario: data.usuario, senhaAtual: pass};
         }
+      } else if(data && data.motivo === 'perfil'){
+        encontrouLoginSenha = true;
       }
-    }catch(err){ console.error(err); }
-  }
-
-  // fallback: credencial fixa de demonstração (funciona mesmo sem Supabase configurado)
-  if(!loggedIn && user === VALID_USER && pass === VALID_PASS){
-    encontrouLoginSenha = true;
-    if(perfilLoginSelecionado === 'gestor'){
-      loggedIn = { nome:'Administrador', tipo:'gestor', login:'hemocentro' };
-    }
+    }catch(err){ console.error(err); falhaConexao = true; }
   }
 
   btn.textContent = 'Entrar';
   btn.disabled = false;
 
+  if(loggedIn && loginPendente){
+    errorEl.style.display = 'none';
+    document.getElementById('login-form').style.display = 'none';
+    document.getElementById('login-role-tabs').style.display = 'none';
+    document.getElementById('login-trocar-form').style.display = 'block';
+    document.getElementById('login-nova').focus();
+    return;
+  }
   if(loggedIn){
+    entrarNoApp(loggedIn);
+  } else {
+    const rotulosPerfil = {gestor:'Gestor', medico:'Médico(a)', recepcao:'Recepção', laboratorio:'Laboratório'};
+    if(falhaConexao){
+      errorEl.textContent = 'Não foi possível falar com o servidor. Verifique a internet e tente de novo.';
+    } else if(encontrouLoginSenha){
+      errorEl.textContent = `Esse login não pertence ao perfil "${rotulosPerfil[perfilLoginSelecionado]}". Verifique a aba selecionada.`;
+    } else {
+      errorEl.textContent = 'Usuário ou senha incorretos. Tente novamente.';
+    }
+    errorEl.style.display = 'block';
+  }
+});
+
+document.getElementById('login-trocar-form').addEventListener('submit', async function(e){
+  e.preventDefault();
+  const nova = document.getElementById('login-nova').value;
+  const nova2 = document.getElementById('login-nova2').value;
+  const errEl = document.getElementById('login-trocar-error');
+  const btn = document.getElementById('login-trocar-btn');
+  const erro = msg => { errEl.textContent = msg; errEl.style.display = 'block'; };
+  if(!loginPendente){ voltarAoLogin(); return; }
+  if(nova.length < 8){ erro('A senha precisa ter pelo menos 8 caracteres.'); return; }
+  if(nova !== nova2){ erro('As senhas não coincidem.'); return; }
+  if(nova === loginPendente.senhaAtual){ erro('Escolha uma senha diferente da atual.'); return; }
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  try{
+    const { error } = await supabaseClient.rpc('pront_trocar_senha', {p_token: sessaoToken, p_atual: loginPendente.senhaAtual, p_nova: nova});
+    if(error){ erro(error.message || 'Não foi possível salvar a senha.'); return; }
+    const u = loginPendente.usuario;
+    loginPendente = null;
+    errEl.style.display = 'none';
+    entrarNoApp(u);
+    showToast('Senha alterada com sucesso.');
+  }catch(err){ console.error(err); erro('Não foi possível falar com o servidor.'); }
+  finally{ btn.disabled = false; btn.textContent = 'Salvar senha e entrar'; }
+});
+
+function voltarAoLogin(){
+  loginPendente = null;
+  ['login-nova','login-nova2'].forEach(id=>{ document.getElementById(id).value = ''; });
+  document.getElementById('login-trocar-error').style.display = 'none';
+  document.getElementById('login-trocar-form').style.display = 'none';
+  document.getElementById('login-form').style.display = '';
+  document.getElementById('login-role-tabs').style.display = '';
+}
+
+function entrarNoApp(loggedIn){
+    voltarAoLogin();
     currentUser = loggedIn;
+    const errorEl = document.getElementById('login-error');
     errorEl.style.display = 'none';
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
@@ -1797,16 +1868,7 @@ document.getElementById('login-form').addEventListener('submit', async function(
       clickNav('resumo');   // também realça "Resumo" no menu (útil quando troca de perfil sem recarregar)
     }
     initFromSupabase();
-  } else {
-    const rotulosPerfil = {gestor:'Gestor', medico:'Médico(a)', recepcao:'Recepção', laboratorio:'Laboratório'};
-    if(encontrouLoginSenha){
-      errorEl.textContent = `Esse login não pertence ao perfil "${rotulosPerfil[perfilLoginSelecionado]}". Verifique a aba selecionada.`;
-    } else {
-      errorEl.textContent = 'Usuário ou senha incorretos. Tente novamente.';
-    }
-    errorEl.style.display = 'block';
-  }
-});
+}
 
 function aplicarPermissoesUsuario(){
   const isRecepcao = currentUser && currentUser.tipo === 'recepcao';
@@ -1873,6 +1935,10 @@ function aplicarMenuPorPerfil(){
 }
 
 function logout(){
+  if(sessaoToken && supabaseConfigured) supabaseClient.rpc('pront_logout', {p_token: sessaoToken}).then(()=>{}, ()=>{});
+  sessaoToken = null;
+  usuariosList = [];
+  voltarAoLogin();
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('login-user').value = '';
@@ -6379,6 +6445,7 @@ function cancelarAgendamento(id){
 }
 
 let usuariosList = [];
+const escUsr = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 function usuariosTemplate(){
   if(!supabaseConfigured){
@@ -6396,8 +6463,8 @@ function usuariosTemplate(){
       <tbody>
         ${usuariosList.length ? usuariosList.map(u=>`
           <tr>
-            <td>${u.nome}</td><td>${u.login}</td><td>${rotulos[u.tipo] || u.tipo}</td><td>${u.crm ? ((u.conselho || 'CRM') + ' ' + u.crm) : '—'}</td>
-            <td><span class="status ${u.ativo ? 'concluido' : 'urgente'}">${u.ativo ? 'Ativo' : 'Inativo'}</span></td>
+            <td>${escUsr(u.nome)}</td><td>${escUsr(u.login)}</td><td>${rotulos[u.tipo] || escUsr(u.tipo)}</td><td>${u.crm ? escUsr((u.conselho || 'CRM') + ' ' + u.crm) : '—'}</td>
+            <td><span class="status ${u.ativo ? 'concluido' : 'urgente'}">${u.ativo ? 'Ativo' : 'Inativo'}</span>${u.trocar_senha ? '<div style="font-size:11px;color:#9A6B00;margin-top:3px;">Senha provisória</div>' : ''}</td>
             <td class="row-actions">
               ${u.tipo !== 'gestor' ? `
                 <button title="Editar" onclick="editarUsuario('${u.id}')">${ico('editar')}</button>
@@ -6413,8 +6480,9 @@ function usuariosTemplate(){
 
 async function carregarUsuarios(){
   if(!supabaseConfigured || !currentUser || currentUser.tipo !== 'gestor') return;
-  const { data, error } = await supabaseClient.from('usuarios').select('*').order('created_at', {ascending:true});
-  if(!error && data) usuariosList = data;
+  const { data, error } = await supabaseClient.rpc('pront_listar_usuarios', {p_token: sessaoToken});
+  if(error){ console.error(error); showToast(error.message || 'Não foi possível carregar os usuários.'); return; }
+  usuariosList = data || [];
 }
 
 let editingUsuarioId = null;
@@ -6447,7 +6515,7 @@ function abrirNovoUsuario(){
   document.getElementById('modal-usuario-btn').textContent = 'Salvar Usuário';
   ['usr-nome','usr-login','usr-crm'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('usr-senha').value = '';
-  document.getElementById('usr-senha').placeholder = 'Defina uma senha';
+  document.getElementById('usr-senha').placeholder = 'Senha provisória (mín. 8)';
   document.getElementById('usr-login').disabled = false;
   document.getElementById('usr-tipo').value = 'medico';
   document.getElementById('usr-conselho').value = 'CRM';
@@ -6469,7 +6537,7 @@ function editarUsuario(id){
   document.getElementById('usr-crm').value = u.crm || '';
   document.getElementById('usr-conselho').value = u.conselho !== null && u.conselho !== undefined ? u.conselho : (u.tipo === 'laboratorio' ? '' : 'CRM');
   document.getElementById('usr-senha').value = '';
-  document.getElementById('usr-senha').placeholder = 'Deixe em branco para manter a senha atual';
+  document.getElementById('usr-senha').placeholder = 'Em branco = manter; preenchida = nova senha provisória';
   alternarCampoDiasAtendimento();
   marcarDiasAtendimento([]);
   if(u.tipo === 'medico'){
@@ -6481,8 +6549,8 @@ function editarUsuario(id){
 }
 
 function alternarStatusUsuario(id, novoStatus){
-  supabaseClient.from('usuarios').update({ativo: novoStatus}).eq('id', id).then(({error})=>{
-    if(error){ showToast('Erro ao atualizar status.'); console.error(error); return; }
+  supabaseClient.rpc('pront_status_usuario', {p_token: sessaoToken, p_id: id, p_ativo: novoStatus}).then(({error})=>{
+    if(error){ showToast(error.message || 'Erro ao atualizar status.'); console.error(error); return; }
     const u = usuariosList.find(x=>x.id === id);
     if(u) u.ativo = novoStatus;
     showToast(novoStatus ? 'Usuário reativado.' : 'Usuário desativado — não conseguirá mais entrar.');
@@ -6507,13 +6575,15 @@ function salvarUsuario(){
   const dias = tipo === 'medico' ? coletarDiasAtendimento() : [];
   if(!nome || !login){ showToast('Preencha nome e login.'); return; }
   if(!editingUsuarioId && !senha){ showToast('Defina uma senha.'); return; }
+  if(senha && senha.length < 8){ showToast('A senha precisa ter pelo menos 8 caracteres.'); return; }
   if(!supabaseConfigured){ showToast('Configure o Supabase primeiro.'); return; }
+  // Senha definida aqui é provisória: a pessoa cria a dela no primeiro login.
+  const salvar = id => supabaseClient.rpc('pront_salvar_usuario', {p_token: sessaoToken, p_id: id, p_nome: nome, p_login: login,
+    p_tipo: tipo, p_crm: crm, p_conselho: conselho, p_senha: senha || null}).then(({data, error}) => ({data: data ? [data] : null, error}));
 
   if(editingUsuarioId){
-    const updates = {nome, tipo, crm, conselho};
-    if(senha) updates.senha = senha;
-    supabaseClient.from('usuarios').update(updates).eq('id', editingUsuarioId).select().then(async ({data, error})=>{
-      if(error){ showToast('Erro ao salvar alterações.'); console.error(error); return; }
+    salvar(editingUsuarioId).then(async ({data, error})=>{
+      if(error){ showToast(error.message || 'Erro ao salvar alterações.'); console.error(error); return; }
       const idx = usuariosList.findIndex(x=>x.id === editingUsuarioId);
       if(idx > -1) usuariosList[idx] = data[0];
       if(tipo === 'medico') await salvarDiasAtendimento(editingUsuarioId, dias);
@@ -6522,9 +6592,9 @@ function salvarUsuario(){
       renderPage('usuarios');
     });
   } else {
-    supabaseClient.from('usuarios').insert({nome, login, senha, tipo, crm, conselho}).select().then(async ({data, error})=>{
+    salvar(null).then(async ({data, error})=>{
       if(error){
-        showToast(error.code === '23505' ? 'Esse login já existe — escolha outro.' : 'Erro ao salvar usuário.');
+        showToast(error.code === '23505' ? 'Esse login já existe — escolha outro.' : (error.message || 'Erro ao salvar usuário.'));
         console.error(error);
         return;
       }
