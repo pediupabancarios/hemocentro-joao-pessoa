@@ -2618,7 +2618,11 @@ function abrirDocumentoImpressao(htmlCompleto, autoImprimir){
   }
   w.document.write(htmlCompleto);
   w.document.close();
-  const acionar = ()=>{ try{ w.focus(); if(autoImprimir) w.print(); }catch(e){} };
+  const esperarImagens = ()=>Promise.race([
+    Promise.all([...w.document.images].map(im=>im.complete ? 1 : new Promise(r=>{ im.onload = im.onerror = r; }))),
+    new Promise(r=>setTimeout(r, 5000))
+  ]);
+  const acionar = async ()=>{ try{ w.focus(); if(autoImprimir){ await esperarImagens(); w.print(); } }catch(e){} };
   if(w.document.readyState === 'complete') setTimeout(acionar, 350);
   else w.addEventListener('load', ()=>setTimeout(acionar, 250));
   return w;
@@ -3818,6 +3822,12 @@ const LAUDO_COAG = [
    notas:['Nota 1: As concentrações dos agonistas foram definidas segundo orientações do Guideline de agregação plaquetária do ISTH.','Nota 2: Os pacientes foram orientados quanto ao preparo prévio para coleta do exame.','Nota 3: Resultados devem ser interpretados em conjunto com quadro clínico, história familiar e exames complementares.']}
 ];
 
+function secTemDado(id, v){ return Object.keys(v).some(k=>k.startsWith(id + '.') && v[k] && !(id === 'agreg' && (k === 'agreg.obs' || k === 'agreg.img'))); }
+function agregImgSrc(path){
+  if(!path) return '';
+  if(/^data:/.test(path)) return path;
+  try{ return supabaseClient.storage.from('anexos').getPublicUrl(path).data.publicUrl; }catch(e){ return ''; }
+}
 function escH(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function numBR(v){   // "7.800" / "7800" / "5,5" -> número
   if(v == null) return NaN;
@@ -3890,9 +3900,68 @@ function agregCamposHTML(s, v){
       <td><select data-k="${ic}" style="width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:12.5px;"><option value=""></option>${AGREG_INTERP.map(o=>`<option ${o === atual ? 'selected' : ''}>${o}</option>`).join('')}</select></td>
       <td style="color:var(--muted);white-space:nowrap;">${escH(ref)}</td></tr>`;
   }).join('');
-  return cab + linhas + `<tr><td colspan="4" style="font-size:11.5px;color:var(--muted);padding-top:6px;">A interpretação é sugerida pelo resultado (pode ser trocada à mão). Método: agregometria óptica · Material: plasma citratado.</td></tr>`;
+  const img = v['agreg.img'] || '';
+  const extra = `<tr><td colspan="4" style="padding-top:10px;">
+      <div style="font-size:12.5px;font-weight:700;margin-bottom:4px;">2ª folha do laudo (opcional): gráfico e observação</div>
+      <input type="hidden" data-k="agreg.img" id="agreg-img" value="${escH(img)}">
+      <input type="file" id="agreg-file" accept="image/png,image/jpeg" style="display:none" onchange="agregAnexar(this)">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <button type="button" class="btn-secondary" onclick="document.getElementById('agreg-file').click()">📎 Anexar gráfico (imagem)</button>
+        <button type="button" class="btn-secondary" id="agreg-rem" style="${img ? '' : 'display:none;'}" onclick="agregRemoverImg()">Remover imagem</button>
+        <span id="agreg-status" style="font-size:12px;color:var(--muted);">${img ? 'Gráfico anexado.' : 'PNG ou JPG da curva do agregômetro.'}</span>
+      </div>
+      <img id="agreg-thumb" alt="Gráfico anexado" src="${img ? escH(agregImgSrc(img)) : ''}" style="${img ? '' : 'display:none;'}max-width:100%;max-height:150px;margin-top:8px;border:1px solid var(--line);border-radius:6px;">
+      <label style="display:block;font-size:12.5px;margin:10px 0 3px;">Observação / relatório técnico</label>
+      <textarea data-k="agreg.obs" rows="5" placeholder="Ex.: Observa-se resposta reduzida à epinefrina (15,6%; referência: > 65%)…" style="width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px;box-sizing:border-box;">${escH(v['agreg.obs'] || '')}</textarea>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:3px;">Sem gráfico e sem texto, o laudo sai só com a 1ª folha.</div>
+    </td></tr>`;
+  return cab + linhas + extra + `<tr><td colspan="4" style="font-size:11.5px;color:var(--muted);padding-top:6px;">A interpretação é sugerida pelo resultado (pode ser trocada à mão). Método: agregometria óptica · Material: plasma citratado.</td></tr>`;
 }
 // sugere a interpretação a partir do resultado e da referência de cada agonista
+// reduz a imagem (máx. 1400 px, JPEG) antes de enviar
+function agregPrepararImagem(file){
+  return new Promise((ok, erro)=>{
+    const url = URL.createObjectURL(file), im = new Image();
+    im.onload = ()=>{
+      const esc = Math.min(1, 1400 / Math.max(im.width, im.height));
+      const c = document.createElement('canvas'); c.width = Math.round(im.width * esc); c.height = Math.round(im.height * esc);
+      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(b=> b ? ok(b) : erro(new Error('sem imagem')), 'image/jpeg', 0.85);
+    };
+    im.onerror = ()=>{ URL.revokeObjectURL(url); erro(new Error('imagem inválida')); };
+    im.src = url;
+  });
+}
+async function agregAnexar(inp){
+  const file = inp.files && inp.files[0]; if(!file) return;
+  const st = document.getElementById('agreg-status');
+  if(!/^image\/(png|jpeg)$/.test(file.type)){ showToast('Escolha uma imagem PNG ou JPG.'); inp.value = ''; return; }
+  if(file.size > 15 * 1024 * 1024){ showToast('Imagem muito grande (máx. 15 MB).'); inp.value = ''; return; }
+  st.textContent = 'Enviando…';
+  try{
+    const blob = await agregPrepararImagem(file);
+    let ref;
+    if(supabaseConfigured){
+      ref = `laudos-agregacao/${Date.now()}_${Math.random().toString(36).slice(2,8)}.jpg`;
+      const { error } = await supabaseClient.storage.from('anexos').upload(ref, blob, {contentType:'image/jpeg'});
+      if(error) throw error;
+    } else {
+      ref = await new Promise(r=>{ const fr = new FileReader(); fr.onload = ()=>r(fr.result); fr.readAsDataURL(blob); });
+    }
+    document.getElementById('agreg-img').value = ref;
+    const t = document.getElementById('agreg-thumb'); t.src = agregImgSrc(ref); t.style.display = '';
+    document.getElementById('agreg-rem').style.display = '';
+    st.textContent = 'Gráfico anexado.';
+  }catch(e){ console.error(e); st.textContent = 'Não consegui anexar a imagem. Tente de novo.'; showToast('Erro ao enviar a imagem do gráfico.'); }
+  inp.value = '';
+}
+function agregRemoverImg(){
+  document.getElementById('agreg-img').value = '';
+  const t = document.getElementById('agreg-thumb'); t.removeAttribute('src'); t.style.display = 'none';
+  document.getElementById('agreg-rem').style.display = 'none';
+  document.getElementById('agreg-status').textContent = 'PNG ou JPG da curva do agregômetro.';
+}
 function agregSugerir(k){
   const s = LAUDO_COAG.find(x=>x.id === 'agreg'); if(!s) return;
   const lin = s.linhas.find(l=>l[0] === k); if(!lin) return;
@@ -3975,7 +4044,7 @@ function modeloAtualizarAbs(){
 function laudoResumoUm(tipo, m){
   const v = m.valores || {};
   if(tipo === 'coagulo'){
-    const feitos = LAUDO_COAG.filter(s=>Object.keys(v).some(k=>k.startsWith(s.id + '.') && v[k])).map(s=>s.titulo.replace(/\s*\(.*\)/,''));
+    const feitos = LAUDO_COAG.filter(s=>secTemDado(s.id, v)).map(s=>s.titulo.replace(/\s*\(.*\)/,''));
     return 'Hemoglobinopatias/Coagulopatias: ' + feitos.join('; ');
   }
   const p = [];
@@ -4197,11 +4266,21 @@ function laudoSecaoHTML(s, v){
   return `<div style="border-top:1px solid #000;margin-top:8px;"><div class="l-st">${s.titulo}</div><table class="l-sb">${corpo}</table>${hist}${notas}</div>`;
 }
 
+function laudoAgregFolha2(r, pac, v){
+  const src = agregImgSrc(v['agreg.img']), obs = (v['agreg.obs'] || '').trim();
+  return `
+  <div class="laudo" style="page-break-before:always;">
+    ${laudoCabecalho(r, pac, 'LABORATÓRIO DE<br>HEMOGLOBINOPATIAS<br>E COAGULOPATIAS')}
+    ${src ? `<div style="text-align:center;margin:8px 0 12px;"><img src="${escH(src)}" crossorigin="anonymous" alt="Gráfico da agregação plaquetária" style="max-width:100%;max-height:125mm;"></div>` : ''}
+    ${obs ? `<div style="font-size:12.5px;line-height:1.5;text-align:justify;padding:0 6px;"><b>OBSERVAÇÃO:</b> ${escH(obs).replace(/\n/g,'<br>')}</div>` : ''}
+    ${laudoRodape(r)}
+  </div>`;
+}
 function laudoCoaguloHTML(m, r, pac){
   const v = m.valores || {};
   const paginas = {};
   LAUDO_COAG.forEach(s=>{
-    if(Object.keys(v).some(k=>k.startsWith(s.id + '.') && v[k])) (paginas[s.pag] = paginas[s.pag] || []).push(s);
+    if(secTemDado(s.id, v)) (paginas[s.pag] = paginas[s.pag] || []).push(s);
   });
   const nums = Object.keys(paginas).sort();
   if(!nums.length) nums.push('1'), paginas['1'] = [];
@@ -4212,7 +4291,7 @@ function laudoCoaguloHTML(m, r, pac){
     ${paginas[n].map(s=>laudoSecaoHTML(s, v)).join('')}
     ${r.observacoes_resultado && i === nums.length - 1 ? `<div class="l-obs" style="margin-top:8px;"><b>Obs.:</b> ${escH(r.observacoes_resultado)}</div>` : ''}
     ${laudoRodape(r)}
-  </div>`).join('');
+  </div>` + (paginas[n].some(s=>s.id === 'agreg') && (v['agreg.img'] || v['agreg.obs']) ? laudoAgregFolha2(r, pac, v) : '')).join('');
 }
 
 function templateResultadoModelo(r, pac){
@@ -4272,7 +4351,7 @@ function rwExameLancado(nome, estado){
   if(!def) return null;                                   // sem modelo: não dá para conferir sozinho
   const v = (estado[def.modelo] && estado[def.modelo].valores) || {};
   if(def.modelo === 'hemograma') return def.chave ? !!v[def.chave] : Object.keys(v).some(k=>k !== 'reticulocitos' && !HEMO_FONIO.some(([f])=>f === k) && v[k]);
-  return def.ids.some(id=>Object.keys(v).some(k=>k.startsWith(id + '.') && v[k]));
+  return def.ids.some(id=>secTemDado(id, v));
 }
 function rwExamesFaltando(){
   const r = labs[editingResultadoIdx]; if(!r || rwFormato() !== 'modelo') return {faltam:[], semModelo:[]};
