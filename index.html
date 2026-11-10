@@ -1899,7 +1899,7 @@ function aplicarPermissoesUsuario(){
 }
 
 // Menu por perfil: o Laboratório só vê o que usa no dia a dia; "Meu Dia" é só do médico.
-const MENU_ENFERMAGEM = ['enfdocs','resumo','dados','agenda','receitas','documentos','anexos','laboratorios','hemocomponentes','incidentes'];   // só consulta e impressão
+const MENU_ENFERMAGEM = ['dados','enfdocs'];   // Enfermagem: só procurar/editar paciente e imprimir os 2 BPAs
 const MENU_LABORATORIO = ['labhome','labexames','filalab','relatoriolab','laboratorios','dados'];
 function aplicarMenuPorPerfil(){
   const tipo = currentUser && currentUser.tipo;
@@ -1969,7 +1969,10 @@ function logout(){
 }
 
 // Enfermagem consulta e imprime; não cria nem edita cadastros
-function podeEditarPacientes(){ return !(currentUser && currentUser.tipo === 'enfermagem'); }
+function podeEditarPacientes(){ return true; }   // enfermagem pode editar paciente
+function podeCadastrarPaciente(){ return !(currentUser && currentUser.tipo === 'enfermagem'); }   // ...mas não cadastrar novo
+function ehEnfermagem(){ return !!(currentUser && currentUser.tipo === 'enfermagem'); }
+function telaAposPaciente(){ return ehEnfermagem() ? 'enfdocs' : 'resumo'; }
 function podeCriarDocumentos(){
   return !currentUser || currentUser.tipo === 'medico' || currentUser.tipo === 'gestor';
 }
@@ -2112,6 +2115,7 @@ function atualizarPacienteTopo(){
 
 const PAGINAS_DO_PACIENTE = ['resumo','receitas','laboratorios','hemocomponentes','medceaf','incidentes','documentos','anexos'];
 function renderPage(page){
+  if(ehEnfermagem() && !MENU_ENFERMAGEM.includes(page)) page = 'enfdocs';
   if(PAGINAS_COM_PACIENTES.includes(page)) setTimeout(()=>atualizarPacientesEPagina(), 50);   // pega edições feitas por outras pessoas
   atualizarPacienteTopo();
   const cp = document.getElementById('context-page');
@@ -3332,7 +3336,7 @@ function enfDocsTemplate(){
     <div class="panel-head"><h3>🖨️ DOCUMENTOS DA ENFERMAGEM</h3></div>
     <div style="padding:16px 18px;">
       <div style="font-size:13px;color:var(--muted);margin-bottom:14px;">${ativo
-        ? `Paciente ativo: <b style="color:var(--text);">${escH(paciente.nome)}</b> — os dados dele saem preenchidos nos formulários.`
+        ? `Paciente ativo: <b style="color:var(--text);">${escH(paciente.nome)}</b> — os dados do paciente saem preenchidos nos formulários.`
         : 'Nenhum paciente selecionado — os formulários saem <b>em branco</b>, para preencher à mão. Para sair com os dados de um paciente, escolha-o em <a href="#" onclick="event.preventDefault();clickNav(\'dados\')">Dados do Paciente</a>.'}</div>
       <div class="le-grid">
         ${Object.keys(ENF_DOCS).map(k=>`
@@ -6313,7 +6317,7 @@ function pacientesTemplate(){
       <div style="display:flex;gap:8px;">
         ${!semSupabase ? `<button class="btn-secondary" onclick="alternarFiltroPacientesHoje()" style="${filtroPacientesHoje ? 'background:var(--red);color:#fff;' : ''}">📅 ${filtroPacientesHoje ? 'Ver todos' : 'Só hoje'}</button>` : ''}
         ${!semSupabase ? `<button class="btn-secondary" onclick="exportarExcel('pacientes')">📊 Excel</button><button class="btn-secondary" onclick="exportarPDF('pacientes')">📄 PDF</button>` : ''}
-        ${podeEditarPacientes() ? `<button class="btn-new" onclick="abrirNovoPaciente()">+ Novo Paciente</button>` : ''}
+        ${podeCadastrarPaciente() ? `<button class="btn-new" onclick="abrirNovoPaciente()">+ Novo Paciente</button>` : ''}
       </div>
     </div>
     ${!semSupabase && filtroPacientesHoje && pacientesHojeIds === null ? `
@@ -6859,12 +6863,12 @@ function ativarPaciente(p, mostrarToast){
 
 function selecionarPaciente(id){
   if(id === 'demo' || !supabaseConfigured){
-    clickNav('resumo');
+    clickNav(telaAposPaciente());
     return;
   }
   const p = pacientesList.find(x=>x.id === id);
   if(!p){ showToast('Paciente não encontrado.'); return; }
-  ativarPaciente(p, true).then(()=>clickNav('resumo'));
+  ativarPaciente(p, true).then(()=>clickNav(telaAposPaciente()));
 }
 
 function calcIdade(nascISO){
@@ -6878,6 +6882,7 @@ function calcIdade(nascISO){
 }
 
 function clickNav(page){
+  if(ehEnfermagem() && !MENU_ENFERMAGEM.includes(page)) page = 'enfdocs';   // enfermagem só acessa suas telas
   marcarPaginaAtiva(page);
   sincronizarBottomNav(page);
   fecharMenuMobile();
@@ -8169,7 +8174,7 @@ function salvarPaciente(){
       closeModal('modal-paciente');
       showToast('Dados do paciente atualizados com sucesso.');
       if(currentPacienteId === editingPacienteId){
-        ativarPaciente(data[0], false).then(()=>renderPage('resumo'));
+        ativarPaciente(data[0], false).then(()=>renderPage(telaAposPaciente()));
       } else {
         renderPage('dados');
       }
