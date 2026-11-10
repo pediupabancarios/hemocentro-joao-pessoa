@@ -3811,7 +3811,11 @@ const LAUDO_COAG = [
   {id:'rpca',pag:5,titulo:'RESISTÊNCIA a PROTEÍNA C ATIVADA',amostra:'PLASMA CITRATADO',metodo:'IMUNOTURBIDIMÉTRICO',tipo:'texto',refs:['NEGATIVO']},
   {id:'ddimero',pag:5,titulo:'D-DÍMERO',amostra:'PLASMA CITRATADO',metodo:'IMUNOTURBIDIMÉTRICO',tipo:'simples',unid:'ng/mL',refs:['Até 500 ng/mL']},
   {id:'lupico',pag:5,titulo:'PESQUISA DE ANTICOAGULANTE LÚPICO CIRCULANTE',amostra:'PLASMA CITRATADO',metodo:'dRVVt (Tempo de Veneno de Víbora Russel diluído)',tipo:'texto',refs:['NEGATIVO'],notas:['Legenda:','TTPa: tempo de tromboplastina parcial ativada.','dRVVT: tempo com veneno de víbora de Russel diluído.','NOTA 1: Os anticorpos antifosfolípides incluem o anticoagulante lúpico, anticorpo cardiolipina e anti-beta2-glicoproteína I. Para que o critério laboratorial de anticorpo antifosfolípide seja atendido, é necessário caracterizar a positividade de pelo menos um destes anticorpos em duas ou mais ocasiões, com intervalo mínimo de 12 semanas entre as coletas.','NOTA 2: O uso de anticoagulantes orais diretos (ex. Dabigatrana, rivaroxabana, apixabana, edoxabana) pode interferir na pesquisa de anticoagulante lúpico. Os antagonistas de vitamina K (warfarina, marevan, marcoumar, coumadin) podem resultar em falsos positivos, a depender dos níveis de anticoagulação. Sugere-se, a critério médico, repetição do exame após suspensão do tratamento.','NOTA 3: A pesquisa de anticoagulante lúpico em pacientes gestantes, na fase aguda do evento trombótico ou na vigência de processos inflamatórios/infecciosos deve ser interpretada com cautela, pela possibilidade de falso positivos ou falso negativos.']},
-  {id:'inibidores',pag:5,titulo:'TITULAÇÃO DE INIBIDORES',amostra:'PLASMA CITRATADO',metodo:'COAGULOMÉTRICO',tipo:'simples',unid:'UB/mL',refs:['< 0,6 UB: NEGATIVO','0,6 OU MAIOR: POSITIVO'],historico:true,notas:['NOTA 1: A presença de inibidores neutralizantes contra os fatores de coagulação pode comprometer a eficácia do tratamento de reposição. Valores elevados estão associados a maior dificuldade no controle de sangramentos e podem demandar terapias alternativas.','NOTA 2: Os resultados devem ser interpretados em conjunto com o quadro clínico e histórico terapêutico do paciente.','NOTA 3: Este laudo é válido somente para a amostra analisada.']}
+  {id:'inibidores',pag:5,titulo:'TITULAÇÃO DE INIBIDORES',amostra:'PLASMA CITRATADO',metodo:'COAGULOMÉTRICO',tipo:'simples',unid:'UB/mL',refs:['< 0,6 UB: NEGATIVO','0,6 OU MAIOR: POSITIVO'],historico:true,notas:['NOTA 1: A presença de inibidores neutralizantes contra os fatores de coagulação pode comprometer a eficácia do tratamento de reposição. Valores elevados estão associados a maior dificuldade no controle de sangramentos e podem demandar terapias alternativas.','NOTA 2: Os resultados devem ser interpretados em conjunto com o quadro clínico e histórico terapêutico do paciente.','NOTA 3: Este laudo é válido somente para a amostra analisada.']},
+  {id:'agreg',pag:6,titulo:'AGREGAÇÃO PLAQUETÁRIA',amostra:'PLASMA CITRATADO',metodo:'AGREGOMETRIA ÓPTICA',tipo:'agreg',
+   reagentes:'5-difosfato de adenosina (ADP), Ristocetina, Ácido araquidônico, Colágeno e Epinefrina.',
+   linhas:[['adp','ADP 10 %','> 65%','min65'],['aa','Ácido Araquidônico 1,0%','> 65%','min65'],['col','Colágeno 5,0 %','> 65%','min65'],['epi','Epinefrina 10 %','> 65%','min65'],['ris06','Ristocetina 0,6 %','ATÉ 4%','max4'],['ris12','Ristocetina 1,2%','> 65%','min65']],
+   notas:['Nota 1: As concentrações dos agonistas foram definidas segundo orientações do Guideline de agregação plaquetária do ISTH.','Nota 2: Os pacientes foram orientados quanto ao preparo prévio para coleta do exame.','Nota 3: Resultados devem ser interpretados em conjunto com quadro clínico, história familiar e exames complementares.']}
 ];
 
 function escH(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -3877,6 +3881,27 @@ function renderModeloHemograma(d){
   <table class="param-table"><tbody>${HEMO_FONIO.map(([k,nome])=>`<tr><td>${nome}</td><td style="width:140px;">${modeloInput(k, v[k])}</td><td>x10³/mm³</td><td style="color:var(--muted);">${F.plaquetas} x10³/mm³</td></tr>`).join('')}</tbody></table>`;
 }
 
+const AGREG_INTERP = ['NORMOAGREGANTE','HIPOAGREGANTE','HIPERAGREGANTE'];
+function agregCamposHTML(s, v){
+  const cab = `<tr style="font-size:11.5px;color:var(--muted);"><td>Agonista</td><td>Resultado (%)</td><td>Interpretação</td><td>Valor de referência</td></tr>`;
+  const linhas = s.linhas.map(([k,nome,ref])=>{
+    const ic = s.id + '.' + k + 'i', atual = v[ic] || '';
+    return `<tr><td>${escH(nome)}</td><td style="width:110px;">${modeloInput(s.id + '.' + k, v[s.id + '.' + k], `oninput="agregSugerir('${k}')"`)}</td>
+      <td><select data-k="${ic}" style="width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:12.5px;"><option value=""></option>${AGREG_INTERP.map(o=>`<option ${o === atual ? 'selected' : ''}>${o}</option>`).join('')}</select></td>
+      <td style="color:var(--muted);white-space:nowrap;">${escH(ref)}</td></tr>`;
+  }).join('');
+  return cab + linhas + `<tr><td colspan="4" style="font-size:11.5px;color:var(--muted);padding-top:6px;">A interpretação é sugerida pelo resultado (pode ser trocada à mão). Método: agregometria óptica · Material: plasma citratado.</td></tr>`;
+}
+// sugere a interpretação a partir do resultado e da referência de cada agonista
+function agregSugerir(k){
+  const s = LAUDO_COAG.find(x=>x.id === 'agreg'); if(!s) return;
+  const lin = s.linhas.find(l=>l[0] === k); if(!lin) return;
+  const inp = document.querySelector(`#resultado-modelo-corpo [data-k="agreg.${k}"]`), sel = document.querySelector(`#resultado-modelo-corpo [data-k="agreg.${k}i"]`);
+  if(!inp || !sel) return;
+  const n = numBR(inp.value);
+  if(isNaN(n)){ sel.value = ''; return; }
+  sel.value = lin[3] === 'max4' ? (n <= 4 ? 'NORMOAGREGANTE' : 'HIPERAGREGANTE') : (n >= 65 ? 'NORMOAGREGANTE' : 'HIPOAGREGANTE');
+}
 function renderModeloCoagulo(d){
   d = d || {}; const v = d.valores || {};
   const secs = LAUDO_COAG.map(s=>{
@@ -3886,7 +3911,7 @@ function renderModeloCoagulo(d){
     }).join('');
     const temDado = Object.keys(v).some(k=>k.startsWith(s.id + '.') && String(v[k] || '').trim());
     const valIni = k=>{ const c = s.id + '.' + k; return v[c] != null ? v[c] : (!temDado && COAG_CONTROLE_PADRAO[c]) || ''; };
-    const campos = s.tipo === 'multi' ? s.linhas.map(([k,nome,un,ref])=>`<tr><td>${nome}</td><td style="width:150px;">${modeloInput(s.id + '.' + k, valIni(k))}</td><td>${un}</td><td style="color:var(--muted);">${escH(ref || '')}</td></tr>`).join('') + extrasHTML
+    const campos = s.tipo === 'agreg' ? agregCamposHTML(s, v) : s.tipo === 'multi' ? s.linhas.map(([k,nome,un,ref])=>`<tr><td>${nome}</td><td style="width:150px;">${modeloInput(s.id + '.' + k, valIni(k))}</td><td>${un}</td><td style="color:var(--muted);">${escH(ref || '')}</td></tr>`).join('') + extrasHTML
       : `<tr><td>Resultado</td><td style="width:150px;">${modeloInput(s.id + '.valor', v[s.id + '.valor'])}</td><td>${s.unid || ''}</td><td style="color:var(--muted);">${s.refs.map(escH).join(' · ')}</td></tr>`;
     const hist = s.historico ? `<tr><td colspan="4" style="padding-top:8px;font-size:12px;color:var(--muted);">Histórico de titulações anteriores (opcional):</td></tr>` + [1,2,3].map(i=>`<tr><td>${modeloInput(s.id + '.h' + i + 'd', v[s.id + '.h' + i + 'd'], 'placeholder="Data"')}</td><td>${modeloInput(s.id + '.h' + i + 'r', v[s.id + '.h' + i + 'r'], 'placeholder="UB/mL"')}</td><td colspan="2">${modeloInput(s.id + '.h' + i + 'i', v[s.id + '.h' + i + 'i'], 'placeholder="Interpretação"')}</td></tr>`).join('') : '';
     const preenchido = Object.keys(v).some(k=>k.startsWith(s.id + '.') && String(v[k] || '').trim());
@@ -3986,6 +4011,10 @@ function laudoLinhasPlanas(r){
       HEMO_FONIO.forEach(([k,n])=>{ if(v[k]) out.push({parametro:n,resultado:v[k],unidade:'x10³/mm³',referencia:F.plaquetas}); });
     } else {
       LAUDO_COAG.forEach(s=>{
+        if(s.tipo === 'agreg'){
+          s.linhas.forEach(([k,n,ref])=>{ const x = v[s.id + '.' + k]; if(x) out.push({parametro:s.titulo + ' — ' + n,resultado:x + (v[s.id + '.' + k + 'i'] ? ' (' + v[s.id + '.' + k + 'i'] + ')' : ''),unidade:'%',referencia:ref}); });
+          return;
+        }
         if(s.tipo === 'multi'){
         s.linhas.forEach(([k,n,u,ref])=>{ const x = v[s.id + '.' + k]; if(x) out.push({parametro:s.titulo + ' — ' + n,resultado:x,unidade:u,referencia:ref || (s.refBloco || []).join(' ')}); });
         (s.extras || []).forEach(([k])=>{ const x = v[s.id + '.' + k]; if(x) out.push({parametro:s.titulo + ' — ' + (v[s.id + '.' + k + 'n'] || k),resultado:x,unidade:'%',referencia:''}); });
@@ -4132,7 +4161,17 @@ function laudoHemogramaHTML(m, r, pac){
   </div>`;
 }
 
+function laudoAgregHTML(s, v){
+  const th = 'border:1px solid #000;padding:3px 6px;font-size:11px;text-align:center;';
+  const td = 'border:1px solid #000;padding:6px 6px;font-size:12px;text-align:center;';
+  const linhas = s.linhas.map(([k,n,ref])=>`<tr><td style="${td}text-align:left;font-weight:700;">${escH(n)}</td><td style="${td}font-weight:700;font-size:15px;">${escH(v[s.id + '.' + k] || '')}</td><td style="${td}font-weight:700;">${escH(v[s.id + '.' + k + 'i'] || '')}</td><td style="${td}">${escH(ref)}</td></tr>`).join('');
+  return `<div style="border-top:1px solid #000;margin-top:8px;"><div class="l-st">${s.titulo}</div>
+    <div style="font-size:12px;line-height:1.5;margin:4px 6px 8px;"><b>Método:</b> Agregometria óptica<br><b>Material:</b> Plasma citratado<br><b>Reagentes utilizados:</b> ${escH(s.reagentes)}</div>
+    <table style="width:100%;border-collapse:collapse;"><tr><th style="${th}width:28%;">AGONISTAS</th><th style="${th}width:18%;">RESULTADO (%)</th><th style="${th}width:30%;">INTERPRETAÇÃO<div style="font-weight:400;">(hipo, normo ou hiperagregante)</div></th><th style="${th}width:24%;">Valores de referência</th></tr>${linhas}</table>
+    <div class="l-notas" style="font-size:10px;margin-top:8px;">${s.notas.map(escH).join('<br>')}</div></div>`;
+}
 function laudoSecaoHTML(s, v){
+  if(s.tipo === 'agreg') return laudoAgregHTML(s, v);
   const g = k => v[s.id + '.' + k];
   let corpo;
   if(s.tipo === 'multi'){
@@ -4207,7 +4246,7 @@ function rwAlternarModo(){ rwAtivo = !rwAtivo; if(rwAtivo) rwPasso = 1; rwRender
 function rwModeloDoExame(nome){
   const ex = normExame(nome);
   if(/hemograma|fonio/.test(ex)) return 'hemograma';
-  if(/(ferritina|folato|vitamina b12|homocist|coagulograma|fator|d dimero|antitrombina|proteina c|proteina s|anticoagulante lupico|inibidor|ristocetina|von willebrand|resistencia a proteina|tempo de|perfil hemoglobinico)/.test(ex)) return 'coagulo';
+  if(/(ferritina|folato|vitamina b12|homocist|coagulograma|fator|d dimero|antitrombina|proteina c|proteina s|anticoagulante lupico|inibidor|ristocetina|von willebrand|resistencia a proteina|tempo de|perfil hemoglobinico|agregacao)/.test(ex)) return 'coagulo';
   return '';
 }
 /* ---------- Conferência: exames pedidos x resultados lançados ---------- */
@@ -4225,7 +4264,7 @@ const RW_EXAME_MAPA = (()=>{
   add('Fator de Von Willebrand (FvW: Ag)','coagulo',['vwf']); add('Atividade do FvW (cofator de Ristocetina)','coagulo',['ristocetina']);
   add('Antitrombina (AT)','coagulo',['at']); add('Proteína C (PC)','coagulo',['pc']); add('Proteína S Livre (PS)','coagulo',['ps']);
   add('Resistência à Proteína C Ativada','coagulo',['rpca']); add('D-Dímero','coagulo',['ddimero']); add('Anticoagulante Lúpico (AL)','coagulo',['lupico']);
-  add('Pesquisa de Inibidor','coagulo',['inibidores']); add('Titulação de Inibidor em Hemofilia A','coagulo',['inibidores']); add('Titulação de Inibidor em Hemofilia B','coagulo',['inibidores']);
+  add('Agregação Plaquetária','coagulo',['agreg']); add('Pesquisa de Inibidor','coagulo',['inibidores']); add('Titulação de Inibidor em Hemofilia A','coagulo',['inibidores']); add('Titulação de Inibidor em Hemofilia B','coagulo',['inibidores']);
   return m;
 })();
 function rwExameLancado(nome, estado){
