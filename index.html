@@ -158,8 +158,8 @@
   }
   .login-role-tabs{
     display:grid;
-    grid-template-columns:repeat(4,1fr);
-    gap:7px;
+    grid-template-columns:repeat(5,1fr);
+    gap:6px;
     margin-bottom:22px;
   }
   .login-role-tab{
@@ -737,6 +737,7 @@
       <button type="button" class="login-role-tab" data-role="medico" onclick="selecionarPerfilLogin('medico')">🩺<span>Médico</span></button>
       <button type="button" class="login-role-tab" data-role="recepcao" onclick="selecionarPerfilLogin('recepcao')">💁<span>Recepção</span></button>
       <button type="button" class="login-role-tab" data-role="laboratorio" onclick="selecionarPerfilLogin('laboratorio')">🧪<span>Laboratório</span></button>
+      <button type="button" class="login-role-tab" data-role="enfermagem" onclick="selecionarPerfilLogin('enfermagem')">💉<span>Enfermagem</span></button>
     </div>
 
     <form id="login-form" autocomplete="off">
@@ -1480,6 +1481,7 @@
             <option value="medico">Médico(a)</option>
             <option value="recepcao">Recepção</option>
             <option value="laboratorio">Laboratório</option>
+            <option value="enfermagem">Enfermagem</option>
           </select>
         </div>
         <div class="form-field">
@@ -1758,7 +1760,7 @@ document.getElementById('login-form').addEventListener('submit', async function(
   const btn = document.querySelector('.login-btn');
 
   if(!perfilLoginSelecionado){
-    errorEl.textContent = 'Selecione seu perfil (Gestor, Médico, Recepção ou Laboratório) antes de entrar.';
+    errorEl.textContent = 'Selecione seu perfil (Gestor, Médico, Recepção, Laboratório ou Enfermagem) antes de entrar.';
     errorEl.style.display = 'block';
     return;
   }
@@ -1802,7 +1804,7 @@ document.getElementById('login-form').addEventListener('submit', async function(
   if(loggedIn){
     entrarNoApp(loggedIn);
   } else {
-    const rotulosPerfil = {gestor:'Gestor', medico:'Médico(a)', recepcao:'Recepção', laboratorio:'Laboratório'};
+    const rotulosPerfil = {gestor:'Gestor', medico:'Médico(a)', recepcao:'Recepção', laboratorio:'Laboratório', enfermagem:'Enfermagem'};
     if(falhaConexao){
       errorEl.textContent = 'Não foi possível falar com o servidor. Verifique a internet e tente de novo.';
     } else if(encontrouLoginSenha){
@@ -1862,6 +1864,8 @@ function entrarNoApp(loggedIn){
       clickNav('labhome');   // entra na tela inicial com os blocos
     } else if(currentUser.tipo === 'recepcao'){
       clickNav('recepcao'); // recepção já entra na tela de atendimento (abas)
+    } else if(currentUser.tipo === 'enfermagem'){
+      clickNav('dados');    // enfermagem entra na lista de pacientes para escolher quem vai atender
     } else if(currentUser.tipo === 'medico'){
       clickNav('meudia');   // médico já entra na agenda/pendências do dia
     } else {
@@ -1878,7 +1882,7 @@ function aplicarPermissoesUsuario(){
   const userMetaB = document.querySelector('.user-meta b');
   const userMetaSpan = document.querySelector('.user-meta span');
   const userAvatar = document.querySelector('.user-avatar');
-  const rotulos = {gestor:'Gestor', medico:'Médico(a)', recepcao:'Recepção', laboratorio:'Laboratório'};
+  const rotulos = {gestor:'Gestor', medico:'Médico(a)', recepcao:'Recepção', laboratorio:'Laboratório', enfermagem:'Enfermagem'};
   if(userMetaB) userMetaB.textContent = currentUser.nome;
   if(userMetaSpan) userMetaSpan.textContent = rotulos[currentUser.tipo] || currentUser.tipo;
   if(userAvatar) userAvatar.textContent = currentUser.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
@@ -1893,6 +1897,7 @@ function aplicarPermissoesUsuario(){
 }
 
 // Menu por perfil: o Laboratório só vê o que usa no dia a dia; "Meu Dia" é só do médico.
+const MENU_ENFERMAGEM = ['resumo','dados','agenda','receitas','documentos','anexos','laboratorios','hemocomponentes','incidentes'];   // só consulta e impressão
 const MENU_LABORATORIO = ['labhome','labexames','filalab','relatoriolab','laboratorios','dados'];
 function aplicarMenuPorPerfil(){
   const tipo = currentUser && currentUser.tipo;
@@ -1918,11 +1923,20 @@ function aplicarMenuPorPerfil(){
   document.querySelectorAll('.nav-item[data-page="labexames"]').forEach(el=>{ if(!ehLab && tipo !== 'gestor') esconder(el); });
   // "Início" (blocos do laboratório) só para o laboratório
   document.querySelectorAll('.nav-item[data-page="labhome"]').forEach(el=>{ if(!ehLab) esconder(el); });
-  if(!ehLab) return;
+  const ehEnf = tipo === 'enfermagem';
+  if(!ehLab && !ehEnf) return;
 
   document.querySelectorAll('.nav-item[data-page], .bottom-nav-item[data-page]').forEach(el=>{
-    if(!MENU_LABORATORIO.includes(el.dataset.page)) esconder(el);
+    if(!(ehLab ? MENU_LABORATORIO : MENU_ENFERMAGEM).includes(el.dataset.page)) esconder(el);
   });
+  if(ehEnf){
+    // esconde só o que ficou vazio; o resto do menu da enfermagem segue como está
+    document.querySelectorAll('.nav-group').forEach(g=>{
+      const itens = [...g.querySelectorAll('.nav-item')];
+      if(itens.length && itens.every(i=>i.style.display === 'none')) esconder(g);
+    });
+    return;
+  }
   // no celular, o botão "Laboratório" passa a abrir a Fila
   const blab = document.querySelector('.bottom-nav-item[data-page="laboratorios"]');
   if(blab){ blab.dataset.labbtn = '1'; blab.dataset.page = 'filalab'; blab.setAttribute('onclick', "clickNav('filalab')"); }
@@ -1951,6 +1965,8 @@ function logout(){
   document.querySelectorAll('.login-role-tab').forEach(t=>t.classList.remove('active'));
 }
 
+// Enfermagem consulta e imprime; não cria nem edita cadastros
+function podeEditarPacientes(){ return !(currentUser && currentUser.tipo === 'enfermagem'); }
 function podeCriarDocumentos(){
   return !currentUser || currentUser.tipo === 'medico' || currentUser.tipo === 'gestor';
 }
@@ -6150,7 +6166,7 @@ function pacientesTemplate(){
       <div style="display:flex;gap:8px;">
         ${!semSupabase ? `<button class="btn-secondary" onclick="alternarFiltroPacientesHoje()" style="${filtroPacientesHoje ? 'background:var(--red);color:#fff;' : ''}">📅 ${filtroPacientesHoje ? 'Ver todos' : 'Só hoje'}</button>` : ''}
         ${!semSupabase ? `<button class="btn-secondary" onclick="exportarExcel('pacientes')">📊 Excel</button><button class="btn-secondary" onclick="exportarPDF('pacientes')">📄 PDF</button>` : ''}
-        <button class="btn-new" onclick="abrirNovoPaciente()">+ Novo Paciente</button>
+        ${podeEditarPacientes() ? `<button class="btn-new" onclick="abrirNovoPaciente()">+ Novo Paciente</button>` : ''}
       </div>
     </div>
     ${!semSupabase && filtroPacientesHoje && pacientesHojeIds === null ? `
@@ -6171,7 +6187,7 @@ function pacientesTemplate(){
             <td>${ativo ? '🔴 ' : ''}${p.nome}${ativo ? ' <b style=\"color:#C81E2C;font-size:11px;\">(ativo)</b>' : ''}</td><td>${p.prontuario || '—'}</td><td>${p.sus || '—'}</td><td>${p.tipo_sanguineo || p.tipoSanguineo || '—'}</td>
             <td class="row-actions">
               <button title="Selecionar como paciente ativo" onclick="selecionarPaciente('${p.id}')">${ico('ver')}</button>
-              ${semSupabase ? '' : `<button title="Editar dados" onclick="editarPaciente('${p.id}')">${ico('editar')}</button>`}
+              ${(semSupabase || !podeEditarPacientes()) ? '' : `<button title="Editar dados" onclick="editarPaciente('${p.id}')">${ico('editar')}</button>`}
               ${(!semSupabase && currentUser && currentUser.tipo === 'gestor') ? `<button class="danger" title="Excluir paciente" onclick="excluirPaciente('${p.id}')">${ico('excluir')}</button>` : ''}
             </td>
           </tr>`;
@@ -6451,7 +6467,7 @@ function usuariosTemplate(){
   if(!supabaseConfigured){
     return `<div class="placeholder"><div class="ic">🔑</div><h3>Configure o Supabase primeiro</h3><p>O cadastro de usuários (médicos e recepção) precisa do banco conectado para funcionar e persistir.</p></div>`;
   }
-  const rotulos = {gestor:'Gestor', medico:'Médico(a)', recepcao:'Recepção', laboratorio:'Laboratório'};
+  const rotulos = {gestor:'Gestor', medico:'Médico(a)', recepcao:'Recepção', laboratorio:'Laboratório', enfermagem:'Enfermagem'};
   return `
   <div class="panel">
     <div class="panel-head">
@@ -6490,7 +6506,7 @@ let editingUsuarioId = null;
 // ao trocar o perfil, sugere o conselho típico (o laboratório pode ser CRF ou CRBM — ajuste na lista)
 function sugerirConselho(){
   const tipo = document.getElementById('usr-tipo').value;
-  document.getElementById('usr-conselho').value = tipo === 'medico' ? 'CRM' : tipo === 'laboratorio' ? 'CRF-PB' : '';
+  document.getElementById('usr-conselho').value = tipo === 'medico' ? 'CRM' : tipo === 'laboratorio' ? 'CRF-PB' : tipo === 'enfermagem' ? 'COREN' : '';
 }
 
 function alternarCampoDiasAtendimento(){
@@ -6673,7 +6689,7 @@ function filtrarListaPacientes(termo){
       <td>${ativo ? '🔴 ' : ''}${p.nome}${ativo ? ' <b style="color:#C81E2C;font-size:11px;">(ativo)</b>' : ''}</td><td>${p.prontuario || '—'}</td><td>${p.sus || '—'}</td><td>${p.tipo_sanguineo || '—'}</td>
       <td class="row-actions">
         <button title="Selecionar como paciente ativo" onclick="selecionarPaciente('${p.id}')">${ico('ver')}</button>
-        <button title="Editar dados" onclick="editarPaciente('${p.id}')">${ico('editar')}</button>
+        ${podeEditarPacientes() ? `<button title="Editar dados" onclick="editarPaciente('${p.id}')">${ico('editar')}</button>` : ''}
         ${(currentUser && currentUser.tipo === 'gestor') ? `<button class="danger" title="Excluir paciente" onclick="excluirPaciente('${p.id}')">${ico('excluir')}</button>` : ''}
       </td>
     </tr>`;
