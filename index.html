@@ -3046,7 +3046,7 @@ function bpa2SequenciaHTML(n, preenchida, opts){
   opts = opts || {};
   const fixo = !!opts.fixos;                      // itens pré-impressos em todas as sequências (código, categoria e X da assinatura)
   const codProc = opts.proc || '0301010072';
-  const p = preenchida ? paciente : null;
+  const p = opts.pac !== undefined ? opts.pac : (preenchida ? paciente : null);
   const hoje = new Date().toLocaleDateString('pt-BR');
   const racaAtual = (p && p.racaCor) || '';
   return `
@@ -3204,9 +3204,9 @@ function templateBPA2(opts){
       </tr>
     </table>
 
-    ${bpa2SequenciaHTML(1, usaPaciente, opts)}
-    ${bpa2SequenciaHTML(2, false, opts)}
-    ${bpa2SequenciaHTML(3, false, opts)}
+    ${[1,2,3].map(i => opts.pacs
+        ? bpa2SequenciaHTML(i, !!opts.pacs[i-1], Object.assign({}, opts, {pac: opts.pacs[i-1] || null}))
+        : bpa2SequenciaHTML(i, i === 1 && usaPaciente, opts)).join('')}
 
     <div class="bpa2-sign-line" style="margin-top:10px;display:flex;justify-content:space-between;">
       <span>Carimbo e Assinatura Responsável pelo Atendimento</span>
@@ -3322,9 +3322,47 @@ function templateBPATransfusao(){
 }
 
 // BPA-I da enfermagem: técnico de enfermagem (CBO 322205), procedimento 0301100012 pré-impresso nas 3 sequências
+let bpaISlots = [null, null, null];   // ids dos até 3 pacientes da folha BPA-I (uma sequência para cada)
+function vazioSeTraco(v){ return (v == null || v === '—') ? '' : v; }
+function pacienteParaBPA(r){
+  if(!r) return null;
+  const o = {
+    nome: r.nome || '', nascimento: r.nascimento ? isoToBR(r.nascimento) : '', idade: r.nascimento ? calcIdade(r.nascimento) : '',
+    sexo: r.sexo || '', telefone: vazioSeTraco(r.telefone), sus: vazioSeTraco(r.sus) || vazioSeTraco(r.cpf),
+    logradouro: vazioSeTraco(r.logradouro), numero: vazioSeTraco(r.numero), bairro: vazioSeTraco(r.bairro),
+    cidade: vazioSeTraco(r.cidade), uf: vazioSeTraco(r.uf), cep: vazioSeTraco(r.cep), racaCor: r.raca_cor || ''
+  };
+  return o;
+}
 function templateBPAEnfermagem(){
-  const usaPaciente = !!(currentPacienteId || !supabaseConfigured);
-  return templateBPA2({equipe:'TÉCNICO DE ENFERMAGEM', cbo:'322205', nomeProf:'', proc:'0301100012', fixos:true, semQtde:true, paraPaciente:usaPaciente});
+  const pacs = bpaISlots.map(id => id ? pacienteParaBPA(pacientesList.find(x=>x.id === id)) : null);
+  return templateBPA2({equipe:'TÉCNICO DE ENFERMAGEM', cbo:'322205', nomeProf:'', proc:'0301100012', fixos:true, pacs});
+}
+function enfRotuloPaciente(p){ return `${p.nome} — ${p.prontuario || p.sus || (p.nascimento ? isoToBR(p.nascimento) : 's/ nº')}`; }
+function enfBpaiSlotsHTML(){
+  const lista = pacientesList.slice().sort((a,b)=>(a.nome||'').localeCompare(b.nome||'','pt-BR'));
+  return `<details style="margin-top:10px;" open>
+    <summary style="cursor:pointer;font-size:13px;font-weight:600;">👥 Pacientes desta folha (até 3, um por sequência)</summary>
+    <datalist id="enf-pacs">${lista.map(p=>`<option value="${escH(enfRotuloPaciente(p))}"></option>`).join('')}</datalist>
+    <div style="margin-top:8px;display:grid;gap:6px;">
+      ${[0,1,2].map(i=>{
+        const pr = bpaISlots[i] ? pacientesList.find(x=>x.id === bpaISlots[i]) : null;
+        return `<div style="display:flex;align-items:center;gap:6px;"><b style="font-size:12px;width:16px;">${i+1}</b>
+          <input list="enf-pacs" value="${pr ? escH(enfRotuloPaciente(pr)) : ''}" placeholder="Digite o nome do paciente…" style="flex:1;min-width:0;padding:6px 8px;border:1px solid var(--line);border-radius:8px;font-size:12px;" onchange="enfBpaiSetSlot(${i}, this)">
+          <button class="btn-secondary" title="Limpar" style="padding:4px 8px;" onclick="bpaISlots[${i}]=null; renderPage('enfdocs')">✕</button></div>`;
+      }).join('')}
+      <div style="font-size:11.5px;color:var(--muted);">Deixe em branco a sequência que quiser preencher à mão.</div>
+    </div>
+  </details>`;
+}
+function enfBpaiSetSlot(i, inp){
+  const v = inp.value.trim();
+  if(!v){ bpaISlots[i] = null; return; }
+  const p = pacientesList.find(x=>enfRotuloPaciente(x) === v);
+  if(!p){ showToast('Escolha o paciente na lista que aparece ao digitar.'); inp.value = bpaISlots[i] ? enfRotuloPaciente(pacientesList.find(x=>x.id === bpaISlots[i]) || {nome:''}) : ''; return; }
+  bpaISlots = bpaISlots.map((id,k)=> (k !== i && id === p.id) ? null : id);   // o mesmo paciente não repete
+  bpaISlots[i] = p.id;
+  renderPage('enfdocs');
 }
 
 const ENF_DOCS = {
@@ -3338,14 +3376,14 @@ function enfDocsTemplate(){
     <div class="panel-head"><h3>🖨️ DOCUMENTOS DA ENFERMAGEM</h3></div>
     <div style="padding:16px 18px;">
       <div style="font-size:13px;color:var(--muted);margin-bottom:14px;">${ativo
-        ? `Paciente ativo: <b style="color:var(--text);">${escH(paciente.nome)}</b> — os dados do paciente saem preenchidos nos formulários.`
-        : 'Nenhum paciente selecionado — os formulários saem <b>em branco</b>, para preencher à mão. Para sair com os dados de um paciente, escolha-o em <a href="#" onclick="event.preventDefault();clickNav(\'dados\')">Dados do Paciente</a>.'}</div>
+        ? `Paciente ativo: <b style="color:var(--text);">${escH(paciente.nome)}</b> — sai preenchido no BPA-1 Transfusão. No BPA-I, escolha até 3 pacientes abaixo.`
+        : 'Nenhum paciente selecionado — o BPA-1 Transfusão sai <b>em branco</b>. Para preenchê-lo, escolha o paciente em <a href="#" onclick="event.preventDefault();clickNav(\'dados\')">Dados do Paciente</a>. No BPA-I, escolha até 3 pacientes abaixo.'}</div>
       <div class="le-grid">
         ${Object.keys(ENF_DOCS).map(k=>`
         <div class="le-card">
           <b>${escH(ENF_DOCS[k].titulo)}</b>
           <div style="font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.45;">${escH(ENF_DOCS[k].desc)}</div>
-          ${k === 'transf' ? enfTransfQtdHTML() : ''}
+          ${k === 'transf' ? enfTransfQtdHTML() : ''}${k === 'bpai' ? enfBpaiSlotsHTML() : ''}
           <div style="display:flex;gap:8px;margin-top:12px;">
             <button class="btn-secondary" style="flex:1;" onclick="enfDocAbrir('${k}', false)">👁 Visualizar</button>
             <button class="btn-primary" style="flex:1;" onclick="enfDocAbrir('${k}', true)">🖨️ Imprimir</button>
@@ -6882,6 +6920,7 @@ function ativarPaciente(p, mostrarToast){
 
 function selecionarPaciente(id){
   bpaTransfQtd = {};   // quantidades do BPA-1 são por paciente
+  if(ehEnfermagem() && id !== 'demo' && !bpaISlots.includes(id)){ const k = bpaISlots.indexOf(null); if(k > -1) bpaISlots[k] = id; }   // entra na 1ª sequência livre do BPA-I
   if(id === 'demo' || !supabaseConfigured){
     clickNav(telaAposPaciente());
     return;
