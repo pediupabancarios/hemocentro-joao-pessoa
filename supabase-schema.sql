@@ -407,3 +407,17 @@ end $$;
 drop trigger if exists etiqueta_unica on solicitacoes_exames;
 create trigger etiqueta_unica before insert or update of registro_numero on solicitacoes_exames
   for each row execute function trg_etiqueta_unica();
+
+-- ==========================================================
+-- Técnicos de enfermagem do BPA-I (nome + CNS), escolhidos na tela Documentos da Enfermagem
+-- ==========================================================
+create table if not exists bpa_tecnicos (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null,
+  cns text not null,
+  ativo boolean not null default true,
+  created_at timestamptz default now()
+);
+alter table bpa_tecnicos enable row level security;
+drop policy if exists "allow all - bpa_tecnicos" on bpa_tecnicos;
+create policy "allow all - bpa_tecnicos" on bpa_tecnicos for all using (true) with check (true);

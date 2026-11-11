@@ -2158,6 +2158,7 @@ function renderPage(page){
     main.innerHTML = fullListTemplate('Solicitações de Hemocomponentes','🩸', hemosRows(), ['Data','Hemocomponente','Quantidade','Situação','Médico','Ações'], "abrirNovaSolicitacaoHemo()", '+ Nova Solicitação', 'hemocomponentes');
   } else if(page === 'enfdocs'){
     main.innerHTML = enfDocsTemplate();
+    enfCarregarTecnicos();
   } else if(page === 'labexames'){
     labExRender();
     labExCarregar().then(()=>{ if(document.querySelector('.nav-item.active')?.dataset.page === 'labexames') labExRender(); });
@@ -3189,7 +3190,7 @@ function templateBPA2(opts){
       <tr>
         <td style="width:34%;">
           <div class="bpa2-mini-label">Cartão Nacional de Saúde (CNS)</div>
-          ${digitBoxes('', 'digit-boxes small', 15)}
+          ${digitBoxes(opts.cns || '', 'digit-boxes small', 15)}
         </td>
         <td>
           <div class="bpa2-mini-label">Nome do Profissional</div>
@@ -3340,7 +3341,69 @@ function pacienteParaBPA(r){
 }
 function templateBPAEnfermagem(){
   const pacs = bpaISlots.map(id => id ? pacienteParaBPA(pacientesList.find(x=>x.id === id)) : null);
-  return templateBPA2({equipe:'TÉCNICO DE ENFERMAGEM', cbo:'322205', nomeProf:'', proc:'0301100012', fixos:true, pacs});
+  return templateBPA2({equipe:'TÉCNICO DE ENFERMAGEM', cbo:'322205', nomeProf:(bpaIProf.nome || '').toUpperCase(), cns:bpaIProf.cns, proc:'0301100012', fixos:true, pacs});
+}
+/* ---- Técnico de enfermagem (nome + CNS) do BPA-I: lista guardada no banco (tabela bpa_tecnicos) ou digitado ---- */
+let bpaITecnicos = [], bpaITecCarregado = false, bpaIProf = {id:'', nome:'', cns:''};
+async function enfCarregarTecnicos(){
+  if(!supabaseConfigured || bpaITecCarregado) return;
+  bpaITecCarregado = true;
+  const { data, error } = await supabaseClient.from('bpa_tecnicos').select('*').eq('ativo', true).order('nome');
+  if(error){ console.error(error); bpaITecCarregado = false; return; }
+  bpaITecnicos = data || [];
+  if(document.querySelector('.nav-item.active')?.dataset.page === 'enfdocs') renderPage('enfdocs');
+}
+function enfBpaiProfHTML(){
+  const est = 'padding:6px 8px;border:1px solid var(--line);border-radius:8px;font-size:12px;';
+  return `<details style="margin-top:10px;" open>
+    <summary style="cursor:pointer;font-size:13px;font-weight:600;">🧑‍⚕️ Técnico de enfermagem (nome e CNS)</summary>
+    <div style="margin-top:8px;display:grid;gap:6px;">
+      <select id="enf-prof-sel" style="${est}" onchange="enfProfEscolher(this.value)">
+        <option value="">Escolher da lista…</option>
+        ${bpaITecnicos.map(t=>`<option value="${t.id}" ${t.id === bpaIProf.id ? 'selected' : ''}>${escH(t.nome)}</option>`).join('')}
+      </select>
+      <input id="enf-prof-nome" value="${escH(bpaIProf.nome)}" placeholder="Nome do profissional" style="${est}" oninput="enfProfDigitou()">
+      <input id="enf-prof-cns" value="${escH(bpaIProf.cns)}" placeholder="CNS (15 números)" inputmode="numeric" maxlength="15" style="${est}" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,15); enfProfDigitou()">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="enfProfSalvar()">＋ Salvar na lista</button>
+        ${bpaIProf.id ? `<button class="btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="enfProfRemover()">Remover da lista</button>` : ''}
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);">Escolha da lista ou digite outro profissional. Sem preencher, o nome e o CNS saem em branco.</div>
+    </div>
+  </details>`;
+}
+function enfProfDigitou(){
+  bpaIProf.nome = document.getElementById('enf-prof-nome').value;
+  bpaIProf.cns = document.getElementById('enf-prof-cns').value;
+  bpaIProf.id = '';
+  const sel = document.getElementById('enf-prof-sel'); if(sel) sel.value = '';
+}
+function enfProfEscolher(id){
+  const t = bpaITecnicos.find(x=>x.id === id);
+  bpaIProf = t ? {id:t.id, nome:t.nome, cns:t.cns} : {id:'', nome:'', cns:''};
+  renderPage('enfdocs');
+}
+async function enfProfSalvar(){
+  const nome = (document.getElementById('enf-prof-nome').value || '').trim(), cns = (document.getElementById('enf-prof-cns').value || '').replace(/\D/g,'');
+  if(!nome){ showToast('Digite o nome do profissional.'); return; }
+  if(cns.length !== 15){ showToast('O CNS tem 15 números. Confira e tente de novo.'); return; }
+  if(bpaITecnicos.some(t=>t.cns === cns)){ showToast('Esse CNS já está na lista.'); return; }
+  if(!supabaseConfigured){ showToast('Sem conexão com o banco para salvar a lista.'); return; }
+  const { data, error } = await supabaseClient.from('bpa_tecnicos').insert({nome, cns}).select();
+  if(error){ console.error(error); showToast('Erro ao salvar o profissional na lista.'); return; }
+  bpaITecnicos = bpaITecnicos.concat(data).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+  bpaIProf = {id:data[0].id, nome, cns};
+  showToast('Profissional salvo na lista.');
+  renderPage('enfdocs');
+}
+async function enfProfRemover(){
+  const t = bpaITecnicos.find(x=>x.id === bpaIProf.id); if(!t) return;
+  if(!confirm(`Remover ${t.nome} da lista de técnicos?`)) return;
+  const { error } = await supabaseClient.from('bpa_tecnicos').update({ativo:false}).eq('id', t.id);
+  if(error){ console.error(error); showToast('Erro ao remover da lista.'); return; }
+  bpaITecnicos = bpaITecnicos.filter(x=>x.id !== t.id);
+  bpaIProf = {id:'', nome:'', cns:''};
+  renderPage('enfdocs');
 }
 function enfRotuloPaciente(p){ return `${p.nome} — ${p.prontuario || p.sus || (p.nascimento ? isoToBR(p.nascimento) : 's/ nº')}`; }
 function enfBpaiSlotsHTML(){
@@ -3387,7 +3450,7 @@ function enfDocsTemplate(){
         <div class="le-card">
           <b>${escH(ENF_DOCS[k].titulo)}</b>
           <div style="font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.45;">${escH(ENF_DOCS[k].desc)}</div>
-          ${k === 'transf' ? enfTransfQtdHTML() : ''}${k === 'bpai' ? enfBpaiSlotsHTML() : ''}
+          ${k === 'transf' ? enfTransfQtdHTML() : ''}${k === 'bpai' ? enfBpaiProfHTML() + enfBpaiSlotsHTML() : ''}
           <div style="display:flex;gap:8px;margin-top:12px;">
             <button class="btn-secondary" style="flex:1;" onclick="enfDocAbrir('${k}', false)">👁 Visualizar</button>
             <button class="btn-primary" style="flex:1;" onclick="enfDocAbrir('${k}', true)">🖨️ Imprimir</button>
