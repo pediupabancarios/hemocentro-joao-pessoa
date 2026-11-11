@@ -3256,7 +3256,7 @@ function templateBPATransfusao(){
   const v = x => p ? (x === '—' || x == null ? '' : x) : '';
   const sexoM = p && p.sexo === 'Masculino' ? 'X' : ' ', sexoF = p && p.sexo === 'Feminino' ? 'X' : ' ';
   const raca = r => (p && p.racaCor === r) ? 'X' : ' ';
-  const doc = p ? ((p.sus && p.sus !== '—' ? p.sus : (p.cpf && p.cpf !== '—' ? p.cpf : '')).replace(/\D/g,'')) : '';
+  const doc = p ? ((p.cpf && p.cpf !== '—' ? p.cpf : '').replace(/\D/g,'')) : '';   // no campo CNS/CPF sai o CPF do paciente
   return `
   <div class="rx-sheet bpa">
     <table class="bpa-top">
