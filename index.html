@@ -2399,30 +2399,40 @@ function receitaTemplateHTML(r){
 }
 
 function templateReceituarioMedico(r){
-  return `
-  <div class="rx-sheet">
-    <div class="pad-logos">
-      <img src="${LOGO_HEMOCENTRO}" class="pad-logo-hemo">
-      <img src="${LOGO_SUS}" class="pad-logo-sus">
-    </div>
-
-    <div class="field-line" style="margin-top:22px;">Paciente: <span class="filled">${paciente.nome}</span></div>
-    <div class="field-line">Data: <span class="filled">${r.data}</span></div>
-    ${r.via ? `<div class="field-line">Via de Administração: <span class="filled">${r.via}</span></div>` : ''}
-
-    <div class="rx-box">
-      <div class="rx-box-title">PRESCRIÇÃO</div>
-      <div class="rx-presc">${(r.prescricao || (r.medicamento + ' — ' + r.uso)).replace(/\n/g,'<br>')}</div>
-    </div>
-
-    <div class="rx-footer">
-      <div></div>
-      <div class="rx-sign">
-        <div class="rx-sign-line"></div>
-        <div>${r.medico}<br><span class="rx-sign-sub">Assinatura e carimbo do médico</span></div>
+  // Modelo F.CP.107.04: A4 paisagem, duas vias iguais lado a lado, rodapé único com código e endereço
+  const presc = escH(r.prescricao || (r.medicamento + ' — ' + r.uso)).replace(/\n/g,'<br>');
+  const meia = `
+    <div class="rxs-half">
+      <div class="pad-logos">
+        <img src="${LOGO_SUS}" class="pad-logo-sus">
+        <img src="${LOGO_HEMOCENTRO}" class="pad-logo-hemo">
       </div>
-    </div>
-
+      <div class="field-line" style="margin-top:14px;">Paciente: <span class="filled">${escH(paciente.nome)}</span></div>
+      <div class="field-line">Data: <span class="filled">${escH(r.data)}</span></div>
+      ${r.via ? `<div class="field-line">Via de Administração: <span class="filled">${escH(r.via)}</span></div>` : ''}
+      <div class="rx-box" style="min-height:410px;margin:12px 0 18px;padding:12px 14px;">
+        <div class="rx-box-title">PRESCRIÇÃO</div>
+        <div class="rx-presc" style="font-size:13px;line-height:1.6;">${presc}</div>
+      </div>
+      <div class="rx-footer" style="margin-top:8px;">
+        <div></div>
+        <div class="rx-sign">
+          <div class="rx-sign-line"></div>
+          <div>${escH(r.medico)}<br><span class="rx-sign-sub">Assinatura e carimbo do médico</span></div>
+        </div>
+      </div>
+    </div>`;
+  return `
+  <div class="rx-sheet rxs">
+    <style>
+      @page{ size:A4 landscape; margin:12.7mm; }
+      .rxs{padding:0;}
+      .rxs-cols{display:grid;grid-template-columns:1fr 1fr;column-gap:12.5mm;}
+      .rxs-half{min-width:0;}
+      .rxs .pad-footer{margin-top:14px;text-align:center;}
+      .rxs .pad-code{text-align:center;}
+    </style>
+    <div class="rxs-cols">${meia}${meia}</div>
     <div class="pad-footer">
       <div class="pad-code">F.CP.107.04.06</div>
       <div class="pad-footer-line"></div>
