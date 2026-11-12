@@ -827,6 +827,7 @@
         <div class="nav-item" data-page="receitas"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10l1 9a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5z"/></svg> Receitas Médicas</div>
         <div class="nav-item" data-page="medceaf"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10l1 9a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5z"/><path d="M9 9h6M12 6v6"/></svg> Solicitação de Medicamentos</div>
         <div class="nav-item" data-page="incidentes"><svg class="nav-icon" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></svg> Incidentes Transfusionais</div>
+        <div class="nav-item" data-page="termohetero"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6M9 18h4"/></svg> Termo de Heterogrupo</div>
         <div class="nav-item" data-page="enfdocs"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg> Documentos da Enfermagem</div>
         <div class="nav-item" data-page="documentos"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg> Documentos</div>
         <div class="nav-item" data-page="evolucoes"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg> Evoluções</div>
@@ -902,6 +903,7 @@
         <div class="nav-item" data-page="receitas" onclick="fecharMenuMobile()"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10l1 9a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5z"/></svg> Receitas Médicas</div>
         <div class="nav-item" data-page="medceaf" onclick="fecharMenuMobile()"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10l1 9a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5z"/><path d="M9 9h6M12 6v6"/></svg> Solicitação de Medicamentos</div>
         <div class="nav-item" data-page="incidentes" onclick="fecharMenuMobile()"><svg class="nav-icon" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></svg> Incidentes Transfusionais</div>
+        <div class="nav-item" data-page="termohetero" onclick="fecharMenuMobile()"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6M9 18h4"/></svg> Termo de Heterogrupo</div>
         <div class="nav-item" data-page="enfdocs" onclick="fecharMenuMobile()"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg> Documentos da Enfermagem</div>
         <div class="nav-item" data-page="documentos" onclick="fecharMenuMobile()"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg> Documentos</div>
         <div class="nav-item" data-page="anexos" onclick="fecharMenuMobile()"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M21.44 11.05 12.25 20.24a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.67 3.67 0 0 1 5.19 5.19l-9.2 9.19a1.83 1.83 0 0 1-2.6-2.6l8.29-8.28"/></svg> Anexos</div>
@@ -2123,7 +2125,7 @@ const NOMES_PAGINA = {
   resumo:'Resumo do Paciente', dados:'Dados do Paciente', agenda:'Agenda',
   atendimentos:'Atendimentos', historico:'Histórico Clínico', alergias:'Alergias e Reações',
   receitas:'Receitas Médicas', documentos:'Documentos', evolucoes:'Evoluções', anexos:'Anexos',
-  medceaf:'Solicitação de Medicamentos (CEAF)', incidentes:'Incidentes Transfusionais',
+  medceaf:'Solicitação de Medicamentos (CEAF)', incidentes:'Incidentes Transfusionais', termohetero:'Termo de Heterogrupo',
   meudia:'Meu Dia', recepcao:'Recepção', labhome:'Início', enfdocs:'Documentos da Enfermagem', labexames:'Exames por setor', filalab:'Fila do Laboratório', relatoriolab:'Relatórios do Laboratório',
   laboratorios:'Solicitações de Laboratórios', hemocomponentes:'Solicitações de Hemocomponentes',
   transfusoes:'Transfusões', exames:'Exames Realizados',
@@ -2140,7 +2142,7 @@ function atualizarPacienteTopo(){
   if(c) c.textContent = semPacienteAtivo() ? 'Nenhum' : (paciente.nome || '—');
 }
 
-const PAGINAS_DO_PACIENTE = ['resumo','receitas','laboratorios','hemocomponentes','medceaf','incidentes','documentos','anexos'];
+const PAGINAS_DO_PACIENTE = ['resumo','receitas','laboratorios','hemocomponentes','medceaf','incidentes','termohetero','evolucoes','documentos','anexos'];
 function renderPage(page){
   if(ehEnfermagem() && !MENU_ENFERMAGEM.includes(page)) page = 'enfdocs';
   if(PAGINAS_COM_PACIENTES.includes(page)) setTimeout(()=>atualizarPacientesEPagina(), 50);   // pega edições feitas por outras pessoas
@@ -2213,6 +2215,8 @@ function renderPage(page){
     main.innerHTML = fullListTemplate('Solicitação de Medicamentos (CEAF)','💊', medsCeafRows(), ['Data','Medicamentos','CID-10','Médico','Ações'], "abrirNovaMedCeaf()", '+ Nova Solicitação', '', podeCriarDocumentos());
   } else if(page === 'evolucoes'){
     main.innerHTML = podeVerEvolucoes() ? evolucoesTemplate() : placeholderTemplate('acesso_negado');
+  } else if(page === 'termohetero'){
+    main.innerHTML = fullListTemplate('Termo para Transfusão de Heterogrupo (F.CP.107.10)','🔁', termosHeteroRows(), ['Data','Hemocomponente','GS/Rh (paciente → transfundir)','Médico','Ações'], "abrirNovoTermoHetero()", '+ Novo Termo', '', podeCriarDocumentos());
   } else if(page === 'incidentes'){
     main.innerHTML = fullListTemplate('Incidentes Transfusionais (F.CQ.403)','⚠️', fichasIncRows(), ['Data','Nº','Gravidade','Tipo de Reação','Responsável','Ações'], "abrirNovaFichaInc()", '+ Nova Notificação', '', podeCriarDocumentos());
   } else if(page === 'documentos'){
@@ -8304,7 +8308,22 @@ function imprimirFichaInc(i){ abrirDocumentoImpressao(printWindowShell(templateF
 /* ================= TERMO PARA TRANSFUSÃO DE HETEROGRUPO (F.CP.107.10) ================= */
 let editingTermoHeteroId = null;
 
+function termosHeteroRows(){
+  if(!termosHetero.length) return `<tr class="empty-row"><td colspan="5">Nenhum termo registrado.</td></tr>`;
+  return termosHetero.map((r,i)=>`
+    <tr>
+      <td>${r.data}</td><td>${escH(r.hemocomponente)}</td><td>${escH(r.gs_paciente)} → ${escH(r.gs_transfundido)}</td><td>${escH(r.medico || '—')}</td>
+      <td class="row-actions">
+        <button title="Visualizar" onclick="verTermoHetero(${i})">${ico('ver')}</button>
+        <button title="Imprimir" onclick="imprimirTermoHetero(${i})">${ico('imprimir')}</button>
+        ${podeCriarDocumentos() ? `<button title="Editar" onclick="editarTermoHetero(${i})">${ico('editar')}</button>` : ''}
+        ${podeCriarDocumentos() ? `<button class="danger" title="Excluir" onclick="excluirTermoHetero(${i})">${ico('excluir')}</button>` : ''}
+      </td>
+    </tr>`).join('');
+}
+
 function abrirNovoTermoHetero(){
+  if(semPacienteAtivo()){ showToast('Escolha primeiro o paciente (Dados do Paciente ou a busca no topo).'); return; }
   editingTermoHeteroId = null;
   document.getElementById('modal-termohetero-title').textContent = 'Termo para Transfusão de Heterogrupo';
   document.getElementById('modal-termohetero-btn').textContent = 'Salvar Termo';
@@ -8485,6 +8504,7 @@ function evolucoesTemplate(){
 }
 
 function abrirNovaEvolucao(){
+  if(semPacienteAtivo()){ showToast('Escolha primeiro o paciente (Dados do Paciente ou a busca no topo).'); return; }
   editingEvolucaoId = null;
   document.getElementById('modal-evolucao-title').textContent = 'Nova Evolução Médica';
   document.getElementById('modal-evolucao-btn').textContent = 'Salvar Evolução';
