@@ -2311,12 +2311,25 @@ function resumoTemplate(){
 
   <div class="panel" style="margin-top:18px;">
     <div class="subtabs">
-      <button class="subtab active" data-sub="receitas" onclick="trocarSubResumo(this,'receitas')">Receitas Médicas</button>
+      ${podeVerEvolucoes() ? `<button class="subtab active" data-sub="evolucoes" onclick="trocarSubResumo(this,'evolucoes')">Evolução</button>` : ''}
+      <button class="subtab${podeVerEvolucoes() ? '' : ' active'}" data-sub="receitas" onclick="trocarSubResumo(this,'receitas')">Receitas Médicas</button>
       <button class="subtab" data-sub="laboratorios" onclick="trocarSubResumo(this,'laboratorios')">Laboratório</button>
       <button class="subtab" data-sub="hemocomponentes" onclick="trocarSubResumo(this,'hemocomponentes')">Hemocomponentes</button>
     </div>
 
-    <div class="sub-pane" data-sub="receitas">
+    ${podeVerEvolucoes() ? `<div class="sub-pane" data-sub="evolucoes">
+      <div class="panel-head">
+        <h3>Evoluções Médicas</h3>
+        ${podeCriarDocumentos() ? `<button class="btn-new" onclick="abrirNovaEvolucao()">+ Nova Evolução</button>` : ''}
+      </div>
+      <table>
+        <thead><tr><th>Data / hora</th><th>Tipo</th><th>Evolução</th><th>Médico</th><th>Ações</th></tr></thead>
+        <tbody id="evolucoes-tbody">${evolucoesRows()}</tbody>
+      </table>
+      <div class="panel-foot" onclick="clickNav('evolucoes')">Ver todas as evoluções →</div>
+    </div>` : ''}
+
+    <div class="sub-pane" data-sub="receitas"${podeVerEvolucoes() ? ' style="display:none;"' : ''}>
       <div class="panel-head">
         <h3>Receitas Médicas</h3>
         ${podeCriarDocumentos() ? `<button class="btn-new" onclick="abrirNovaReceita()">+ Nova Receita</button>` : ''}
@@ -8849,6 +8862,8 @@ function refreshTables(){
     const rtb = document.getElementById('receitas-tbody');
     const ltb = document.getElementById('labs-tbody');
     const htb = document.getElementById('hemos-tbody');
+    const etb = document.getElementById('evolucoes-tbody');
+    if(etb) etb.innerHTML = evolucoesRows();
     if(rtb) rtb.innerHTML = receitasRows();
     if(ltb) ltb.innerHTML = labsRows();
     if(htb) htb.innerHTML = hemosRows();
