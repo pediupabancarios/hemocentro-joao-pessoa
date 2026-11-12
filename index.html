@@ -8089,69 +8089,184 @@ function excluirFichaInc(i){
 }
 
 function templateFichaInc(r){
-  const sint = (r.sinais_sintomas || '').split(/;\s*/).map(s=>s.trim().toLowerCase()).filter(Boolean);
-  const ri = (r.reacoes_imediatas || '').split(/;\s*/).map(s=>s.trim().toLowerCase()).filter(Boolean);
-  const rt = (r.reacoes_tardias || '').split(/;\s*/).map(s=>s.trim().toLowerCase()).filter(Boolean);
-  let fiHemoLinhas = [];
-  try{ fiHemoLinhas = r.hemocomponentes_json ? JSON.parse(r.hemocomponentes_json) : []; }catch(e){ fiHemoLinhas = []; }
-  const colChecks = (lista, marcados, ncols) => {
-    const cells = lista.map(it=>`<span style="display:inline-block;width:${Math.floor(100/ncols)}%;font-size:10px;">${chk(marcados.includes(it.toLowerCase()))} ${it}</span>`).join('');
-    return `<div>${cells}</div>`;
+  const lista = s => (s || '').split(/;\s*/).map(x=>x.trim().toLowerCase()).filter(Boolean);
+  const sint = lista(r.sinais_sintomas), ri = lista(r.reacoes_imediatas), rt = lista(r.reacoes_tardias);
+  let hemo = [];
+  try{ hemo = r.hemocomponentes_json ? JSON.parse(r.hemocomponentes_json) : []; }catch(e){ hemo = []; }
+  const so = s => String(s == null ? '' : s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const semAcento = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  const cb = (on, label) => `<span class="fi-it"><i class="fi-cb">${on ? '✕' : ''}</i><span>${label}</span></span>`;
+  const tg = n => `<b class="fi-tg">${n}</b>`;
+  const quad = (str, n, gaps) => {
+    const s = String(str || '');
+    return `<span class="fi-dt">${Array.from({length:n}, (_,i)=>`<i class="fi-dg${(gaps||[]).includes(i) ? ' gap' : ''}">${so(s[i] || '')}</i>`).join('')}</span>`;
   };
+  const dataQuad = v => {
+    let iso = v || '';
+    if(iso.includes('/')) iso = brToISO(iso) || '';
+    const p = iso.slice(0,10).split('-');
+    return quad(p.length === 3 ? p[2] + p[1] + p[0] : '', 8, [1,3]);
+  };
+  const digitos = s => String(s || '').replace(/[^0-9]/g,'');
+
+  const dtOcorrencia = r.data_ocorrencia || (r.data && r.data !== '—' ? r.data : '');
+  const mIdade = String(paciente.idade || '').match(/(\d+)\s*(ano|mes|mês|dia)/i);
+  const idadeNum = mIdade ? mIdade[1] : '';
+  const idadeUn = mIdade ? (semAcento(mIdade[2]).startsWith('a') ? 'A' : semAcento(mIdade[2]).startsWith('m') ? 'M' : 'D') : '';
+  const sexoL = semAcento(paciente.sexo).startsWith('m') ? 'M' : semAcento(paciente.sexo).startsWith('f') ? 'F' : '';
+  const raca = semAcento(paciente.racaCor);
+  const setorN = semAcento(r.setor);
+  const setoresLinha1 = ['Ambulatório de transfusão','Centro cirúrgico','Centro obstétrico','Clínica cirúrgica','Clínica de diálise','Clínica de transplante de medula óssea'];
+  const setoresLinha2 = ['Clínica gineco-obstétrica','Clínica médica','Clínica pediátrica','Emergência/PS','Transfusão domiciliar','UTI/CTI'];
+  const linhasHemo = hemo.slice();
+  while(linhasHemo.length < 3) linhasHemo.push({});
+
+  const colSint = (a,b) => `<div class="fi-col">${FI_SINTOMAS.slice(a,b).map(x=>cb(sint.includes(x.toLowerCase()), x)).join('')}</div>`;
+
   return `
-  <div class="rx-sheet">
+  <div class="rx-sheet f403">
+    <style>
+      .f403{font-size:9px;line-height:1.25;color:#000;}
+      .f403 .doc-head{margin-bottom:5px;border:2px solid #000;}
+      .f403 .doc-head td{padding:3px 8px;border:1px solid #000;}
+      .f403 .doc-head-title{font-size:15px;}
+      .f403 .doc-head-label{font-size:9px;font-weight:400;}
+      .f403 .doc-head-value{font-size:11.5px;}
+      .f403 .doc-head-logo img{height:40px;}
+      .f403 .fi-tg{display:inline-block;border:1px solid #000;font-size:8.5px;font-weight:800;padding:0 3px;margin-right:4px;line-height:1.3;background:#fff;}
+      .f403 .fi-cb{display:inline-flex;align-items:center;justify-content:center;width:11px;height:11px;border:1px solid #000;font-style:normal;font-size:9px;font-weight:800;line-height:1;flex:none;background:#fff;}
+      .f403 .fi-it{display:inline-flex;align-items:center;gap:4px;font-weight:700;font-size:9px;margin:1.5px 0;}
+      .f403 .fi-col{flex:1;display:flex;flex-direction:column;align-items:flex-start;}
+      .f403 .fi-dt{display:inline-flex;vertical-align:middle;}
+      .f403 .fi-dg{display:inline-block;width:12px;height:14px;border-left:1px solid #000;font-style:normal;font-size:10px;font-weight:700;text-align:center;line-height:14px;}
+      .f403 .fi-dg:last-child{border-right:1px solid #000;}
+      .f403 .fi-dg.gap{margin-right:6px;border-right:1px solid #000;}
+      .f403 .fi-top{display:flex;justify-content:space-between;align-items:center;border:1px solid #000;border-left-width:2px;margin-bottom:4px;padding:2px 4px;font-weight:800;font-size:9.5px;}
+      .f403 .fi-sec{display:flex;margin-bottom:4px;}
+      .f403 .fi-vert{width:22px;flex:none;position:relative;border:2px solid #000;border-right:0;}
+      .f403 .fi-vert span{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-90deg);white-space:nowrap;font-weight:800;font-size:10.5px;}
+      .f403 .fi-body{flex:1;border:2px solid #000;}
+      .f403 .fi-row{display:flex;align-items:center;gap:8px;padding:3px 5px;border-top:1px solid #000;}
+      .f403 .fi-row:first-child{border-top:0;}
+      .f403 .fi-lbl{font-weight:800;}
+      .f403 .fi-val{font-weight:700;font-size:10px;}
+      .f403 .fi-grow{flex:1;}
+      .f403 .fi-desc{min-height:44px;padding:2px 6px 4px;font-weight:700;font-size:10px;}
+      .f403 .fi-setor{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr 1fr 1.5fr;column-gap:4px;padding:2px 5px;}
+      .f403 .fi-hemotab{width:100%;border-collapse:collapse;}
+      .f403 .fi-hemotab th, .f403 .fi-hemotab td{border:1px solid #000;font-size:9px;padding:2px 4px;height:15px;}
+      .f403 .fi-hemotab th{font-weight:800;text-align:left;}
+      .f403 .fi-hemotab td{font-weight:700;}
+      .f403 .fi-leg{display:flex;gap:6px;padding:3px 5px;font-size:7.5px;line-height:1.3;border-top:1px solid #000;}
+      .f403 .fi-leg > div{flex:1;}
+      .f403 .fi-leg b{font-size:8px;}
+      .f403 .fi-sign{display:flex;justify-content:space-around;margin-top:14px;text-align:center;font-size:9px;}
+      .f403 .fi-sign > div{width:42%;}
+      .f403 .fi-sign .line{border-top:1px solid #000;margin-bottom:2px;}
+      .f403 .fi-cod{text-align:right;font-size:8px;margin-top:4px;}
+    </style>
+
     <table class="doc-head">
       <tr><td class="doc-head-logo" rowspan="3"><img src="${LOGO_HEMOCENTRO}"></td>
       <td class="doc-head-title" colspan="5">Ficha de notificação e investigação de incidentes transfusionais</td></tr>
-      <tr><td class="doc-head-label">Processo</td><td class="doc-head-label">Área</td><td class="doc-head-label">Código</td><td class="doc-head-label">Revisão</td><td class="doc-head-label">Paginação</td></tr>
-      <tr><td class="doc-head-value">Coordenação da Garantia da Qualidade</td><td class="doc-head-value">Gerenciamento de Riscos</td><td class="doc-head-value">F.CQ.403</td><td class="doc-head-value">03</td><td class="doc-head-value">1 / 2</td></tr>
+      <tr><td class="doc-head-label">Processo</td><td class="doc-head-label">Área</td><td class="doc-head-label" style="text-align:center;">Código</td><td class="doc-head-label" style="text-align:center;">Revisão</td><td class="doc-head-label" style="text-align:center;">Paginação</td></tr>
+      <tr><td class="doc-head-value" style="text-align:left;">Coordenação da Garantia da Qualidade</td><td class="doc-head-value">Gerenciamento de Riscos</td><td class="doc-head-value">F.CQ.403</td><td class="doc-head-value">03</td><td class="doc-head-value">1 / 2</td></tr>
     </table>
-    <div class="field-row" style="display:flex;justify-content:space-between;"><span><b>2. Produto:</b> USO DE SANGUE E COMPONENTES</span> <span><b>Nº</b> <span class="filled">${r.numero || '—'}</span></span></div>
 
-    <div class="section-box"><div class="section-title" style="font-size:12px;">3.1 Evento adverso</div><div class="section-body" style="min-height:60px;">${(r.descricao_evento || '').replace(/\n/g,'<br>') || '&nbsp;'}</div></div>
+    <div class="fi-top"><span>${tg('2')}Produto: USO DE SANGUE E COMPONENTES</span><span>Nº ${quad(r.numero || '', 13)}</span></div>
 
-    <div class="section-box"><div class="section-title" style="font-size:12px;">3.2 Sinais e sintomas</div>
-      <div class="section-body">${colChecks(FI_SINTOMAS, sint, 3)}</div>
-    </div>
-    <div class="field-row">3.3 Evolução/Gravidade: ${FI_GRAVIDADES.map(g=>`<b>${chk(r.gravidade===g)} ${g}</b>`).join(' &nbsp; ')}</div>
-    <div class="field-row">3.4 Data da ocorrência do evento: <span class="filled">${r.data_ocorrencia ? isoToBR(r.data_ocorrencia) : (r.data || '—')}</span></div>
-    <div class="field-row">4.1 Estabelecimento de saúde: <span class="filled">${r.estabelecimento || '—'}</span> &nbsp;&nbsp; 4.2 Nº CNES: <span class="filled">${r.cnes || '—'}</span></div>
-
-    <div class="field-row">5.1 Tipo da transfusão: <b>${chk(r.tipo_transfusao==='Alogênica')} Alogênica</b> &nbsp; <b>${chk(r.tipo_transfusao==='Autóloga')} Autóloga</b> &nbsp;&nbsp; 5.2 Indicação: <span class="filled">${r.indicacao_transfusao || '—'}</span></div>
-    <div class="section-box"><div class="section-title" style="font-size:12px;">5.3 Setor onde ocorreu a transfusão</div>
-      <div class="section-body">${colChecks(FI_SETORES, [(r.setor||'').toLowerCase()], 2)}</div>
-    </div>
-    <div class="field-row">6.1 Data da transfusão: <span class="filled">${r.data_transfusao ? isoToBR(r.data_transfusao) : '—'}</span></div>
-
-    <div class="ficha-hemo-title">Hemocomponentes relacionados à notificação</div>
-    <table class="resultado-param-table">
-      <thead><tr><th>6.2 Tipo</th><th>6.3 Nº</th><th>6.4 Qualificação</th><th>6.5 ABO/Rh</th><th>6.6 Nome da instituição produtora</th><th>6.7 CNES instituição</th></tr></thead>
-      <tbody>${fiHemoLinhas.length ? fiHemoLinhas.map(l=>`<tr><td>${l.tipo||''}</td><td>${l.num||''}</td><td>${l.qualif||''}</td><td>${l.abo||''}</td><td>${l.instituicao||''}</td><td>${l.cnes||''}</td></tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#999;">Nenhum hemocomponente informado.</td></tr>'}</tbody>
-    </table>
-    <div class="ficha-legenda">
-      <div><b>Tipo de hemocomponente:</b> ${Object.entries(FI_HEMO_TIPOS_LEGENDA).map(([sig,nome])=>`${sig} - ${nome}`).join(' · ')}</div>
-      <div style="margin-top:3px;"><b>Qualificações:</b> ${FI_HEMO_QUALIFICACOES.join(' · ')}</div>
-    </div>
-
-    <div class="section-box"><div class="section-title" style="font-size:12px;">Dados do paciente</div>
-      <div class="section-body">
-        <div class="field-row">7.1 Nome completo: <span class="filled">${paciente.nome}</span></div>
-        <div class="field-row">7.4 Nome da mãe: <span class="filled">${paciente.nomeMae || '—'}</span></div>
-        <div class="field-row">7.7 Sexo: <span class="filled">${paciente.sexo}</span> &nbsp; 7.8 Raça/Cor: <span class="filled">${paciente.racaCor || '—'}</span> &nbsp; 7.9 Ocupação: <span class="filled">${r.ocupacao || '—'}</span></div>
-        <div class="field-row">7.10 Data de nascimento: <span class="filled">${paciente.nascimento}</span> &nbsp; 7.11 Idade: <span class="filled">${paciente.idade}</span></div>
-        <div class="field-row">7.12 Nº prontuário: <span class="filled">${paciente.prontuario}</span> &nbsp; 7.13 Nº cartão SUS: <span class="filled">${paciente.sus}</span></div>
+    <div class="fi-sec">
+      <div class="fi-vert"><span>Dados do Evento Adverso</span></div>
+      <div class="fi-body">
+        <div class="fi-row" style="display:block;padding:3px 5px 0;">
+          <div>${tg('3.1')}<b>Descreva detalhadamente o evento adverso</b></div>
+          <div class="fi-desc">${so(r.descricao_evento).replace(/\n/g,'<br>')}</div>
+        </div>
+        <div class="fi-row" style="display:block;">
+          <div style="margin-bottom:2px;">${tg('3.2')}<b>Sinais e sintomas *</b></div>
+          <div style="display:flex;gap:10px;padding-left:6px;">${colSint(0,10)}${colSint(10,20)}${colSint(20,27)}</div>
+        </div>
+        <div class="fi-row" style="gap:6px;">
+          <div style="flex:1;">${tg('3.3')}<b>Evolução/Gravidade *</b><br>
+            <span style="display:inline-flex;gap:14px;padding-left:6px;margin-top:2px;">${FI_GRAVIDADES.map(g=>cb(r.gravidade === g, g)).join('')}</span></div>
+          <div>${tg('3.4')}<b>Data da ocorrência do evento *</b><br><span style="float:right;margin-top:3px;">${dataQuad(dtOcorrencia)}</span></div>
+        </div>
+        <div class="fi-row">
+          <div class="fi-grow">${tg('4.1')}<b>Nome do estabelecimento de saúde *</b><div class="fi-val" style="padding-left:6px;">${so(r.estabelecimento)}</div></div>
+          <div>${tg('4.2')}<b>Número CNES *</b><div style="margin-top:2px;">${quad(digitos(r.cnes), 7)}</div></div>
+        </div>
       </div>
     </div>
 
-    <div class="field-row">8. Tipo de Reação: <b>${chk(r.tipo_reacao==='Imediata')} Imediata</b> &nbsp; <b>${chk(r.tipo_reacao==='Tardia')} Tardia</b></div>
-    <div class="section-box"><div class="section-title" style="font-size:12px;">8.1 Reações imediatas</div><div class="section-body">${colChecks(FI_REACOES_IMEDIATAS, ri, 2)}</div></div>
-    <div class="section-box"><div class="section-title" style="font-size:12px;">8.2 Reações tardias</div><div class="section-body">${colChecks(FI_REACOES_TARDIAS, rt, 2)}</div></div>
-
-    <div class="doc-footer-sign">
-      <div><div class="line"></div>${r.responsavel || ''}<br>Responsável pela notificação</div>
-      <div><div class="line"></div>${r.medico || ''}<br>Médico responsável</div>
+    <div class="fi-sec">
+      <div class="fi-vert"><span>Dados da Transfusão</span></div>
+      <div class="fi-body">
+        <div class="fi-row" style="align-items:flex-start;">
+          <div style="width:34%;">${tg('5.1')}<b>Tipo da transfusão *</b><br>
+            <span style="display:inline-flex;gap:14px;padding-left:6px;margin-top:2px;">${cb(r.tipo_transfusao === 'Alogênica','Alogênica')}${cb(r.tipo_transfusao === 'Autóloga','Autóloga')}</span></div>
+          <div class="fi-grow">${tg('5.2')}<b>Indicação da transfusão</b><div class="fi-val" style="padding-left:6px;">${so(r.indicacao_transfusao)}</div></div>
+        </div>
+        <div class="fi-row" style="display:block;padding-bottom:0;">
+          <div>${tg('5.3')}<b>Setor onde ocorreu a transfusão</b></div>
+          <div class="fi-setor">${setoresLinha1.map(s=>cb(setorN === semAcento(s), s)).join('')}${setoresLinha2.map(s=>cb(setorN === semAcento(s), s)).join('')}</div>
+        </div>
+        <div class="fi-row" style="justify-content:space-between;">
+          <b style="flex:1;text-align:center;">Hemocomponentes relacionados à notificação</b>
+          <span>${tg('6.1')}<b>Data da transfusão *</b> ${dataQuad(r.data_transfusao)}</span>
+        </div>
+        <table class="fi-hemotab">
+          <tr><th style="width:8%;">${tg('6.2')}Tipo</th><th style="width:9%;">${tg('6.3')}Nº</th><th style="width:14%;">${tg('6.4')}Qualificação</th><th style="width:11%;">${tg('6.5')}ABO/Rh</th><th>${tg('6.6')}Nome da instituição produtora</th><th style="width:17%;">${tg('6.7')}CNES instituição produtora</th></tr>
+          ${linhasHemo.map(l=>`<tr><td>${so(l.tipo)}</td><td>${so(l.num)}</td><td>${so(l.qualif)}</td><td>${so(l.abo)}</td><td>${so(l.instituicao)}</td><td>${so(l.cnes)}</td></tr>`).join('')}
+        </table>
+        <div class="fi-leg">
+          <div><b>Tipo de hemocomponente</b><br>${Object.entries(FI_HEMO_TIPOS_LEGENDA).map(([sig,nome])=>sig === 'Outro' ? 'Outro: citar' : `${sig} - ${nome}`).join('<br>')}</div>
+          <div><b>Qualificações do hemocomponente</b><br>${FI_HEMO_QUALIFICACOES.map(q=>q.replace('-',' - ')).join(' &nbsp;·&nbsp; ')}</div>
+        </div>
+      </div>
     </div>
-    <div class="doc-code">F.CQ.403 — Revisão 03</div>
+
+    <div class="fi-sec">
+      <div class="fi-vert"><span style="font-size:9.5px;">Dados do paciente</span></div>
+      <div class="fi-body">
+        <div class="fi-row">${tg('7.1')}<b>Nome completo do paciente *</b><span class="fi-val">${so(paciente.nome)}</span></div>
+        <div class="fi-row">${tg('7.4')}<b>Nome completo da mãe do paciente</b><span class="fi-val">${so(paciente.nomeMae && paciente.nomeMae !== '—' ? paciente.nomeMae : '')}</span></div>
+        <div class="fi-row" style="gap:6px;">
+          <div style="display:flex;align-items:center;gap:4px;">${tg('7.7')}<b>Sexo *</b><span style="font-size:7.5px;line-height:1.2;">M - Masculino<br>F - Feminino<br>I - Ignorado</span>${quad(sexoL, 1)}</div>
+          <div style="flex:1;border-left:1px solid #000;padding-left:5px;">${tg('7.8')}<b>Raça/Cor</b>
+            <span style="display:inline-flex;gap:8px;margin-left:4px;">${cb(raca === 'branca','Branca')}${cb(raca === 'preta','Preta')}${cb(raca === 'amarela','Amarela')}</span><br>
+            <span style="display:inline-flex;gap:8px;margin-left:46px;">${cb(raca === 'parda','Parda')}${cb(raca === 'indigena','Indígena')}${cb(raca === 'ignorada','Ignorada')}</span></div>
+          <div style="width:24%;border-left:1px solid #000;padding-left:5px;">${tg('7.9')}<b>Ocupação</b><div class="fi-val">${so(r.ocupacao)}</div></div>
+        </div>
+        <div class="fi-row" style="gap:6px;">
+          <div>${tg('7.10')}<b>Data de nascimento *</b><br><span style="display:inline-block;margin-top:2px;">${dataQuad(paciente.nascimento && paciente.nascimento !== '—' ? paciente.nascimento : '')}</span></div>
+          <div style="border-left:1px solid #000;padding-left:5px;">${tg('7.11')}<b>(ou) Idade na data do evento *</b><br>
+            <span style="display:inline-flex;align-items:center;gap:6px;margin-top:2px;">${quad(idadeNum, 3)}${quad(idadeUn, 1)}<span style="font-size:7.5px;line-height:1.2;">D - dias &nbsp; M - meses<br>A - anos</span></span></div>
+          <div class="fi-grow" style="border-left:1px solid #000;padding-left:5px;">${tg('7.12')}<b>Nº prontuário *</b><div class="fi-val">${so(paciente.prontuario && paciente.prontuario !== '—' ? paciente.prontuario : '')}</div></div>
+          <div style="width:26%;border-left:1px solid #000;padding-left:5px;">${tg('7.13')}<b>Nº cartão SUS</b><div class="fi-val">${so(paciente.sus && paciente.sus !== '—' ? paciente.sus : '')}</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="fi-sec">
+      <div class="fi-vert"><span style="font-size:10px;">Tipo de Reação</span></div>
+      <div class="fi-body" style="display:flex;">
+        <div style="width:17%;padding:3px 5px;border-right:1px solid #000;">${tg('8')}<b>Tipo de Reação *</b>
+          <div style="display:flex;flex-direction:column;gap:12px;margin:14px 0 0 8px;">${cb(r.tipo_reacao === 'Imediata','Imediata')}${cb(r.tipo_reacao === 'Tardia','Tardia')}</div></div>
+        <div style="flex:1;padding:3px 5px;border-right:1px solid #000;">${tg('8.1')}<b>Reações imediatas *</b>
+          <div style="display:flex;gap:8px;margin-top:2px;">
+            <div class="fi-col">${FI_REACOES_IMEDIATAS.slice(0,5).map(x=>cb(ri.includes(x.toLowerCase()), x)).join('')}</div>
+            <div class="fi-col">${FI_REACOES_IMEDIATAS.slice(5).map(x=>cb(ri.includes(x.toLowerCase()), x)).join('')}</div>
+          </div></div>
+        <div style="width:31%;padding:3px 5px;">${tg('8.2')}<b>(ou) Reações tardias *</b>
+          <div class="fi-col" style="margin-top:2px;">${FI_REACOES_TARDIAS.map(x=>cb(rt.includes(x.toLowerCase()), x)).join('')}</div></div>
+      </div>
+    </div>
+
+    <div class="fi-sign">
+      <div><div class="line"></div>${so(r.responsavel)}<br>Responsável pela notificação</div>
+      <div><div class="line"></div>${so(r.medico)}<br>Médico responsável</div>
+    </div>
+    <div class="fi-cod">F.CQ.403 — Revisão 03</div>
   </div>`;
 }
 
