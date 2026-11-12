@@ -421,3 +421,24 @@ create table if not exists bpa_tecnicos (
 alter table bpa_tecnicos enable row level security;
 drop policy if exists "allow all - bpa_tecnicos" on bpa_tecnicos;
 create policy "allow all - bpa_tecnicos" on bpa_tecnicos for all using (true) with check (true);
+
+-- ==========================================================
+-- Evolução médica (texto livre) — página Evoluções do paciente
+-- ==========================================================
+create table if not exists evolucoes_medicas (
+  id uuid primary key default gen_random_uuid(),
+  paciente_id uuid references pacientes(id) on delete cascade,
+  paciente_nome text,
+  data_hora timestamptz not null default now(),
+  tipo text default 'Evolução',
+  texto text not null,
+  medico text,
+  medico_crm text,
+  usuario_login text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+create index if not exists evolucoes_medicas_paciente_idx on evolucoes_medicas (paciente_id, data_hora desc);
+alter table evolucoes_medicas enable row level security;
+drop policy if exists "allow all - evolucoes_medicas" on evolucoes_medicas;
+create policy "allow all - evolucoes_medicas" on evolucoes_medicas for all using (true) with check (true);

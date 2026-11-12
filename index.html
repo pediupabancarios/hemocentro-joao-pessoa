@@ -1588,6 +1588,28 @@
   </div>
 </div>
 
+<!-- Evolução médica (texto livre) -->
+<div class="modal-overlay" id="modal-evolucao">
+  <div class="modal" style="max-width:760px;">
+    <div class="modal-head"><h3 id="modal-evolucao-title">Nova Evolução Médica</h3><button class="close" onclick="closeModal('modal-evolucao')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field full"><label>Paciente</label><input type="text" id="ev-paciente-display" disabled></div>
+        <div class="form-field"><label>Data e hora</label><input type="datetime-local" id="ev-data"></div>
+        <div class="form-field"><label>Tipo</label>
+          <select id="ev-tipo"><option>Evolução</option><option>Consulta</option><option>Retorno</option><option>Intercorrência</option></select>
+        </div>
+        <div class="form-field full"><label>Evolução</label><textarea id="ev-texto" style="min-height:280px;" placeholder="Escreva a evolução do paciente..."></textarea></div>
+        <div class="form-field full"><label>Médico</label><input type="text" id="ev-medico" disabled></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-secondary" onclick="closeModal('modal-evolucao')">Cancelar</button>
+      <button class="btn-primary" id="modal-evolucao-btn" onclick="salvarEvolucao()">Salvar Evolução</button>
+    </div>
+  </div>
+</div>
+
 <!-- Ficha de notificação e investigação de incidentes transfusionais (F.CQ.403) -->
 <div class="modal-overlay" id="modal-fichainc">
   <div class="modal" style="max-width:820px;">
@@ -1736,6 +1758,7 @@ let hemos = [
 
 let fichasInc = [];  // Fichas de notificação de incidente transfusional (F.CQ.403)
 let medsCeaf = [];   // Solicitações de Medicamento CEAF/LME
+let evolucoes = [];  // Evoluções médicas (texto livre)
 
 let pacientesList = []; // preenchida a partir do Supabase (ou fica vazia se não configurado)
 let currentPacienteId = null;
@@ -1925,6 +1948,7 @@ function aplicarMenuPorPerfil(){
   document.querySelectorAll('.nav-item[data-page="labexames"]').forEach(el=>{ if(!ehLab && tipo !== 'gestor') esconder(el); });
   // "Início" (blocos do laboratório) só para o laboratório
   document.querySelectorAll('.nav-item[data-page="labhome"]').forEach(el=>{ if(!ehLab) esconder(el); });
+  document.querySelectorAll('.nav-item[data-page="evolucoes"]').forEach(el=>{ if(!ehMedico && tipo !== 'gestor') esconder(el); });   // evolução médica: médico e gestor
   const ehEnf = tipo === 'enfermagem';
   document.querySelectorAll('.nav-item[data-page="enfdocs"]').forEach(el=>{ if(!ehEnf && tipo !== 'gestor') esconder(el); });   // documentos da enfermagem: enfermagem e gestor
   if(!ehLab && !ehEnf) return;
@@ -2016,7 +2040,7 @@ function rotularTabelas(){
 
 /* ================= NAVIGATION ================= */
 // Seções ainda sem tela própria — marcadas visualmente com "em breve"
-const PAGINAS_EM_BREVE = ['atendimentos','historico','alergias','evolucoes','transfusoes','exames','relatorios','config'];
+const PAGINAS_EM_BREVE = ['atendimentos','historico','alergias','transfusoes','exames','relatorios','config'];
 PAGINAS_EM_BREVE.forEach(p=>{
   document.querySelectorAll(`.nav-item[data-page="${p}"]`).forEach(el=>{
     el.classList.add('soon');
@@ -2184,6 +2208,8 @@ function renderPage(page){
     });
   } else if(page === 'medceaf'){
     main.innerHTML = fullListTemplate('Solicitação de Medicamentos (CEAF)','💊', medsCeafRows(), ['Data','Medicamentos','CID-10','Médico','Ações'], "abrirNovaMedCeaf()", '+ Nova Solicitação', '', podeCriarDocumentos());
+  } else if(page === 'evolucoes'){
+    main.innerHTML = podeVerEvolucoes() ? evolucoesTemplate() : placeholderTemplate('acesso_negado');
   } else if(page === 'incidentes'){
     main.innerHTML = fullListTemplate('Incidentes Transfusionais (F.CQ.403)','⚠️', fichasIncRows(), ['Data','Nº','Gravidade','Tipo de Reação','Responsável','Ações'], "abrirNovaFichaInc()", '+ Nova Notificação', '', podeCriarDocumentos());
   } else if(page === 'documentos'){
@@ -8273,6 +8299,174 @@ function templateFichaInc(r){
 function verFichaInc(i){ abrirDocumentoImpressao(printWindowShell(templateFichaInc(fichasInc[i]), 'Notificação de Incidente — ' + paciente.nome), false); }
 function imprimirFichaInc(i){ abrirDocumentoImpressao(printWindowShell(templateFichaInc(fichasInc[i]), 'Notificação de Incidente — ' + paciente.nome), true); }
 
+/* ================= EVOLUÇÃO MÉDICA (texto livre) ================= */
+let editingEvolucaoId = null;
+const EV_TIPOS = ['Evolução','Consulta','Retorno','Intercorrência'];
+
+function podeVerEvolucoes(){ return !currentUser || currentUser.tipo === 'medico' || currentUser.tipo === 'gestor'; }
+function podeEditarEvolucao(r){
+  if(!currentUser || currentUser.tipo === 'gestor') return true;
+  return currentUser.tipo === 'medico' && !!r.usuario_login && r.usuario_login === currentUser.login;
+}
+function evDataHoraBR(iso){
+  const d = new Date(iso);
+  if(isNaN(d)) return {data:'—', hora:''};
+  return {data: d.toLocaleDateString('pt-BR'), hora: d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})};
+}
+function evAgoraLocal(){
+  const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0,16);
+}
+function evParaInputLocal(iso){
+  const d = new Date(iso); if(isNaN(d)) return evAgoraLocal();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0,16);
+}
+function evOrdenar(){ evolucoes.sort((a,b)=> new Date(b.data_hora) - new Date(a.data_hora)); }
+
+function evolucoesRows(){
+  if(!evolucoes.length) return `<tr class="empty-row"><td colspan="5">Nenhuma evolução registrada.</td></tr>`;
+  return evolucoes.map((r,i)=>{
+    const dh = evDataHoraBR(r.data_hora);
+    const txt = String(r.texto || '');
+    const resumo = txt.length > 160 ? txt.slice(0,160) + '…' : txt;
+    return `
+    <tr>
+      <td style="white-space:nowrap;">${dh.data}<br><span style="font-size:11px;opacity:.7;">${dh.hora}</span></td>
+      <td>${escH(r.tipo || 'Evolução')}</td>
+      <td style="max-width:420px;white-space:pre-wrap;">${escH(resumo)}</td>
+      <td>${escH(r.medico || '—')}${r.medico_crm ? `<br><span style="font-size:11px;opacity:.7;">${escH(r.medico_crm)}</span>` : ''}</td>
+      <td class="row-actions">
+        <button title="Visualizar" onclick="verEvolucao(${i})">${ico('ver')}</button>
+        <button title="Imprimir" onclick="imprimirEvolucao(${i})">${ico('imprimir')}</button>
+        ${podeEditarEvolucao(r) ? `<button title="Editar" onclick="editarEvolucao(${i})">${ico('editar')}</button>` : ''}
+        ${podeEditarEvolucao(r) ? `<button class="danger" title="Excluir" onclick="excluirEvolucao(${i})">${ico('excluir')}</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function evolucoesTemplate(){
+  return `
+    <div class="panel" style="margin-top:4px;">
+      <div class="panel-head">
+        <h3>📝 EVOLUÇÕES MÉDICAS</h3>
+        <div style="display:flex;gap:8px;">
+          ${evolucoes.length > 1 ? `<button class="btn-secondary" onclick="imprimirTodasEvolucoes()">🖨 Imprimir todas</button>` : ''}
+          ${podeCriarDocumentos() ? `<button class="btn-new" onclick="abrirNovaEvolucao()">+ Nova Evolução</button>` : ''}
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Data / hora</th><th>Tipo</th><th>Evolução</th><th>Médico</th><th>Ações</th></tr></thead>
+        <tbody>${evolucoesRows()}</tbody>
+      </table>
+    </div>`;
+}
+
+function abrirNovaEvolucao(){
+  editingEvolucaoId = null;
+  document.getElementById('modal-evolucao-title').textContent = 'Nova Evolução Médica';
+  document.getElementById('modal-evolucao-btn').textContent = 'Salvar Evolução';
+  document.getElementById('ev-paciente-display').value = paciente.nome;
+  document.getElementById('ev-data').value = evAgoraLocal();
+  document.getElementById('ev-tipo').value = 'Evolução';
+  document.getElementById('ev-texto').value = '';
+  document.getElementById('ev-medico').value = currentUser ? currentUser.nome + (currentUser.crm ? ' — ' + currentUser.crm : '') : '';
+  openModal('modal-evolucao');
+}
+function editarEvolucao(i){
+  const r = evolucoes[i];
+  editingEvolucaoId = i;
+  document.getElementById('modal-evolucao-title').textContent = 'Editar Evolução Médica';
+  document.getElementById('modal-evolucao-btn').textContent = 'Salvar Alterações';
+  document.getElementById('ev-paciente-display').value = paciente.nome;
+  document.getElementById('ev-data').value = evParaInputLocal(r.data_hora);
+  document.getElementById('ev-tipo').value = r.tipo || 'Evolução';
+  document.getElementById('ev-texto').value = r.texto || '';
+  document.getElementById('ev-medico').value = (r.medico || '') + (r.medico_crm ? ' — ' + r.medico_crm : '');
+  openModal('modal-evolucao');
+}
+
+function salvarEvolucao(){
+  const texto = document.getElementById('ev-texto').value.trim();
+  if(!texto){ showToast('Escreva a evolução.'); return; }
+  const dtVal = document.getElementById('ev-data').value;
+  const dt = dtVal ? new Date(dtVal) : new Date();
+  if(isNaN(dt)){ showToast('Data e hora inválidas.'); return; }
+  const base = { data_hora: dt.toISOString(), tipo: document.getElementById('ev-tipo').value, texto };
+
+  if(editingEvolucaoId !== null){
+    const r = evolucoes[editingEvolucaoId];
+    Object.assign(r, base);
+    const id = r.id;
+    closeModal('modal-evolucao'); evOrdenar(); refreshTables();
+    if(supabaseConfigured && id){
+      supabaseClient.from('evolucoes_medicas').update({...base, updated_at:new Date().toISOString()}).eq('id', id).then(({error})=>{
+        showToast(error ? 'Erro ao salvar no Supabase.' : 'Evolução atualizada.');
+        if(error) console.error(error);
+      });
+    } else { showToast('Evolução atualizada nesta sessão.'); }
+    return;
+  }
+
+  const novo = {...base, medico: currentUser ? currentUser.nome : null, medico_crm: currentUser ? (currentUser.crm || null) : null, usuario_login: currentUser ? (currentUser.login || null) : null};
+  evolucoes.unshift(novo);
+  closeModal('modal-evolucao'); evOrdenar(); refreshTables();
+  if(supabaseConfigured){
+    supabaseClient.from('evolucoes_medicas').insert({...novo, paciente_id: currentPacienteId, paciente_nome: paciente.nome})
+      .select().then(({data:ins, error})=>{
+        if(!error && ins && ins[0]) novo.id = ins[0].id;
+        showToast(error ? 'Salvo localmente (falha no Supabase).' : 'Evolução salva.');
+        if(error) console.error(error);
+      });
+  } else { showToast('Evolução registrada (Supabase não configurado).'); }
+}
+
+function excluirEvolucao(i){
+  const r = evolucoes[i];
+  const dh = evDataHoraBR(r.data_hora);
+  if(!confirm(`Excluir a evolução de ${dh.data} ${dh.hora}? Essa ação não pode ser desfeita.`)) return;
+  evolucoes.splice(i,1); refreshTables();
+  if(supabaseConfigured && r.id){
+    supabaseClient.from('evolucoes_medicas').delete().eq('id', r.id).then(({error})=>{
+      showToast(error ? 'Erro ao excluir no Supabase.' : 'Evolução excluída.');
+      if(error) console.error(error);
+    });
+  } else { showToast('Evolução excluída desta sessão.'); }
+}
+
+function templateEvolucao(r){
+  const dh = evDataHoraBR(r.data_hora);
+  const v = x => (x && x !== '—') ? escH(x) : '—';
+  return `
+  <div class="rx-sheet">
+    <table class="doc-head">
+      <tr><td class="doc-head-logo"><img src="${LOGO_HEMOCENTRO}"></td>
+      <td class="doc-head-title" style="font-size:20px;font-weight:800;">Evolução médica</td></tr>
+    </table>
+    <div class="section-box"><div class="section-body">
+      <div class="field-row"><b>Paciente:</b> <span class="filled">${escH(paciente.nome)}</span></div>
+      <div class="field-row"><b>Nascimento:</b> <span class="filled">${v(paciente.nascimento)}</span> &nbsp; <b>Idade:</b> <span class="filled">${v(paciente.idade)}</span> &nbsp; <b>Sexo:</b> <span class="filled">${v(paciente.sexo)}</span></div>
+      <div class="field-row"><b>Prontuário:</b> <span class="filled">${v(paciente.prontuario)}</span> &nbsp; <b>Cartão SUS:</b> <span class="filled">${v(paciente.sus)}</span></div>
+    </div></div>
+    <div class="field-row"><b>Data e hora:</b> <span class="filled">${dh.data} ${dh.hora}</span> &nbsp; <b>Tipo:</b> <span class="filled">${escH(r.tipo || 'Evolução')}</span></div>
+    <div style="border:1px solid #000;padding:12px 14px;min-height:560px;font-size:13px;line-height:1.6;white-space:pre-wrap;">${escH(r.texto)}</div>
+    <div class="rx-footer">
+      <div class="rx-sign">
+        ${carimboMedicoHTML(r.medico, r.medico_crm)}
+        <div class="rx-sign-line"></div>
+        <div class="rx-sign-sub">Assinatura do médico</div>
+      </div>
+    </div>
+  </div>`;
+}
+function verEvolucao(i){ abrirDocumentoImpressao(printWindowShell(templateEvolucao(evolucoes[i]), 'Evolução médica — ' + paciente.nome), false); }
+function imprimirEvolucao(i){ abrirDocumentoImpressao(printWindowShell(templateEvolucao(evolucoes[i]), 'Evolução médica — ' + paciente.nome), true); }
+function imprimirTodasEvolucoes(){
+  const ordem = evolucoes.slice().sort((a,b)=> new Date(a.data_hora) - new Date(b.data_hora));   // da mais antiga para a mais nova
+  abrirDocumentoImpressao(printWindowShell(ordem.map(templateEvolucao).join('<div style="page-break-after:always;"></div>'), 'Evoluções médicas — ' + paciente.nome), true);
+}
+
 let editingPacienteId = null;
 
 function abrirNovoPaciente(){
@@ -8571,7 +8765,7 @@ async function initFromSupabase(){
 async function loadDocumentosDoPaciente(){
   if(!supabaseConfigured) return;
   if(!currentPacienteId){            // sem paciente ativo não carrega documentos de ninguém
-    receitas = []; labs = []; hemos = []; medsCeaf = []; fichasInc = []; anexosList = [];
+    receitas = []; labs = []; hemos = []; medsCeaf = []; fichasInc = []; anexosList = []; evolucoes = [];
     return;
   }
   try{
@@ -8580,6 +8774,7 @@ async function loadDocumentosDoPaciente(){
     let hemoQuery = supabaseClient.from('solicitacoes_hemocomponentes').select('*').order('created_at', {ascending:false});
     let medQuery = supabaseClient.from('solicitacoes_medicamento_ceaf').select('*').order('created_at', {ascending:false});
     let ficQuery = supabaseClient.from('fichas_incidente_transfusional').select('*').order('created_at', {ascending:false});
+    let evQuery = podeVerEvolucoes() ? supabaseClient.from('evolucoes_medicas').select('*').eq('paciente_id', currentPacienteId).order('data_hora', {ascending:false}) : Promise.resolve({data:[]});
     if(currentPacienteId){
       rxQuery = rxQuery.eq('paciente_id', currentPacienteId);
       labQuery = labQuery.eq('paciente_id', currentPacienteId);
@@ -8587,7 +8782,10 @@ async function loadDocumentosDoPaciente(){
       medQuery = medQuery.eq('paciente_id', currentPacienteId);
       ficQuery = ficQuery.eq('paciente_id', currentPacienteId);
     }
-    const [rxRes, labRes, hemoRes, medRes, ficRes] = await Promise.all([rxQuery, labQuery, hemoQuery, medQuery, ficQuery]);
+    const [rxRes, labRes, hemoRes, medRes, ficRes, evRes] = await Promise.all([rxQuery, labQuery, hemoQuery, medQuery, ficQuery, evQuery]);
+    if(evRes && evRes.data){
+      evolucoes = evRes.data.map(r=>({id:r.id, data_hora:r.data_hora, tipo:r.tipo, texto:r.texto, medico:r.medico, medico_crm:r.medico_crm, usuario_login:r.usuario_login}));
+    }
 
     if(rxRes.data){
       receitas = rxRes.data.map(r=>({
