@@ -963,28 +963,9 @@
           <label>Data</label>
           <input type="date" id="rx-data">
         </div>
-        <div class="form-field">
-          <label>Via de Administração</label>
-          <select id="rx-via">
-            <option value="">— (não informado)</option>
-            <option value="Oral">Oral</option>
-            <option value="EV">EV (Endovenosa)</option>
-            <option value="IM">IM (Intramuscular)</option>
-            <option value="SC">SC (Subcutânea)</option>
-            <option value="Inalatório">Inalatório</option>
-          </select>
-        </div>
         <div class="form-field full">
-          <label>Medicamento(s) — adicione quantos precisar</label>
-          <table class="param-table" id="rx-itens-tabela">
-            <thead><tr><th style="width:55%;">Medicamento</th><th>Posologia / Uso</th><th></th></tr></thead>
-            <tbody id="rx-itens-body"></tbody>
-          </table>
-          <button type="button" class="btn-secondary" style="margin-top:8px;" onclick="adicionarLinhaRxItem()">+ Adicionar medicamento</button>
-        </div>
-        <div class="form-field full">
-          <label>Prescrição completa (opcional — substitui a lista acima na impressão)</label>
-          <textarea id="rx-prescricao" placeholder="Deixe em branco para usar a lista de medicamentos acima, ou escreva aqui a prescrição na íntegra..."></textarea>
+          <label>Prescrição</label>
+          <textarea id="rx-prescricao" style="min-height:240px;" placeholder="Escreva a prescrição (medicamento, dose, posologia, quantidade)..."></textarea>
         </div>
         <div class="form-field full">
           <label>Médico assinante</label>
@@ -2197,7 +2178,7 @@ function renderPage(page){
       carregarUsuarios().then(()=>{ if(document.querySelector('.nav-item.active')?.dataset.page === 'usuarios') main.innerHTML = usuariosTemplate(); });
     }
   } else if(page === 'receitas'){
-    main.innerHTML = fullListTemplate('Receitas Médicas','📋', receitasRows(), ['Data','Medicamento','Uso','Médico','Ações'], "abrirNovaReceita()", '+ Nova Receita', 'receitas');
+    main.innerHTML = fullListTemplate('Receitas Médicas','📋', receitasRows(), ['Data','Prescrição','Médico','Ações'], "abrirNovaReceita()", '+ Nova Receita', 'receitas');
   } else if(page === 'laboratorios'){
     main.innerHTML = fullListTemplate('Solicitações de Laboratórios','🧪', labsRows(), ['Data','Exame Solicitado','Situação','Médico','Ações'], "abrirNovaSolicitacaoLab()", '+ Nova Solicitação', 'laboratorios', podeCriarLaboratorio());
   } else if(page === 'hemocomponentes'){
@@ -2357,7 +2338,7 @@ function resumoTemplate(){
         ${podeCriarDocumentos() ? `<button class="btn-new" onclick="abrirNovaReceita()">+ Nova Receita</button>` : ''}
       </div>
       <table>
-        <thead><tr><th>Data</th><th>Medicamento</th><th>Uso</th><th>Médico</th><th>Ações</th></tr></thead>
+        <thead><tr><th>Data</th><th>Prescrição</th><th>Médico</th><th>Ações</th></tr></thead>
         <tbody id="receitas-tbody">${receitasRows()}</tbody>
       </table>
       <div class="panel-foot" onclick="clickNav('receitas')">Ver todas as receitas →</div>
@@ -2396,10 +2377,10 @@ function trocarSubResumo(btn, sub){
 }
 
 function receitasRows(){
-  if(!receitas.length) return `<tr class="empty-row"><td colspan="5">Nenhuma receita registrada.</td></tr>`;
+  if(!receitas.length) return `<tr class="empty-row"><td colspan="4">Nenhuma receita registrada.</td></tr>`;
   return receitas.map((r,i)=>`
     <tr>
-      <td>${r.data}</td><td>${r.medicamento}</td><td>${r.uso}</td><td>${r.medico}</td>
+      <td>${r.data}</td><td style="white-space:pre-wrap;">${r.medicamento}</td><td>${r.medico}</td>
       <td class="row-actions">
         <button title="Visualizar modelo" onclick="verReceita(${i})">${ico('ver')}</button>
         <button title="Imprimir" onclick="imprimirReceita(${i})">${ico('imprimir')}</button>
@@ -7329,45 +7310,14 @@ let editingReceitaId = null;
 let editingLabId = null;
 let editingHemoId = null;
 
-/* Lista de medicamentos (várias linhas) dentro da receita */
-function adicionarLinhaRxItem(med, uso){
-  const body = document.getElementById('rx-itens-body');
-  const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td><input type="text" class="rx-item-med" value="${(med||'').replace(/"/g,'&quot;')}" placeholder="Ex.: Hidroxiureia 500 mg"></td>
-    <td><input type="text" class="rx-item-uso" value="${(uso||'').replace(/"/g,'&quot;')}" placeholder="Ex.: 1 comprimido ao dia"></td>
-    <td><button type="button" class="param-remove-btn" onclick="this.closest('tr').remove()">✕</button></td>
-  `;
-  body.appendChild(tr);
-}
-function renderRxItens(itens){
-  const body = document.getElementById('rx-itens-body');
-  body.innerHTML = '';
-  if(itens && itens.length) itens.forEach(it=>adicionarLinhaRxItem(it.medicamento, it.uso));
-  else adicionarLinhaRxItem('', '');
-}
-function coletarRxItens(){
-  return [...document.querySelectorAll('#rx-itens-body tr')].map(tr=>({
-    medicamento: tr.querySelector('.rx-item-med').value.trim(),
-    uso: tr.querySelector('.rx-item-uso').value.trim(),
-  })).filter(it=>it.medicamento);
-}
-function gerarPrescricaoAuto(itens, via){
-  const linhas = itens.map(it => it.medicamento + (it.uso ? ' — ' + it.uso : ''));
-  if(via) linhas.push('Via: ' + via);
-  return linhas.join('\n');
-}
-
 function abrirNovaReceita(){
   if(semPacienteAtivo()){ showToast('Escolha primeiro o paciente (Dados do Paciente ou a busca no topo).'); return; }
   editingReceitaId = null;
   document.getElementById('modal-receita-title').textContent = 'Nova Receita Médica';
   document.getElementById('modal-receita-btn').textContent = 'Salvar Receita';
-  document.getElementById('rx-via').value = '';
   document.getElementById('rx-prescricao').value = '';
   document.getElementById('rx-data').value = '';
   document.getElementById('rx-tipo').value = 'Receituário médico';
-  renderRxItens([]);
   openModal('modal-receita');
 }
 
@@ -7376,47 +7326,34 @@ function editarReceita(i){
   editingReceitaId = i;
   document.getElementById('modal-receita-title').textContent = 'Editar Receita Médica';
   document.getElementById('modal-receita-btn').textContent = 'Salvar Alterações';
-  document.getElementById('rx-via').value = r.via || '';
   document.getElementById('rx-tipo').value = r.tipo || 'Receituário médico';
-  let itens = [];
-  try{ itens = r.itens_json ? JSON.parse(r.itens_json) : []; }catch(e){ itens = []; }
-  if(!itens.length && r.medicamento){
-    itens = [{medicamento: r.medicamento, uso: r.uso === '—' ? '' : (r.uso || '')}];
-  }
-  renderRxItens(itens);
-  // só restaura o texto na caixa "Prescrição completa" se ele foi editado à mão
-  // (diferente do que a lista de medicamentos geraria sozinha)
-  const auto = gerarPrescricaoAuto(itens, r.via || '');
-  document.getElementById('rx-prescricao').value = (r.prescricao && r.prescricao.trim() !== auto.trim()) ? r.prescricao : '';
+  document.getElementById('rx-prescricao').value = r.prescricao || (r.medicamento ? r.medicamento + (r.uso && r.uso !== '—' ? ' — ' + r.uso : '') : '');
   openModal('modal-receita');
   document.getElementById('rx-medico').value = r.medico || '';
   document.getElementById('rx-medico').disabled = (currentUser && currentUser.tipo === 'medico');
 }
 
 function salvarReceita(){
-  const itens = coletarRxItens();
-  const via = document.getElementById('rx-via').value;
   const data = document.getElementById('rx-data').value;
   const tipo = document.getElementById('rx-tipo').value;
-  const prescricaoManual = document.getElementById('rx-prescricao').value.trim();
+  const prescricao = document.getElementById('rx-prescricao').value.trim();
   const medico = document.getElementById('rx-medico').value.trim();
-  if(!itens.length){ showToast('Informe ao menos um medicamento.'); return; }
+  if(!prescricao){ showToast('Escreva a prescrição.'); return; }
   if(!medico){ showToast('Informe o nome do médico solicitante.'); return; }
 
-  const medicamentoResumo = itens.map(i=>i.medicamento).join(', ');
-  const usoResumo = itens.length === 1 ? (itens[0].uso || '—') : (itens.map(i=>i.uso).filter(Boolean).join('; ') || '—');
-  const itensJson = JSON.stringify(itens);
-  const prescricaoFinal = prescricaoManual || gerarPrescricaoAuto(itens, via);
+  // resumo para a lista: as linhas da prescrição numa só, cortada em ~110 caracteres
+  const junto = prescricao.split('\n').map(l=>l.trim()).filter(Boolean).join(' · ');
+  const resumo = junto.length > 110 ? junto.slice(0,110) + '…' : junto;
 
   if(editingReceitaId !== null){
     const idx = editingReceitaId;
     const r = receitas[idx];
-    Object.assign(r, {medicamento:medicamentoResumo, uso: usoResumo, via, medico, tipo, prescricao: prescricaoFinal, itens_json: itensJson});
+    Object.assign(r, {medicamento:resumo, uso:'—', medico, tipo, prescricao});
     if(data) r.data = fmtDate(data);
     closeModal('modal-receita');
     refreshTables();
     if(supabaseConfigured && r.id){
-      supabaseClient.from('receitas').update({medicamento:medicamentoResumo, uso: usoResumo || null, via: via || null, medico, tipo, prescricao: prescricaoFinal, itens_json: itensJson}).eq('id', r.id).then(({error})=>{
+      supabaseClient.from('receitas').update({medicamento:resumo, uso:null, medico, tipo, prescricao}).eq('id', r.id).then(({error})=>{
         showToast(error ? 'Erro ao salvar alterações no Supabase.' : 'Receita atualizada com sucesso.');
         if(error) console.error(error);
       });
@@ -7426,10 +7363,7 @@ function salvarReceita(){
     return;
   }
 
-  const novaReceita = {
-    data:fmtDate(data), medicamento:medicamentoResumo, uso: usoResumo, via, medico:medico,
-    tipo:tipo, prescricao: prescricaoFinal, itens_json: itensJson
-  };
+  const novaReceita = { data:fmtDate(data), medicamento:resumo, uso:'—', via:'', medico, tipo, prescricao };
   receitas.unshift(novaReceita);
   closeModal('modal-receita');
   refreshTables();
@@ -7437,8 +7371,8 @@ function salvarReceita(){
   if(supabaseConfigured){
     supabaseClient.from('receitas').insert({
       data: data || new Date().toISOString().slice(0,10),
-      tipo: tipo, medicamento: medicamentoResumo, uso: usoResumo || null, via: via || null, itens_json: itensJson,
-      prescricao: novaReceita.prescricao, medico: medico,
+      tipo, medicamento: resumo, uso: null, via: null, itens_json: null,
+      prescricao, medico,
       paciente_id: currentPacienteId, paciente_nome: paciente.nome
     }).select().then(({data:inserted, error})=>{
       if(!error && inserted && inserted[0]) novaReceita.id = inserted[0].id;
@@ -9063,8 +8997,8 @@ function datasetExport(tipo){
   if(tipo === 'receitas'){
     return {
       titulo: `Receitas Médicas — ${paciente.nome}`,
-      cols: ['Data','Tipo','Medicamento','Uso','Via','Médico'],
-      rows: receitas.map(r=>[r.data, r.tipo, r.medicamento, r.uso, r.via, r.medico])
+      cols: ['Data','Tipo','Prescrição','Médico'],
+      rows: receitas.map(r=>[r.data, r.tipo, r.prescricao || r.medicamento, r.medico])
     };
   }
   if(tipo === 'laboratorios'){
