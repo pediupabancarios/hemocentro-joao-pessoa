@@ -2445,47 +2445,68 @@ function templateReceituarioMedico(r){
 }
 
 function templateControleEspecial(r){
-  const prescTexto = (r.prescricao || (r.medicamento + (r.uso && r.uso !== '—' ? ' — ' + r.uso : ''))).replace(/\n/g,'<br>');
+  // Modelo F.CP.107.05: A4 paisagem, duas cópias iguais lado a lado (1ª via farmácia / 2ª via paciente)
+  const txt = String(r.prescricao || (r.medicamento + (r.uso && r.uso !== '—' ? ' — ' + r.uso : '')));
+  const linhasPresc = txt.split('\n');
+  while(linhasPresc.length < 8) linhasPresc.push('');
+  const endereco = (paciente.endereco && paciente.endereco !== '—') ? paciente.endereco : '';
+  const copia = `
+    <div class="cex-half">
+      <img src="${LOGO_HEMOCENTRO}" class="cex-logo">
+      <div class="cex-title">RECEITUÁRIO CONTROLE ESPECIAL</div>
+      <table class="cex-head"><tr>
+        <td class="cex-info"><b>HEMOCENTRO COORDENADOR DA PARAÍBA</b><br>Av: Dom Pedro II, 1548, Jaguaribe, João Pessoa-PB<br>E-MAIL: hemocentrodaparaiba@yahoo.com.br<br>Fone: (83) 3133-3463</td>
+        <td class="cex-vias">1ª Via – FARMÁCIA<br>2ª Via - PACIENTE</td>
+      </tr></table>
+      <div class="cex-line">Paciente: <b>${escH(paciente.nome)}</b></div>
+      <div class="cex-line">Endereço: <b>${escH(endereco)}</b></div>
+      <div class="cex-presc-label">Prescrição:</div>
+      ${linhasPresc.map(l=>`<div class="cex-presc">${escH(l) || '&nbsp;'}</div>`).join('')}
+      <div class="cex-datesign">Data: <b>${escH(r.data)}</b> &nbsp;&nbsp; Assinatura do Médico: <b>${escH(r.medico)}</b></div>
+      <div class="cex-grid">
+        <div class="cex-box">
+          <div class="cex-box-title">IDENTIFICAÇÃO DO FORNECEDOR</div>
+          <div class="cex-sp"></div>
+          <div class="cex-uline"></div>
+          <div class="cex-small"><b>ASSINATURA DO FARMACÊUTICO</b></div>
+          <div class="cex-small"><b>DATA:</b> ____/____/____</div>
+        </div>
+        <div class="cex-box">
+          <div class="cex-box-title">IDENTIFICAÇÃO DO COMPRADOR</div>
+          <div class="cex-small"><b>NOME:</b> ______________________________</div>
+          <div class="cex-small"><b>RG:</b> _________________________________</div>
+          <div class="cex-small"><b>ENDEREÇO:</b> ___________________________</div>
+          <div class="cex-small"><b>CIDADE:</b> ______________________________</div>
+          <div class="cex-small"><b>UF:</b> ______ <b>FONE:</b> ______________</div>
+        </div>
+      </div>
+      <div class="cex-code">F.CP.107.05.06</div>
+    </div>`;
   return `
-  <div class="rx-sheet ce">
-    <div class="ce-title">RECEITUÁRIO CONTROLE ESPECIAL</div>
-    <table class="ce-head">
-      <tr>
-        <td class="ce-head-info">
-          <b>HEMOCENTRO COORDENADOR DA PARAÍBA</b><br>
-          Av: Dom Pedro II, 1548, Jaguaribe, João Pessoa-PB<br>
-          E-MAIL: hemocentrodaparaiba@yahoo.com.br &nbsp; Fone: (83) 3133-3463
-        </td>
-        <td class="ce-head-vias">1ª Via – FARMÁCIA<br>2ª Via - PACIENTE</td>
-      </tr>
-    </table>
-
-    <div class="ce-line">Paciente: <span class="filled">${paciente.nome}</span></div>
-    <div class="ce-line">Endereço: <span class="filled">${paciente.endereco}</span></div>
-
-    <div class="ce-presc-label">Prescrição: <span class="filled">${prescTexto}</span></div>
-    <div class="ce-presc-lines"><div></div><div></div><div></div><div></div><div></div></div>
-
-    <div class="ce-datesign">
-      Data: <span class="filled">${r.data}</span> &nbsp;&nbsp;&nbsp; Assinatura do Médico: <span class="filled">${r.medico}</span>
-    </div>
-
-    <div class="ce-grid">
-      <div class="ce-col">
-        <div class="ce-col-title">IDENTIFICAÇÃO DO FORNECEDOR</div>
-        <div class="ce-blank-line"></div>
-        <div class="ce-small">ASSINATURA DO FARMACÊUTICO</div>
-        <div class="ce-small">DATA: ____/____/____</div>
-      </div>
-      <div class="ce-col">
-        <div class="ce-col-title">IDENTIFICAÇÃO DO COMPRADOR</div>
-        <div class="ce-small">NOME: ______________________________</div>
-        <div class="ce-small">RG: _________________________________</div>
-        <div class="ce-small">ENDEREÇO: ___________________________</div>
-        <div class="ce-small">CIDADE: __________________ UF: ____ FONE: ______________</div>
-      </div>
-    </div>
-    <div class="ce-code">F.CP.107.05.03</div>
+  <div class="rx-sheet cex">
+    <style>
+      @page{ size:A4 landscape; margin:10mm 14mm 9mm 15mm; }
+      .cex{padding:0;}
+      .cex-cols{display:grid;grid-template-columns:1fr 1fr;column-gap:12.5mm;}
+      .cex-half{min-width:0;font-size:11px;}
+      .cex-logo{height:38px;display:block;margin-bottom:4px;}
+      .cex-title{text-align:center;font-weight:800;font-size:14px;margin:2px 0 8px;}
+      .cex-head{width:100%;border-collapse:collapse;margin-bottom:10px;}
+      .cex-head td{border:1.5px solid #000;padding:6px 8px;font-size:10px;line-height:1.5;vertical-align:top;}
+      .cex-vias{width:30%;font-size:10px;}
+      .cex-line{font-size:11.5px;margin:9px 0;border-bottom:1px solid #000;padding-bottom:2px;}
+      .cex-presc-label{font-size:11.5px;margin-top:10px;}
+      .cex-presc{border-bottom:1px solid #000;min-height:24px;line-height:24px;font-size:12px;font-weight:700;}
+      .cex-datesign{font-size:11px;margin:12px 0 12px;}
+      .cex-grid{display:grid;grid-template-columns:1fr 1fr;column-gap:10px;}
+      .cex-box{border:1.5px solid #000;padding:5px 7px 8px;}
+      .cex-box-title{font-weight:800;font-size:9.5px;text-align:center;margin-bottom:6px;}
+      .cex-sp{height:16px;}
+      .cex-uline{border-top:1px solid #000;width:90%;margin-bottom:3px;}
+      .cex-small{font-size:9.5px;margin-bottom:6px;white-space:nowrap;overflow:hidden;}
+      .cex-code{font-size:9px;text-align:right;margin-top:6px;}
+    </style>
+    <div class="cex-cols">${copia}${copia}</div>
   </div>`;
 }
 
