@@ -442,3 +442,23 @@ create index if not exists evolucoes_medicas_paciente_idx on evolucoes_medicas (
 alter table evolucoes_medicas enable row level security;
 drop policy if exists "allow all - evolucoes_medicas" on evolucoes_medicas;
 create policy "allow all - evolucoes_medicas" on evolucoes_medicas for all using (true) with check (true);
+
+-- ==========================================================
+-- Termo para Transfusão de Heterogrupo (F.CP.107.10)
+-- ==========================================================
+create table if not exists termos_heterogrupo (
+  id uuid primary key default gen_random_uuid(),
+  paciente_id uuid references pacientes(id) on delete cascade,
+  paciente_nome text,
+  data date default current_date,
+  gs_paciente text,
+  gs_transfundido text,
+  hemocomponente text,
+  medico text,
+  medico_crm text,
+  usuario_login text,
+  created_at timestamptz default now()
+);
+alter table termos_heterogrupo enable row level security;
+drop policy if exists "allow all - termos_heterogrupo" on termos_heterogrupo;
+create policy "allow all - termos_heterogrupo" on termos_heterogrupo for all using (true) with check (true);

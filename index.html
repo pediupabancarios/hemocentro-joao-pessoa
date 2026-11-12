@@ -1588,6 +1588,27 @@
   </div>
 </div>
 
+<!-- Termo para Transfusão de Heterogrupo (F.CP.107.10) -->
+<div class="modal-overlay" id="modal-termohetero">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-head"><h3 id="modal-termohetero-title">Termo para Transfusão de Heterogrupo</h3><button class="close" onclick="closeModal('modal-termohetero')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field full"><label>Paciente</label><input type="text" id="th-paciente-display" disabled></div>
+        <div class="form-field"><label>GS/Rh do paciente</label><input type="text" id="th-gs-paciente" placeholder="Ex.: A Rh+"></div>
+        <div class="form-field"><label>GS/Rh a transfundir</label><input type="text" id="th-gs-transf" placeholder="Ex.: O Rh+"></div>
+        <div class="form-field full"><label>Hemocomponente</label><input type="text" id="th-hemocomponente" list="th-hemo-lista" placeholder="Ex.: Concentrado de hemácias"><datalist id="th-hemo-lista"></datalist></div>
+        <div class="form-field"><label>Data</label><input type="date" id="th-data"></div>
+        <div class="form-field"><label>Médico</label><input type="text" id="th-medico" disabled></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-secondary" onclick="closeModal('modal-termohetero')">Cancelar</button>
+      <button class="btn-primary" id="modal-termohetero-btn" onclick="salvarTermoHetero()">Salvar Termo</button>
+    </div>
+  </div>
+</div>
+
 <!-- Evolução médica (texto livre) -->
 <div class="modal-overlay" id="modal-evolucao">
   <div class="modal" style="max-width:760px;">
@@ -1759,6 +1780,7 @@ let hemos = [
 let fichasInc = [];  // Fichas de notificação de incidente transfusional (F.CQ.403)
 let medsCeaf = [];   // Solicitações de Medicamento CEAF/LME
 let evolucoes = [];  // Evoluções médicas (texto livre)
+let termosHetero = [];  // Termos de transfusão de heterogrupo (F.CP.107.10)
 
 let pacientesList = []; // preenchida a partir do Supabase (ou fica vazia se não configurado)
 let currentPacienteId = null;
@@ -4896,13 +4918,14 @@ function documentosTemplate(){
     ...receitas.map((r,i)=>({...r, _tipo:'receita', _idx:i, _label:r.tipo, _icon:'📋', _resumo:r.medicamento})),
     ...labs.map((r,i)=>({...r, _tipo:'exame', _idx:i, _label:'Solicitação de Exames', _icon:'🧪', _resumo:r.exame})),
     ...hemos.map((r,i)=>({...r, _tipo:'hemo', _idx:i, _label:'Solicitação de Hemocomponentes', _icon:'🩸', _resumo:r.tipo})),
+    ...termosHetero.map((r,i)=>({...r, _tipo:'termo', _idx:i, _label:'Termo de Transfusão de Heterogrupo', _icon:'🔁', _resumo:`${r.hemocomponente} (${r.gs_paciente} → ${r.gs_transfundido})`})),
   ].sort((a,b)=> brDateToSortable(b.data).localeCompare(brDateToSortable(a.data)));
 
   const rows = todos.length ? todos.map(d=>{
-    const verFn = d._tipo==='receita' ? `verReceita(${d._idx})` : d._tipo==='exame' ? `verLab(${d._idx})` : `verHemo(${d._idx})`;
-    const imprimirFn = d._tipo==='receita' ? `imprimirReceita(${d._idx})` : d._tipo==='exame' ? `imprimirLab(${d._idx})` : `imprimirHemo(${d._idx})`;
-    const editarFn = d._tipo==='receita' ? `editarReceita(${d._idx})` : d._tipo==='exame' ? `editarLab(${d._idx})` : `editarHemo(${d._idx})`;
-    const excluirFn = d._tipo==='receita' ? `excluirReceita(${d._idx})` : d._tipo==='exame' ? `excluirLab(${d._idx})` : `excluirHemo(${d._idx})`;
+    const verFn = d._tipo==='receita' ? `verReceita(${d._idx})` : d._tipo==='exame' ? `verLab(${d._idx})` : d._tipo==='termo' ? `verTermoHetero(${d._idx})` : `verHemo(${d._idx})`;
+    const imprimirFn = d._tipo==='receita' ? `imprimirReceita(${d._idx})` : d._tipo==='exame' ? `imprimirLab(${d._idx})` : d._tipo==='termo' ? `imprimirTermoHetero(${d._idx})` : `imprimirHemo(${d._idx})`;
+    const editarFn = d._tipo==='receita' ? `editarReceita(${d._idx})` : d._tipo==='exame' ? `editarLab(${d._idx})` : d._tipo==='termo' ? `editarTermoHetero(${d._idx})` : `editarHemo(${d._idx})`;
+    const excluirFn = d._tipo==='receita' ? `excluirReceita(${d._idx})` : d._tipo==='exame' ? `excluirLab(${d._idx})` : d._tipo==='termo' ? `excluirTermoHetero(${d._idx})` : `excluirHemo(${d._idx})`;
     const bpaBtn = (d._tipo==='exame' && podeImprimirBPA()) ? `<button title="Imprimir BPA-1" onclick="imprimirBPA(${d._idx})">${ico('bpa')}</button>` : '';
     const resultadoBtn = d._tipo==='exame' && podeRegistrarResultado() ? `<button title="${d.resultado ? 'Editar resultado' : 'Registrar resultado'}" onclick="abrirRegistrarResultado(${d._idx})">${ico('resultado')}</button>` : '';
     const verResultadoBtn = d._tipo==='exame' && d.resultado ? `<button title="Ver / Imprimir resultado" onclick="imprimirResultadoExame(${d._idx})">${ico('verresultado')}</button>` : '';
@@ -4928,6 +4951,7 @@ function documentosTemplate(){
   <div class="panel" style="margin-top:4px;">
     <div class="panel-head">
       <h3>📄 DOCUMENTOS — ${paciente.nome}</h3>
+      ${podeCriarDocumentos() ? `<button class="btn-new" onclick="abrirNovoTermoHetero()">+ Termo de Heterogrupo</button>` : ''}
     </div>
     <table>
       <thead><tr><th>Data</th><th>Tipo de Documento</th><th>Resumo</th><th>Médico</th><th>Ações</th></tr></thead>
@@ -8343,6 +8367,125 @@ function templateFichaInc(r){
 function verFichaInc(i){ abrirDocumentoImpressao(printWindowShell(templateFichaInc(fichasInc[i]), 'Notificação de Incidente — ' + paciente.nome), false); }
 function imprimirFichaInc(i){ abrirDocumentoImpressao(printWindowShell(templateFichaInc(fichasInc[i]), 'Notificação de Incidente — ' + paciente.nome), true); }
 
+/* ================= TERMO PARA TRANSFUSÃO DE HETEROGRUPO (F.CP.107.10) ================= */
+let editingTermoHeteroId = null;
+
+function abrirNovoTermoHetero(){
+  editingTermoHeteroId = null;
+  document.getElementById('modal-termohetero-title').textContent = 'Termo para Transfusão de Heterogrupo';
+  document.getElementById('modal-termohetero-btn').textContent = 'Salvar Termo';
+  document.getElementById('th-paciente-display').value = paciente.nome;
+  document.getElementById('th-data').value = new Date().toISOString().slice(0,10);
+  document.getElementById('th-gs-paciente').value = (paciente.tipoSanguineo && paciente.tipoSanguineo !== '—') ? paciente.tipoSanguineo : '';
+  document.getElementById('th-gs-transf').value = '';
+  document.getElementById('th-hemocomponente').value = '';
+  document.getElementById('th-medico').value = currentUser ? currentUser.nome + (currentUser.crm ? ' — ' + currentUser.crm : '') : '';
+  document.getElementById('th-hemo-lista').innerHTML = Object.entries(FI_HEMO_TIPOS_LEGENDA).filter(([k])=>k !== 'Outro').map(([,nome])=>`<option value="${nome}">`).join('');
+  openModal('modal-termohetero');
+}
+function editarTermoHetero(i){
+  const r = termosHetero[i];
+  editingTermoHeteroId = i;
+  document.getElementById('modal-termohetero-title').textContent = 'Editar Termo de Heterogrupo';
+  document.getElementById('modal-termohetero-btn').textContent = 'Salvar Alterações';
+  document.getElementById('th-paciente-display').value = paciente.nome;
+  document.getElementById('th-data').value = r.data_iso || '';
+  document.getElementById('th-gs-paciente').value = r.gs_paciente || '';
+  document.getElementById('th-gs-transf').value = r.gs_transfundido || '';
+  document.getElementById('th-hemocomponente').value = r.hemocomponente || '';
+  document.getElementById('th-medico').value = (r.medico || '') + (r.medico_crm ? ' — ' + r.medico_crm : '');
+  document.getElementById('th-hemo-lista').innerHTML = Object.entries(FI_HEMO_TIPOS_LEGENDA).filter(([k])=>k !== 'Outro').map(([,nome])=>`<option value="${nome}">`).join('');
+  openModal('modal-termohetero');
+}
+
+function salvarTermoHetero(){
+  const gsP = document.getElementById('th-gs-paciente').value.trim();
+  const gsT = document.getElementById('th-gs-transf').value.trim();
+  const hemo = document.getElementById('th-hemocomponente').value.trim();
+  if(!gsP || !gsT || !hemo){ showToast('Informe o GS/Rh do paciente, o GS/Rh a transfundir e o hemocomponente.'); return; }
+  const dataISO = document.getElementById('th-data').value || new Date().toISOString().slice(0,10);
+  const reg = { data: dataISO, gs_paciente: gsP, gs_transfundido: gsT, hemocomponente: hemo };
+  const local = { data: isoToBR(dataISO), data_iso: dataISO, gs_paciente: gsP, gs_transfundido: gsT, hemocomponente: hemo };
+
+  if(editingTermoHeteroId !== null){
+    const r = termosHetero[editingTermoHeteroId];
+    Object.assign(r, local);
+    closeModal('modal-termohetero'); refreshTables();
+    if(supabaseConfigured && r.id){
+      supabaseClient.from('termos_heterogrupo').update(reg).eq('id', r.id).then(({error})=>{
+        showToast(error ? 'Erro ao salvar no Supabase.' : 'Termo atualizado.');
+        if(error) console.error(error);
+      });
+    } else { showToast('Termo atualizado nesta sessão.'); }
+    return;
+  }
+
+  const novo = {...local, medico: currentUser ? currentUser.nome : null, medico_crm: currentUser ? (currentUser.crm || null) : null, usuario_login: currentUser ? (currentUser.login || null) : null};
+  termosHetero.unshift(novo);
+  closeModal('modal-termohetero'); refreshTables();
+  if(supabaseConfigured){
+    supabaseClient.from('termos_heterogrupo').insert({...reg, medico: novo.medico, medico_crm: novo.medico_crm, usuario_login: novo.usuario_login, paciente_id: currentPacienteId, paciente_nome: paciente.nome})
+      .select().then(({data:ins, error})=>{
+        if(!error && ins && ins[0]) novo.id = ins[0].id;
+        showToast(error ? 'Salvo localmente (falha no Supabase).' : 'Termo salvo.');
+        if(error) console.error(error);
+      });
+  } else { showToast('Termo registrado (Supabase não configurado).'); }
+}
+
+function excluirTermoHetero(i){
+  const r = termosHetero[i];
+  if(!confirm(`Excluir o termo de heterogrupo de ${r.data}? Essa ação não pode ser desfeita.`)) return;
+  termosHetero.splice(i,1); refreshTables();
+  if(supabaseConfigured && r.id){
+    supabaseClient.from('termos_heterogrupo').delete().eq('id', r.id).then(({error})=>{
+      showToast(error ? 'Erro ao excluir no Supabase.' : 'Termo excluído.');
+      if(error) console.error(error);
+    });
+  } else { showToast('Termo excluído desta sessão.'); }
+}
+
+function templateTermoHetero(r){
+  const MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  const [y,m,d] = (r.data_iso || new Date().toISOString().slice(0,10)).split('-');
+  const dataExtenso = `${parseInt(d,10)} de ${MESES[parseInt(m,10)-1]} de ${y}`;
+  const f = x => `<b style="border-bottom:1px solid #000;padding:0 4px;">${escH(x)}</b>`;
+  return `
+  <div class="rx-sheet th">
+    <style>
+      .th .doc-head{border:2px solid #000;}
+      .th .doc-head td{padding:6px 10px;}
+      .th .doc-head-title{font-size:19px;font-weight:800;}
+      .th .doc-head-logo img{height:64px;}
+      .th .doc-head-label{font-size:10px;font-weight:400;}
+      .th .doc-head-value{font-size:14px;}
+      .th-body{font-family:"Times New Roman",Times,serif;font-size:15px;color:#000;}
+      .th-titulo{text-align:center;font-weight:700;font-size:19px;margin:34px 0 70px;}
+      .th-texto{text-align:justify;line-height:1.7;}
+      .th-ass{margin:90px 0 0 40px;}
+      .th-linha{width:310px;border-top:1px solid #000;margin:70px 0 6px 190px;}
+      .th-medico{margin-left:190px;width:310px;text-align:center;}
+      .th-data{text-align:right;margin-top:90px;}
+    </style>
+    <table class="doc-head">
+      <tr><td class="doc-head-logo" rowspan="3"><img src="${LOGO_HEMOCENTRO}"></td>
+      <td class="doc-head-title" colspan="5">Termo para Transfusão de Heterogrupo</td></tr>
+      <tr><td class="doc-head-label">Processo</td><td class="doc-head-label">Área</td><td class="doc-head-label" style="text-align:center;">Código</td><td class="doc-head-label" style="text-align:center;">Revisão</td><td class="doc-head-label" style="text-align:center;">Paginação</td></tr>
+      <tr><td class="doc-head-value">Coordenação de Atendimento ao Paciente</td><td class="doc-head-value">Transfusão</td><td class="doc-head-value">F.CP.107.10</td><td class="doc-head-value">01</td><td class="doc-head-value">1 / 1</td></tr>
+    </table>
+    <div class="th-body">
+      <div class="th-titulo">TERMO PARA TRANSFUSÃO DE HETEROGRUPO</div>
+      <div class="th-texto">Autorizo o serviço de hemoterapia, Hemocentro Coordenador de João Pessoa, a fazer a transfusão no paciente ${f(paciente.nome)} de GS/Rh ${f(r.gs_paciente)} pelo GS/Rh ${f(r.gs_transfundido)}, o hemocomponente ${f(r.hemocomponente)} devido a necessidade de transfusão.</div>
+      <div class="th-ass">Assinatura, de acordo, para atendimento à solicitação</div>
+      <div class="th-linha"></div>
+      <div class="th-medico">${r.medico ? `<b>${escH(r.medico)}</b>${r.medico_crm ? `<br>Médico — ${escH(r.medico_crm)}` : '<br>Médico'}` : 'Médico'}</div>
+      <div class="th-data">João Pessoa, ${dataExtenso}.</div>
+    </div>
+  </div>`;
+}
+function verTermoHetero(i){ abrirDocumentoImpressao(printWindowShell(templateTermoHetero(termosHetero[i]), 'Termo de Heterogrupo — ' + paciente.nome), false); }
+function imprimirTermoHetero(i){ abrirDocumentoImpressao(printWindowShell(templateTermoHetero(termosHetero[i]), 'Termo de Heterogrupo — ' + paciente.nome), true); }
+
 /* ================= EVOLUÇÃO MÉDICA (texto livre) ================= */
 let editingEvolucaoId = null;
 const EV_TIPOS = ['Evolução','Consulta','Retorno','Intercorrência'];
@@ -8809,7 +8952,7 @@ async function initFromSupabase(){
 async function loadDocumentosDoPaciente(){
   if(!supabaseConfigured) return;
   if(!currentPacienteId){            // sem paciente ativo não carrega documentos de ninguém
-    receitas = []; labs = []; hemos = []; medsCeaf = []; fichasInc = []; anexosList = []; evolucoes = [];
+    receitas = []; labs = []; hemos = []; medsCeaf = []; fichasInc = []; anexosList = []; evolucoes = []; termosHetero = [];
     return;
   }
   try{
@@ -8826,7 +8969,11 @@ async function loadDocumentosDoPaciente(){
       medQuery = medQuery.eq('paciente_id', currentPacienteId);
       ficQuery = ficQuery.eq('paciente_id', currentPacienteId);
     }
-    const [rxRes, labRes, hemoRes, medRes, ficRes, evRes] = await Promise.all([rxQuery, labQuery, hemoQuery, medQuery, ficQuery, evQuery]);
+    const thQuery = supabaseClient.from('termos_heterogrupo').select('*').eq('paciente_id', currentPacienteId).order('created_at', {ascending:false});
+    const [rxRes, labRes, hemoRes, medRes, ficRes, evRes, thRes] = await Promise.all([rxQuery, labQuery, hemoQuery, medQuery, ficQuery, evQuery, thQuery]);
+    if(thRes && thRes.data){
+      termosHetero = thRes.data.map(r=>({id:r.id, data:isoToBR(r.data), data_iso:r.data, gs_paciente:r.gs_paciente, gs_transfundido:r.gs_transfundido, hemocomponente:r.hemocomponente, medico:r.medico, medico_crm:r.medico_crm, usuario_login:r.usuario_login}));
+    }
     if(evRes && evRes.data){
       evolucoes = evRes.data.map(r=>({id:r.id, data_hora:r.data_hora, tipo:r.tipo, texto:r.texto, medico:r.medico, medico_crm:r.medico_crm, usuario_login:r.usuario_login}));
     }
