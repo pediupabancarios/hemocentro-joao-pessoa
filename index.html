@@ -8338,12 +8338,21 @@ function backupTemplate(){
   <div class="panel" style="margin-top:4px;">
     <div class="panel-head"><h3>🧪 BACKUP DOS RESULTADOS DO LABORATÓRIO</h3></div>
     <div style="padding:18px 20px;line-height:1.6;">
-      <p style="margin:0 0 10px;">Baixa só os <b>exames que já têm resultado</b>: paciente, exame, datas, número de registro, responsável, o resultado em texto e <b>todos os valores</b> de cada campo (hemograma, coagulação, hemoglobinopatias…).</p>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
-        <button class="btn-new" id="backup-lab-xlsx" onclick="backupLabBaixar('xlsx')">📊 Baixar resultados em planilha (.xlsx)</button>
-        <button class="btn-secondary" id="backup-lab-json" onclick="backupLabBaixar('json')">💾 Baixar resultados completos (.json)</button>
+      <p style="margin:0 0 10px;"><b>Em PDF:</b> os laudos como são impressos (logo, dados do paciente, valores e assinatura), <b>um laudo por folha</b>, só dos exames que já têm resultado.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px;">
+        <label style="font-size:12.5px;display:flex;flex-direction:column;gap:3px;">Resultados liberados de <input type="date" id="backup-pdf-de"></label>
+        <label style="font-size:12.5px;display:flex;flex-direction:column;gap:3px;">até <input type="date" id="backup-pdf-ate"></label>
+        <button class="btn-new" id="backup-pdf-btn" onclick="backupLabPDF()">📄 Gerar PDF dos resultados</button>
       </div>
-      <div style="font-size:12.5px;opacity:.75;">A planilha tem 2 abas: <b>Resultados</b> (uma linha por exame) e <b>Valores detalhados</b> (um valor por linha). O .json guarda tudo como está no banco, para restaurar se precisar.</div>
+      <div style="font-size:12.5px;margin-bottom:12px;">Atalhos: <a href="#" onclick="backupPdfPeriodo('mes');return false;">este mês</a> · <a href="#" onclick="backupPdfPeriodo('mesant');return false;">mês passado</a> · <a href="#" onclick="backupPdfPeriodo('tudo');return false;">todos os períodos</a> (deixe as datas em branco)</div>
+      <div style="font-size:12.5px;opacity:.75;margin-bottom:14px;">Abre uma janela com os laudos. Clique em <b>Imprimir / Salvar PDF</b> e escolha <b>Salvar como PDF</b>. Para milhares de folhas, prefira um mês de cada vez.</div>
+      <div style="border-top:1px solid #e5e7eb;padding-top:12px;">
+        <div style="font-size:12.5px;margin-bottom:6px;"><b>Outros formatos</b> (dados, não laudos):</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+          <button class="btn-secondary" id="backup-lab-xlsx" onclick="backupLabBaixar('xlsx')">📊 Planilha (.xlsx)</button>
+          <button class="btn-secondary" id="backup-lab-json" onclick="backupLabBaixar('json')">💾 Completo (.json, para restaurar)</button>
+        </div>
+      </div>
     </div>
   </div>
   <div class="panel" style="margin-top:14px;">
@@ -8538,6 +8547,70 @@ async function backupLabBaixar(formato){
   }finally{
     backupLabRodando = false;
     ['backup-lab-xlsx','backup-lab-json'].forEach(id=>{ const b = document.getElementById(id); if(b) b.disabled = false; });
+  }
+}
+
+/* ---- Backup dos resultados do laboratório em PDF (laudos como são impressos) ---- */
+let backupPdfRodando = false;
+
+function backupPdfPeriodo(tipo){
+  const hoje = new Date(); const y = hoje.getFullYear(), m = hoje.getMonth();
+  const iso = d => isoLocal(d);
+  let de = '', ate = '';
+  if(tipo === 'mes'){ de = iso(new Date(y, m, 1)); ate = iso(new Date(y, m + 1, 0)); }
+  else if(tipo === 'mesant'){ de = iso(new Date(y, m - 1, 1)); ate = iso(new Date(y, m, 0)); }
+  document.getElementById('backup-pdf-de').value = de;
+  document.getElementById('backup-pdf-ate').value = ate;
+}
+
+async function backupLogoBlob(dataUri){
+  const resp = await fetch(dataUri);
+  return URL.createObjectURL(await resp.blob());
+}
+
+async function backupLabPDF(){
+  if(!currentUser || currentUser.tipo !== 'gestor'){ showToast('Só o gestor pode gerar o backup.'); return; }
+  if(!supabaseConfigured){ showToast('Banco de dados não configurado.'); return; }
+  if(backupPdfRodando || backupLabRodando || backupRodando) return;
+  const de = document.getElementById('backup-pdf-de').value, ate = document.getElementById('backup-pdf-ate').value;
+  if(de && ate && de > ate){ showToast('A data inicial está depois da final.'); return; }
+  backupPdfRodando = true;
+  const btn = document.getElementById('backup-pdf-btn'); if(btn) btn.disabled = true;
+  try{
+    backupStatus('<div style="font-size:13px;">Buscando os resultados…</div>');
+    await recarregarPacientes(true);
+    const exames = []; const passo = 1000;
+    for(let ini = 0; ; ini += passo){
+      let q = supabaseClient.from('solicitacoes_exames').select('*').not('resultado','is',null);
+      if(de) q = q.gte('data_resultado', de);
+      if(ate) q = q.lte('data_resultado', ate);
+      const { data, error } = await q.order('data_resultado', {ascending:true}).order('paciente_nome', {ascending:true}).order('id', {ascending:true}).range(ini, ini + passo - 1);
+      if(error) throw new Error(error.message);
+      exames.push(...data);
+      if(data.length < passo) break;
+    }
+    if(!exames.length){ backupStatus('<div style="font-size:13.5px;">Nenhum resultado liberado nesse período.</div>'); showToast('Nenhum resultado nesse período.'); return; }
+    if(exames.length > 150 && !confirm(`Serão ${exames.length} laudos. Pode demorar alguns minutos para abrir. Continuar?\n(Dica: escolha um mês de cada vez para ficar mais rápido.)`)) { backupStatus(''); return; }
+    backupStatus(`<div style="font-size:13px;">Montando ${exames.length} laudos…</div>`);
+    await new Promise(r=>setTimeout(r, 30));   // deixa a tela atualizar
+    let html = exames.map(filaLabFolhaResultado).join('<div class="page-break"></div>');
+    // as logos entram uma vez só (em vez de repetidas em cada laudo): o arquivo fica bem menor
+    html = html.split(LOGO_HEMOCENTRO).join(await backupLogoBlob(LOGO_HEMOCENTRO)).split(LOGO_GOVERNO_PB).join(await backupLogoBlob(LOGO_GOVERNO_PB));
+    const periodo = de || ate ? `${de ? isoToBR(de) : 'início'} a ${ate ? isoToBR(ate) : 'hoje'}` : 'todos os períodos';
+    const janela = abrirDocumentoImpressao(printWindowShell(html, `Backup — Resultados do laboratório — ${periodo} — ${exames.length} laudos`), false);
+    if(janela){
+      backupStatus(`<div style="font-size:13.5px;"><b>✔ ${exames.length} laudos prontos (${periodo}).</b><br>Na janela que abriu, clique em <b>Imprimir / Salvar PDF</b> e escolha <b>Salvar como PDF</b> como destino.</div>`);
+      try{ localStorage.setItem('backup_ultimo', new Date().toISOString()); }catch(e){}
+    } else {
+      backupStatus('<div style="color:#b00020;font-size:13.5px;">A janela foi bloqueada pelo navegador. Libere os pop-ups deste site e clique de novo.</div>');
+    }
+  }catch(e){
+    console.error(e);
+    backupStatus(`<div style="color:#b00020;font-size:13.5px;"><b>Não foi possível gerar o PDF.</b> ${escH(e.message || e)}</div>`);
+    showToast('Erro ao gerar o PDF.');
+  }finally{
+    backupPdfRodando = false;
+    if(btn) btn.disabled = false;
   }
 }
 
