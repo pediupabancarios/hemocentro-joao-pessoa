@@ -8336,7 +8336,18 @@ function backupTemplate(){
   const ult = backupUltimoTexto();
   return `
   <div class="panel" style="margin-top:4px;">
-    <div class="panel-head"><h3>💾 BACKUP COMPLETO</h3></div>
+    <div class="panel-head"><h3>🧪 BACKUP DOS RESULTADOS DO LABORATÓRIO</h3></div>
+    <div style="padding:18px 20px;line-height:1.6;">
+      <p style="margin:0 0 10px;">Baixa só os <b>exames que já têm resultado</b>: paciente, exame, datas, número de registro, responsável, o resultado em texto e <b>todos os valores</b> de cada campo (hemograma, coagulação, hemoglobinopatias…).</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+        <button class="btn-new" id="backup-lab-xlsx" onclick="backupLabBaixar('xlsx')">📊 Baixar resultados em planilha (.xlsx)</button>
+        <button class="btn-secondary" id="backup-lab-json" onclick="backupLabBaixar('json')">💾 Baixar resultados completos (.json)</button>
+      </div>
+      <div style="font-size:12.5px;opacity:.75;">A planilha tem 2 abas: <b>Resultados</b> (uma linha por exame) e <b>Valores detalhados</b> (um valor por linha). O .json guarda tudo como está no banco, para restaurar se precisar.</div>
+    </div>
+  </div>
+  <div class="panel" style="margin-top:14px;">
+    <div class="panel-head"><h3>💾 BACKUP COMPLETO DO SISTEMA</h3></div>
     <div style="padding:18px 20px;line-height:1.6;">
       <p style="margin:0 0 10px;">Baixa uma cópia de <b>todos os dados do prontuário</b>: pacientes, exames e resultados, receitas, hemocomponentes, medicamentos CEAF, incidentes, termos, evoluções, agendamentos e usuários.</p>
       <p style="margin:0 0 14px;font-size:13px;opacity:.8;">Fora do arquivo ficam as <b>senhas</b> dos usuários e o <b>conteúdo</b> dos arquivos anexados (fotos e PDFs): do anexo vem só o nome e o caminho. Os arquivos continuam guardados no Supabase.</p>
@@ -8438,6 +8449,95 @@ async function backupBaixar(formato){
   }finally{
     backupRodando = false;
     ['backup-btn-json','backup-btn-xlsx'].forEach(id=>{ const b = document.getElementById(id); if(b) b.disabled = false; });
+  }
+}
+
+/* ---- Backup só dos resultados do laboratório ---- */
+let backupLabRodando = false;
+
+// transforma o JSON de valores em linhas "campo → valor" (qualquer formato: modelo, tabela...)
+function backupAchatarValores(obj, caminho, saida){
+  if(obj === null || obj === undefined || obj === '') return;
+  if(Array.isArray(obj)){ obj.forEach((x,i)=>backupAchatarValores(x, caminho.concat(String(i+1)), saida)); return; }
+  if(typeof obj === 'object'){ Object.keys(obj).forEach(k=>backupAchatarValores(obj[k], caminho.concat(k), saida)); return; }
+  const campo = caminho.filter(c=>c !== 'modelos' && c !== 'valores').join(' › ');
+  if(campo && campo !== 'v') saida.push([campo, String(obj)]);   // ignora o número de versão do formato
+}
+
+async function backupLabColetar(){
+  backupStatus('<div style="font-size:13px;">Lendo os resultados do laboratório…</div>');
+  const exames = []; const passo = 1000;
+  for(let ini = 0; ; ini += passo){
+    const { data, error } = await supabaseClient.from('solicitacoes_exames').select('*').not('resultado','is',null).order('id',{ascending:true}).range(ini, ini + passo - 1);
+    if(error) throw new Error('Exames: ' + error.message);
+    exames.push(...data);
+    if(data.length < passo) break;
+  }
+  const { count, error: e2 } = await supabaseClient.from('solicitacoes_exames').select('id', {count:'exact', head:true}).not('resultado','is',null);
+  if(e2) throw new Error('Exames: ' + e2.message);
+  const pacs = {}; 
+  for(let ini = 0; ; ini += passo){
+    const { data, error } = await supabaseClient.from('pacientes').select('id,nome,prontuario,nascimento,sexo,sus,cpf').order('id',{ascending:true}).range(ini, ini + passo - 1);
+    if(error) throw new Error('Pacientes: ' + error.message);
+    data.forEach(p=>{ pacs[p.id] = p; });
+    if(data.length < passo) break;
+  }
+  const usados = {};
+  exames.forEach(e=>{ if(pacs[e.paciente_id]) usados[e.paciente_id] = pacs[e.paciente_id]; });   // só os pacientes que têm resultado
+  return { quando: new Date(), exames, pacs: usados, total: count, ok: count === exames.length };
+}
+
+async function backupLabBaixar(formato){
+  if(!currentUser || currentUser.tipo !== 'gestor'){ showToast('Só o gestor pode baixar o backup.'); return; }
+  if(!supabaseConfigured){ showToast('Banco de dados não configurado.'); return; }
+  if(backupLabRodando || backupRodando) return;
+  backupLabRodando = true;
+  ['backup-lab-xlsx','backup-lab-json'].forEach(id=>{ const b = document.getElementById(id); if(b) b.disabled = true; });
+  try{
+    const d = await backupLabColetar();
+    const p = n => String(n).padStart(2,'0'); const q = d.quando;
+    const carimbo = `${q.getFullYear()}-${p(q.getMonth()+1)}-${p(q.getDate())}_${p(q.getHours())}${p(q.getMinutes())}`;
+    const dataBR = iso => iso ? isoToBR(String(iso).slice(0,10)) : '';
+    if(formato === 'xlsx'){
+      const lista = d.exames.slice().sort((a,b)=> String(b.data_resultado || b.data || '').localeCompare(String(a.data_resultado || a.data || '')));
+      const resumo = lista.map(e=>{
+        const pc = d.pacs[e.paciente_id] || {};
+        return {
+          'Data do resultado': dataBR(e.data_resultado), 'Paciente': e.paciente_nome || pc.nome || '', 'Prontuário': pc.prontuario || '',
+          'Nascimento': pc.nascimento || '', 'Exame': e.exame || '', 'Categoria': e.categoria_laboratorio || '', 'Nº de registro': e.registro_numero || '',
+          'Resultado': String(e.resultado || '').slice(0,32000), 'Observações': String(e.observacoes_resultado || '').slice(0,32000),
+          'Responsável (laboratório)': e.responsavel_laboratorio || '', 'Registrado por': e.responsavel_registro || '',
+          'Médico solicitante': e.medico || '', 'CRM': e.medico_crm || '', 'Data da solicitação': dataBR(e.data), 'ID': e.id
+        };
+      });
+      const detalhe = [];
+      lista.forEach(e=>{
+        let obj = null; try{ obj = e.parametros_json ? JSON.parse(e.parametros_json) : null; }catch(err){ obj = null; }
+        const linhas = []; backupAchatarValores(obj, [], linhas);
+        linhas.forEach(([campo, valor])=>detalhe.push({'Data do resultado': dataBR(e.data_resultado), 'Paciente': e.paciente_nome || '', 'Exame': e.exame || '', 'Nº de registro': e.registro_numero || '', 'Campo': campo, 'Valor': valor.slice(0,32000)}));
+      });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumo.length ? resumo : [{}]), 'Resultados');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalhe.length ? detalhe : [{}]), 'Valores detalhados');
+      XLSX.writeFile(wb, `backup-resultados-laboratorio-${carimbo}.xlsx`);
+    } else {
+      const conteudo = {
+        sistema: 'Prontuário Eletrônico — Hemocentro João Pessoa', tipo: 'Resultados do laboratório',
+        gerado_em: q.toISOString(), gerado_por: currentUser.nome, total: d.exames.length,
+        pacientes: d.pacs, exames: d.exames
+      };
+      backupBaixarArquivo(new Blob([JSON.stringify(conteudo)], {type:'application/json'}), `backup-resultados-laboratorio-${carimbo}.json`);
+    }
+    try{ localStorage.setItem('backup_ultimo', new Date().toISOString()); }catch(e){}
+    backupStatus(`<div style="font-size:13.5px;"><b>${d.ok ? '✔ Backup dos resultados baixado e conferido.' : '⚠ Baixado, mas o banco tem ' + d.total + ' resultados e o arquivo ' + d.exames.length + '. Tente de novo.'}</b> ${d.exames.length} resultados de ${Object.keys(d.pacs).length} pacientes.</div>`);
+    showToast(d.ok ? 'Backup dos resultados baixado.' : 'Backup baixado — confira o aviso na tela.');
+  }catch(e){
+    console.error(e);
+    backupStatus(`<div style="color:#b00020;font-size:13.5px;"><b>Não foi possível concluir o backup.</b> ${escH(e.message || e)}<br>Nenhum arquivo foi gerado. Tente de novo.</div>`);
+    showToast('Erro ao gerar o backup.');
+  }finally{
+    backupLabRodando = false;
+    ['backup-lab-xlsx','backup-lab-json'].forEach(id=>{ const b = document.getElementById(id); if(b) b.disabled = false; });
   }
 }
 
