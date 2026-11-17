@@ -2691,13 +2691,16 @@ function printWindowShell(bodyHTML, title){
 /* Abre uma janela para visualizar/imprimir um documento.
    Protege contra bloqueio de pop-up e dispara a impressão de forma
    confiável — o evento 'load' pode já ter ocorrido quando registrado. */
-function abrirDocumentoImpressao(htmlCompleto, autoImprimir){
-  let w;
-  try{ w = window.open('', '_blank'); }catch(e){ w = null; }
+function abrirDocumentoImpressao(htmlCompleto, autoImprimir, janelaPronta){
+  let w = janelaPronta || null;
+  if(!w){
+    try{ w = window.open('', '_blank'); }catch(e){ w = null; }
+  }
   if(!w){
     showToast('Libere os pop-ups deste site no navegador para gerar o documento.');
     return null;
   }
+  if(janelaPronta) w.document.open();
   w.document.write(htmlCompleto);
   w.document.close();
   const esperarImagens = ()=>Promise.race([
@@ -8342,10 +8345,11 @@ function backupTemplate(){
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px;">
         <label style="font-size:12.5px;display:flex;flex-direction:column;gap:3px;">Resultados liberados de <input type="date" id="backup-pdf-de"></label>
         <label style="font-size:12.5px;display:flex;flex-direction:column;gap:3px;">até <input type="date" id="backup-pdf-ate"></label>
-        <button class="btn-new" id="backup-pdf-btn" onclick="backupLabPDF()">📄 Gerar PDF dos resultados</button>
+        <button class="btn-new" id="backup-pdf-arq-btn" onclick="backupLabPDFArquivo()">⬇️ Baixar PDF (arquivo direto)</button>
+        <button class="btn-secondary" id="backup-pdf-btn" onclick="backupLabPDF()">📄 Abrir para imprimir / salvar</button>
       </div>
       <div style="font-size:12.5px;margin-bottom:12px;">Atalhos: <a href="#" onclick="backupPdfPeriodo('mes');return false;">este mês</a> · <a href="#" onclick="backupPdfPeriodo('mesant');return false;">mês passado</a> · <a href="#" onclick="backupPdfPeriodo('tudo');return false;">todos os períodos</a> (deixe as datas em branco)</div>
-      <div style="font-size:12.5px;opacity:.75;margin-bottom:14px;">Abre uma janela com os laudos. Clique em <b>Imprimir / Salvar PDF</b> e escolha <b>Salvar como PDF</b>. Para milhares de folhas, prefira um mês de cada vez.</div>
+      <div style="font-size:12.5px;opacity:.75;margin-bottom:14px;"><b>Baixar PDF (arquivo direto)</b> salva na pasta Downloads, sem abrir janela, em arquivos de 30 laudos cada (uns 15 segundos por arquivo; para todos os 459 laudos são 16 arquivos, uns 4 minutos). <b>Abrir para imprimir / salvar</b> abre uma janela com todos os laudos juntos: nela, clique em Imprimir / Salvar PDF e escolha Salvar como PDF (precisa liberar pop-ups).</div>
       <div style="border-top:1px solid #e5e7eb;padding-top:12px;">
         <div style="font-size:12.5px;margin-bottom:6px;"><b>Outros formatos</b> (dados, não laudos):</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
@@ -8574,6 +8578,18 @@ async function backupLabPDF(){
   if(backupPdfRodando || backupLabRodando || backupRodando) return;
   const de = document.getElementById('backup-pdf-de').value, ate = document.getElementById('backup-pdf-ate').value;
   if(de && ate && de > ate){ showToast('A data inicial está depois da final.'); return; }
+  // a janela precisa abrir AQUI, no clique: depois de uma espera (busca no banco) o navegador bloqueia
+  let janela = null;
+  try{ janela = window.open('', '_blank'); }catch(e){ janela = null; }
+  if(!janela){
+    backupStatus('<div style="color:#b00020;font-size:13.5px;"><b>O navegador bloqueou a janela do PDF.</b> Libere os pop-ups deste site (ícone na barra de endereço) e clique de novo.</div>');
+    showToast('Libere os pop-ups para gerar o PDF.');
+    return;
+  }
+  try{
+    janela.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Preparando os laudos…</title></head><body style="font-family:Arial,Helvetica,sans-serif;padding:48px;color:#333;"><h2>Preparando os laudos…</h2><p>Aguarde, esta janela vai mostrar os laudos em instantes.</p></body></html>');
+    janela.document.close();
+  }catch(e){}
   backupPdfRodando = true;
   const btn = document.getElementById('backup-pdf-btn'); if(btn) btn.disabled = true;
   try{
@@ -8589,16 +8605,15 @@ async function backupLabPDF(){
       exames.push(...data);
       if(data.length < passo) break;
     }
-    if(!exames.length){ backupStatus('<div style="font-size:13.5px;">Nenhum resultado liberado nesse período.</div>'); showToast('Nenhum resultado nesse período.'); return; }
-    if(exames.length > 150 && !confirm(`Serão ${exames.length} laudos. Pode demorar alguns minutos para abrir. Continuar?\n(Dica: escolha um mês de cada vez para ficar mais rápido.)`)) { backupStatus(''); return; }
+    if(!exames.length){ try{ janela.close(); }catch(e){} backupStatus('<div style="font-size:13.5px;">Nenhum resultado liberado nesse período.</div>'); showToast('Nenhum resultado nesse período.'); return; }
     backupStatus(`<div style="font-size:13px;">Montando ${exames.length} laudos…</div>`);
     await new Promise(r=>setTimeout(r, 30));   // deixa a tela atualizar
     let html = exames.map(filaLabFolhaResultado).join('<div class="page-break"></div>');
     // as logos entram uma vez só (em vez de repetidas em cada laudo): o arquivo fica bem menor
     html = html.split(LOGO_HEMOCENTRO).join(await backupLogoBlob(LOGO_HEMOCENTRO)).split(LOGO_GOVERNO_PB).join(await backupLogoBlob(LOGO_GOVERNO_PB));
     const periodo = de || ate ? `${de ? isoToBR(de) : 'início'} a ${ate ? isoToBR(ate) : 'hoje'}` : 'todos os períodos';
-    const janela = abrirDocumentoImpressao(printWindowShell(html, `Backup — Resultados do laboratório — ${periodo} — ${exames.length} laudos`), false);
-    if(janela){
+    const aberta = abrirDocumentoImpressao(printWindowShell(html, `Backup — Resultados do laboratório — ${periodo} — ${exames.length} laudos`), false, janela);
+    if(aberta){
       backupStatus(`<div style="font-size:13.5px;"><b>✔ ${exames.length} laudos prontos (${periodo}).</b><br>Na janela que abriu, clique em <b>Imprimir / Salvar PDF</b> e escolha <b>Salvar como PDF</b> como destino.</div>`);
       try{ localStorage.setItem('backup_ultimo', new Date().toISOString()); }catch(e){}
     } else {
@@ -8606,10 +8621,66 @@ async function backupLabPDF(){
     }
   }catch(e){
     console.error(e);
+    try{ janela.close(); }catch(err){}
     backupStatus(`<div style="color:#b00020;font-size:13.5px;"><b>Não foi possível gerar o PDF.</b> ${escH(e.message || e)}</div>`);
     showToast('Erro ao gerar o PDF.');
   }finally{
     backupPdfRodando = false;
+    if(btn) btn.disabled = false;
+  }
+}
+
+/* ---- Backup dos resultados em PDF: arquivo baixado direto (sem janela de impressão), em partes ---- */
+const BACKUP_PDF_PARTE = 30;   // laudos por arquivo (cada laudo vira 1 ou 2 folhas)
+let backupPdfDiretoRodando = false;
+
+async function backupLabPDFArquivo(opts){
+  opts = opts || {};
+  if(!currentUser || currentUser.tipo !== 'gestor'){ showToast('Só o gestor pode gerar o backup.'); return; }
+  if(!supabaseConfigured){ showToast('Banco de dados não configurado.'); return; }
+  if(backupPdfDiretoRodando || backupPdfRodando || backupLabRodando || backupRodando) return;
+  const de = document.getElementById('backup-pdf-de').value, ate = document.getElementById('backup-pdf-ate').value;
+  if(de && ate && de > ate){ showToast('A data inicial está depois da final.'); return; }
+  backupPdfDiretoRodando = true;
+  const btn = document.getElementById('backup-pdf-arq-btn'); if(btn) btn.disabled = true;
+  const resultados = [];
+  try{
+    backupStatus('<div style="font-size:13px;">Buscando os resultados…</div>');
+    await recarregarPacientes(true);
+    let exames = []; const passo = 1000;
+    for(let ini = 0; ; ini += passo){
+      let q = supabaseClient.from('solicitacoes_exames').select('*').not('resultado','is',null);
+      if(de) q = q.gte('data_resultado', de);
+      if(ate) q = q.lte('data_resultado', ate);
+      const { data, error } = await q.order('data_resultado', {ascending:true}).order('paciente_nome', {ascending:true}).order('id', {ascending:true}).range(ini, ini + passo - 1);
+      if(error) throw new Error(error.message);
+      exames.push(...data);
+      if(data.length < passo) break;
+    }
+    if(!exames.length){ backupStatus('<div style="font-size:13.5px;">Nenhum resultado liberado nesse período.</div>'); showToast('Nenhum resultado nesse período.'); return; }
+    if(opts.max) exames = exames.slice(0, opts.max);
+    const partes = Math.ceil(exames.length / BACKUP_PDF_PARTE);
+    const periodo = de || ate ? `${de ? isoToBR(de) : 'início'} a ${ate ? isoToBR(ate) : 'hoje'}` : 'todos os períodos';
+    for(let i = 0; i < partes; i++){
+      const lote = exames.slice(i * BACKUP_PDF_PARTE, (i + 1) * BACKUP_PDF_PARTE);
+      backupStatus(`<div style="font-size:13.5px;"><b>Gerando o arquivo ${i+1} de ${partes}…</b> (${lote.length} laudos, ${periodo}). Não feche esta tela.<br><span style="opacity:.75;">Cada arquivo leva em torno de 15 segundos.</span></div>`);
+      await new Promise(r=>setTimeout(r, 50));
+      const nome = `Backup_resultados_laboratorio_${isoLocal(new Date())}_parte_${String(i+1).padStart(2,'0')}_de_${String(partes).padStart(2,'0')}`;
+      const pdf = await baixarPDFdeHTML(lote.map(filaLabFolhaResultado).join(''), nome, opts.semSalvar ? {semSalvar:true} : undefined);
+      if(!pdf) throw new Error('Falha ao gerar o arquivo ' + (i+1) + ' de ' + partes + '.');
+      resultados.push({parte:i+1, laudos:lote.length, paginas: pdf.getNumberOfPages()});
+    }
+    try{ localStorage.setItem('backup_ultimo', new Date().toISOString()); }catch(e){}
+    const paginas = resultados.reduce((s,r)=>s + r.paginas, 0);
+    backupStatus(`<div style="font-size:13.5px;"><b>✔ ${exames.length} laudos salvos em ${partes} arquivo(s) PDF</b> (${paginas} páginas), na pasta Downloads do computador.<br>Nome: <i>Backup_resultados_laboratorio_…_parte_01_de_${String(partes).padStart(2,'0')}.pdf</i> e seguintes. Se o navegador perguntar, permita baixar vários arquivos.</div>`);
+    showToast(`${partes} arquivo(s) PDF gerado(s).`);
+    return resultados;
+  }catch(e){
+    console.error(e);
+    backupStatus(`<div style="color:#b00020;font-size:13.5px;"><b>Não foi possível gerar o PDF.</b> ${escH(e.message || e)}</div>`);
+    showToast('Erro ao gerar o PDF.');
+  }finally{
+    backupPdfDiretoRodando = false;
     if(btn) btn.disabled = false;
   }
 }
