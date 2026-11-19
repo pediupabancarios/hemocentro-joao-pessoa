@@ -5125,6 +5125,18 @@ function filaLabAtrasado(r){
   return r.situacao !== 'Concluído' && diasDesdeISO(r.data) > FILA_LAB_DIAS_ATRASO;
 }
 
+// Lê uma consulta inteira, de 1000 em 1000 (o Supabase corta em 1000 linhas por consulta, mesmo com .limit maior).
+// fazerConsulta() deve devolver a consulta já ordenada de forma estável (ex.: ordem + id).
+async function lerTudoEmPaginas(fazerConsulta){
+  const todas = [], passo = 1000;
+  for(let de = 0; ; de += passo){
+    const { data, error } = await fazerConsulta().range(de, de + passo - 1);
+    if(error) return {data:null, error};
+    todas.push(...(data || []));
+    if(!data || data.length < passo) return {data:todas, error:null};
+  }
+}
+
 // O Supabase devolve no máximo 1000 linhas por consulta: busca de 1000 em 1000 até acabar
 async function buscarTodasSolicitacoes(colunas){
   const todas = [], passo = 1000;
@@ -5355,8 +5367,8 @@ function filaLabDiaEscolhido(){
 
 // Busca no banco os exames concluídos cuja liberação foi no dia (ISO)
 async function filaLabResultadosDoDia(dia){
-  const { data, error } = await supabaseClient.from('solicitacoes_exames').select('*')
-    .eq('situacao','Concluído').eq('data_resultado', dia).order('paciente_nome', {ascending:true}).limit(2000);
+  const { data, error } = await lerTudoEmPaginas(()=>supabaseClient.from('solicitacoes_exames').select('*')
+    .eq('situacao','Concluído').eq('data_resultado', dia).order('paciente_nome', {ascending:true}).order('id', {ascending:true}));
   if(error){ console.error(error); showToast('Erro ao buscar os resultados do dia.'); return null; }
   return data || [];
 }
@@ -5574,7 +5586,7 @@ async function labExCarregar(){
 }
 async function labCarregarParciais(){
   if(!supabaseConfigured) return;
-  const { data } = await supabaseClient.from('solicitacoes_exames').select('id, parametros_json').neq('situacao','Concluído').not('parametros_json','is',null).limit(2000);
+  const { data } = await lerTudoEmPaginas(()=>supabaseClient.from('solicitacoes_exames').select('id, parametros_json').neq('situacao','Concluído').not('parametros_json','is',null).order('id', {ascending:true}));
   labParciais = {};
   (data || []).forEach(x=>{ try{ const m = JSON.parse(x.parametros_json); if(m && m.modelos) labParciais[x.id] = m.modelos; else if(m && m.v === 2) labParciais[x.id] = {[m.modelo]: m}; }catch(e){} });
 }
