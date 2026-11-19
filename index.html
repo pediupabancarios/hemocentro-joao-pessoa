@@ -6099,12 +6099,25 @@ function relLabTemplate(){
    A lista de pacientes é carregada no login. Se outra pessoa (ex.: recepção) edita um cadastro, quem já está logado
    continuava vendo o dado antigo. Aqui a lista é recarregada de tempos em tempos, ao voltar para a aba e antes de imprimir. */
 let _pacRecarregadoEm = 0;
+// O Supabase devolve no máximo 1000 linhas por consulta: busca os pacientes de 1000 em 1000 até acabar
+// (sem isso, quem foi cadastrado depois do 1000º paciente "sumia" da lista e dava "Paciente não encontrado")
+async function buscarTodosPacientes(){
+  const todos = [], passo = 1000;
+  for(let de = 0; ; de += passo){
+    const { data, error } = await supabaseClient.from('pacientes').select('*')
+      .order('created_at', {ascending:true}).order('id', {ascending:true}).range(de, de + passo - 1);
+    if(error) return {data:null, error};
+    todos.push(...(data || []));
+    if(!data || data.length < passo) return {data:todos, error:null};
+  }
+}
+
 async function recarregarPacientes(forcar){
   if(!supabaseConfigured || !currentUser) return false;
   if(!forcar && Date.now() - _pacRecarregadoEm < 30000) return false;
   _pacRecarregadoEm = Date.now();
   try{
-    const { data, error } = await supabaseClient.from('pacientes').select('*').order('created_at', {ascending:true});
+    const { data, error } = await buscarTodosPacientes();
     if(error || !data) return false;
     const mudou = JSON.stringify(data) !== JSON.stringify(pacientesList);
     pacientesList = data;
@@ -9269,7 +9282,7 @@ async function initFromSupabase(){
     return;
   }
   try{
-    const pacRes = await supabaseClient.from('pacientes').select('*').order('created_at', {ascending:true});
+    const pacRes = await buscarTodosPacientes();
     if(pacRes.data && pacRes.data.length) pacientesList = pacRes.data;
     currentPacienteId = null;                 // ao abrir, nenhum paciente fica ativo: a pessoa escolhe quem vai atender
     await loadDocumentosDoPaciente();         // sem paciente: só limpa as listas
